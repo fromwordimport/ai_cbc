@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0.0",
+  "schema_name": "psychologies",
+  "description": "心理维度标签体系（Layer 3）",
+  "dimensions": [
+    {
+      "id": "core_values",
+      "name": "核心价值观",
+      "description": "个人生活中最重视的价值观",
+      "type": "multi_select",
+      "options": [
+        "家庭幸福",
+        "事业成就",
+        "健康身心",
+        "个人成长/自我实现",
+        "财富自由",
+        "社会贡献/利他",
+        "自由独立",
+        "快乐享受",
+        "安全与秩序",
+        "权力与影响力",
+        "享乐主义"
+      ]
+    },
+    {
+      "id": "core_anxieties",
+      "name": "核心焦虑",
+      "description": "当前阶段的主要焦虑来源",
+      "type": "multi_select",
+      "options": [
+        "中年危机",
+        "35岁焦虑",
+        "同辈压力",
+        "育儿焦虑",
+        "养老焦虑",
+        "健康焦虑",
+        "职业倦怠",
+        "身份迷茫/转型期"
+      ]
+    },
+    {
+      "id": "tension_combination",
+      "name": "张力组合",
+      "description": "内在矛盾标签组合及其叙事解释",
+      "type": "composite",
+      "sub_fields": [
+        {
+          "id": "labels",
+          "name": "矛盾标签组合",
+          "type": "multi_select",
+          "description": "表面行为与深层动机不一致的标签组合"
+        },
+        {
+          "id": "narrative_explanation",
+          "name": "叙事解释",
+          "type": "text",
+          "description": "对张力组合的心理叙事解释，不少于50字"
+        }
+      ]
+    },
+    {
+      "id": "secret_motivation",
+      "name": "隐藏动机",
+      "description": "驱动消费行为的深层、未言明的心理动机",
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "defense_mechanism",
+      "name": "防御机制",
+      "description": "面对消费决策冲突时采用的心理防御策略",
+      "type": "text",
+      "options": []
+    }
+  ]
+}

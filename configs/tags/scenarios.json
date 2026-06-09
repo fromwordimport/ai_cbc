@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "schema_name": "scenarios",
+  "description": "情境维度标签体系（Layer 4）",
+  "dimensions": [
+    {
+      "id": "daily_routine",
+      "name": "日常生活",
+      "description": "典型的一天生活轨迹与节奏",
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "purchase_trigger",
+      "name": "购买触发",
+      "description": "引发购买行为的具体触发事件或情境",
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "stress_response",
+      "name": "压力反应",
+      "description": "在压力或焦虑状态下的典型反应模式",
+      "type": "text",
+      "options": []
+    },
+    {
+      "id": "social_behavior",
+      "name": "社交行为",
+      "description": "在社交网络与线下社交中的行为特征",
+      "type": "text",
+      "options": []
+    }
+  ]
+}
