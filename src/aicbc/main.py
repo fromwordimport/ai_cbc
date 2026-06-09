@@ -4,7 +4,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from aicbc.api.routes import health, personas, questionnaires, simulations
+from aicbc.api.routes import health, personas, questionnaires, responses, simulations
 from aicbc.config.settings import get_settings
 
 settings = get_settings()
@@ -23,6 +23,7 @@ app.include_router(health.router, tags=["Health"])
 app.include_router(personas.router, prefix="/api/v1", tags=["Personas"])
 app.include_router(simulations.router, prefix="/api/v1", tags=["Simulations"])
 app.include_router(questionnaires.router, prefix="/api/v1", tags=["Questionnaires"])
+app.include_router(responses.router, prefix="/api/v1", tags=["Responses"])
 
 
 @app.exception_handler(Exception)

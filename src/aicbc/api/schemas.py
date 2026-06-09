@@ -417,3 +417,60 @@ class QuestionnaireDetailResponse(BaseModel):
             ],
             created_at=q.created_at,
         )
+
+
+# ---------------------------------------------------------------------------
+# Response simulation
+# ---------------------------------------------------------------------------
+
+
+class SimulateResponsesRequest(BaseModel):
+    """Request to simulate persona responses for a study."""
+
+    persona_ids: list[str] = Field(
+        ..., min_length=1, max_length=100, description="List of persona IDs to simulate"
+    )
+    deterministic: bool = Field(
+        default=False, description="If True, always pick max-utility option"
+    )
+    seed: int | None = Field(default=None, description="Random seed for reproducibility")
+
+
+class SimulatedResponseSummary(BaseModel):
+    """Summary of a single simulated response."""
+
+    persona_id: str
+    response_id: str
+    completion_status: str
+    n_choice_sets_answered: int
+
+
+class SimulateResponsesResponse(BaseModel):
+    """Response for batch response simulation."""
+
+    study_id: str
+    questionnaire_id: str
+    simulated: int
+    failed: int
+    summaries: list[SimulatedResponseSummary]
+
+
+class RawDatasetExportResponse(BaseModel):
+    """CBCRawDataset export response."""
+
+    study_id: str
+    n_respondents: int
+    n_choice_sets: int
+    n_alternatives: int
+    n_total_records: int
+    choice_records: list[dict[str, Any]]
+
+
+class PersonaResponseSummary(BaseModel):
+    """Light-weight response representation for list views."""
+
+    response_id: str
+    persona_id: str
+    completion_status: str
+    n_answers: int
+    created_at: datetime

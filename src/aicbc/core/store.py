@@ -10,6 +10,7 @@ import threading
 
 from aicbc.core.models.persona import PersonaProfile
 from aicbc.questionnaire.models import CBCQuestionnaire, CBCStudy
+from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
 
 
 class QuestionnaireStore:
@@ -81,6 +82,63 @@ class QuestionnaireStore:
         with self._lock:
             self._studies.clear()
             self._questionnaires.clear()
+
+
+class ResponseStore:
+    """Thread-safe in-memory store for persona responses and raw datasets."""
+
+    def __init__(self) -> None:
+        self._responses: dict[str, PersonaResponse] = {}  # key = response_id
+        self._datasets: dict[str, CBCRawDataset] = {}  # key = study_id
+        self._lock = threading.Lock()
+
+    def save_response(self, response: PersonaResponse) -> None:
+        """Store a single persona response."""
+        with self._lock:
+            self._responses[response.response_id] = response
+
+    def get_response(self, response_id: str) -> PersonaResponse | None:
+        """Retrieve a response by ID."""
+        with self._lock:
+            return self._responses.get(response_id)
+
+    def list_responses_by_study(
+        self,
+        study_id: str,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> tuple[list[PersonaResponse], int]:
+        """Query responses for a study."""
+        with self._lock:
+            items = [
+                r for r in self._responses.values() if r.study_id == study_id
+            ]
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return items[start:end], total
+
+    def save_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
+        """Store (or merge) a raw dataset for a study."""
+        with self._lock:
+            existing = self._datasets.get(study_id)
+            if existing is not None:
+                merged_records = existing.choice_records + dataset.choice_records
+                existing.choice_records = merged_records
+                existing.metadata.n_respondents += dataset.metadata.n_respondents
+            else:
+                self._datasets[study_id] = dataset
+
+    def get_dataset(self, study_id: str) -> CBCRawDataset | None:
+        """Retrieve the raw dataset for a study."""
+        with self._lock:
+            return self._datasets.get(study_id)
+
+    def clear(self) -> None:
+        """Clear all stored responses and datasets."""
+        with self._lock:
+            self._responses.clear()
+            self._datasets.clear()
 
 
 class PersonaStore:
@@ -162,6 +220,7 @@ class PersonaStore:
 # Module-level singletons
 _store: PersonaStore | None = None
 _questionnaire_store: QuestionnaireStore | None = None
+_response_store: ResponseStore | None = None
 
 
 def get_store() -> PersonaStore:
@@ -178,3 +237,11 @@ def get_questionnaire_store() -> QuestionnaireStore:
     if _questionnaire_store is None:
         _questionnaire_store = QuestionnaireStore()
     return _questionnaire_store
+
+
+def get_response_store() -> ResponseStore:
+    """Return the global ResponseStore singleton."""
+    global _response_store
+    if _response_store is None:
+        _response_store = ResponseStore()
+    return _response_store
