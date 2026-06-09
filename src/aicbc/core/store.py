@@ -9,6 +9,78 @@ from __future__ import annotations
 import threading
 
 from aicbc.core.models.persona import PersonaProfile
+from aicbc.questionnaire.models import CBCQuestionnaire, CBCStudy
+
+
+class QuestionnaireStore:
+    """Thread-safe in-memory store for CBC studies and questionnaires."""
+
+    def __init__(self) -> None:
+        self._studies: dict[str, CBCStudy] = {}
+        self._questionnaires: dict[str, CBCQuestionnaire] = {}
+        self._lock = threading.Lock()
+
+    # ------------------------------------------------------------------
+    # Study CRUD
+    # ------------------------------------------------------------------
+
+    def save_study(self, study: CBCStudy) -> None:
+        """Store a study (upsert)."""
+        with self._lock:
+            self._studies[study.study_id] = study
+
+    def get_study(self, study_id: str) -> CBCStudy | None:
+        """Retrieve a study by ID."""
+        with self._lock:
+            return self._studies.get(study_id)
+
+    def delete_study(self, study_id: str) -> bool:
+        """Delete a study and its questionnaire by ID."""
+        with self._lock:
+            deleted = study_id in self._studies
+            if deleted:
+                del self._studies[study_id]
+                self._questionnaires.pop(study_id, None)
+            return deleted
+
+    def list_studies(
+        self,
+        *,
+        product_category: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[CBCStudy], int]:
+        """Query studies with optional filters."""
+        with self._lock:
+            items = list(self._studies.values())
+
+        if product_category is not None:
+            items = [s for s in items if s.product_category == product_category]
+
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return items[start:end], total
+
+    # ------------------------------------------------------------------
+    # Questionnaire CRUD
+    # ------------------------------------------------------------------
+
+    def save_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
+        """Store a questionnaire, keyed by study_id."""
+        with self._lock:
+            self._questionnaires[questionnaire.study_id] = questionnaire
+
+    def get_questionnaire(self, study_id: str) -> CBCQuestionnaire | None:
+        """Retrieve the questionnaire for a study."""
+        with self._lock:
+            return self._questionnaires.get(study_id)
+
+    def clear(self) -> None:
+        """Clear all stored studies and questionnaires."""
+        with self._lock:
+            self._studies.clear()
+            self._questionnaires.clear()
 
 
 class PersonaStore:
@@ -87,8 +159,9 @@ class PersonaStore:
             self._data.clear()
 
 
-# Module-level singleton
+# Module-level singletons
 _store: PersonaStore | None = None
+_questionnaire_store: QuestionnaireStore | None = None
 
 
 def get_store() -> PersonaStore:
@@ -97,3 +170,11 @@ def get_store() -> PersonaStore:
     if _store is None:
         _store = PersonaStore()
     return _store
+
+
+def get_questionnaire_store() -> QuestionnaireStore:
+    """Return the global QuestionnaireStore singleton."""
+    global _questionnaire_store
+    if _questionnaire_store is None:
+        _questionnaire_store = QuestionnaireStore()
+    return _questionnaire_store

@@ -263,3 +263,157 @@ class PurchaseDecisionResponse(BaseModel):
     confidence: float = Field(..., ge=0, le=1)
     stages: list[dict[str, Any]]
     stage_count: int
+
+
+# ---------------------------------------------------------------------------
+# CBC Studies
+# ---------------------------------------------------------------------------
+
+
+class CreateStudyRequest(BaseModel):
+    """Request to create a new CBC study."""
+
+    study_id: str = Field(..., description="Unique study identifier")
+    product_category: str = Field(..., description="Product category")
+    research_goal: str = Field(..., description="Research objective")
+    target_segments: list[str] = Field(default_factory=list, description="Target consumer segments")
+
+
+class StudySummary(BaseModel):
+    """Light-weight study representation for list views."""
+
+    study_id: str
+    product_category: str
+    research_goal: str
+    status: str
+    created_at: datetime
+
+    @classmethod
+    def from_study(cls, study: Any) -> StudySummary:
+        """Build a summary from a CBCStudy."""
+        return cls(
+            study_id=study.study_id,
+            product_category=study.product_category,
+            research_goal=study.research_goal,
+            status=study.status.value,
+            created_at=study.created_at,
+        )
+
+
+class StudyDetailResponse(BaseModel):
+    """Full study definition response."""
+
+    study_id: str
+    product_category: str
+    research_goal: str
+    target_segments: list[str]
+    status: str
+    n_attributes: int
+    n_choice_sets: int
+    n_alternatives: int
+    algorithm: str
+    include_none: bool
+    created_at: datetime
+
+    @classmethod
+    def from_study(cls, study: Any) -> StudyDetailResponse:
+        """Build a detail response from a CBCStudy."""
+        return cls(
+            study_id=study.study_id,
+            product_category=study.product_category,
+            research_goal=study.research_goal,
+            target_segments=study.target_segments,
+            status=study.status.value,
+            n_attributes=len(study.attributes),
+            n_choice_sets=study.design_parameters.n_choice_sets,
+            n_alternatives=study.design_parameters.n_alternatives,
+            algorithm=study.design_parameters.algorithm.value,
+            include_none=study.design_parameters.include_none,
+            created_at=study.created_at,
+        )
+
+
+class StudyListResponse(BaseModel):
+    """Response for study list queries."""
+
+    total: int
+    page: int
+    page_size: int
+    studies: list[StudySummary]
+
+
+# ---------------------------------------------------------------------------
+# CBC Questionnaires
+# ---------------------------------------------------------------------------
+
+
+class AlternativeView(BaseModel):
+    """A single alternative in a choice set."""
+
+    alt_index: int
+    attributes: dict[str, Any]
+
+
+class ChoiceSetView(BaseModel):
+    """A single choice set (question)."""
+
+    choice_set_id: int
+    alternatives: list[AlternativeView]
+
+
+class GenerateQuestionnaireResponse(BaseModel):
+    """Response for questionnaire generation."""
+
+    study_id: str
+    questionnaire_id: str
+    algorithm: str
+    d_efficiency: float | None
+    a_efficiency: float | None
+    n_choice_sets: int
+    n_alternatives: int
+    include_none: bool
+    validation_passed: bool
+    validation_errors: list[str]
+
+
+class QuestionnaireDetailResponse(BaseModel):
+    """Full questionnaire with all choice sets."""
+
+    questionnaire_id: str
+    study_id: str
+    algorithm: str
+    d_efficiency: float | None
+    a_efficiency: float | None
+    n_choice_sets: int
+    n_alternatives: int
+    include_none: bool
+    choice_sets: list[ChoiceSetView]
+    created_at: datetime
+
+    @classmethod
+    def from_questionnaire(cls, q: Any) -> QuestionnaireDetailResponse:
+        """Build a detail response from a CBCQuestionnaire."""
+        return cls(
+            questionnaire_id=q.questionnaire_id,
+            study_id=q.study_id,
+            algorithm=q.design_parameters.algorithm.value,
+            d_efficiency=q.d_efficiency,
+            a_efficiency=q.a_efficiency,
+            n_choice_sets=len(q.choice_sets),
+            n_alternatives=q.design_parameters.n_alternatives,
+            include_none=q.design_parameters.include_none,
+            choice_sets=[
+                ChoiceSetView(
+                    choice_set_id=cs.choice_set_id,
+                    alternatives=[
+                        AlternativeView(
+                            alt_index=alt.alt_index,
+                            attributes=alt.attributes,
+                        )
+                        for alt in cs.alternatives
+                    ],
+                )
+                for cs in q.choice_sets
+            ],
+            created_at=q.created_at,
+        )
