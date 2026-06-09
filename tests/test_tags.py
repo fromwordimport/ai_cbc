@@ -247,7 +247,7 @@ def test_tension_combination_valid() -> None:
     """TensionCombination must accept valid data with narrative >= 50 chars."""
     tc = TensionCombination(
         labels=["收入高", "极简主义", "对促销高度敏感"],
-        narrative_explanation="她年薪五十万却坚持极简生活，表面是理性消费，实则是童年物质匮乏导致的补偿性控制。",
+        narrative_explanation="她年薪五十万却坚持极简生活，表面上是理性消费的选择，实则是童年物质匮乏经历在她心理上留下的深刻烙印，一种通过控制消费来获得安全感的补偿机制。",
     )
     assert len(tc.narrative_explanation) >= 50
 
@@ -268,7 +268,7 @@ def test_layer3_psychology_valid() -> None:
         core_anxieties=["时间不够用", "家务分工矛盾"],
         tension_combination=TensionCombination(
             labels=["精致品质", "凑单退单高手"],
-            narrative_explanation="她追求精致生活却总在凑单后退掉不需要的商品，这种矛盾源于她既想享受品质又害怕浪费金钱的深层焦虑。",
+            narrative_explanation="她追求精致生活却总在凑单后退掉不需要的商品，这种表面矛盾实际上是她内心深处既渴望品质生活又极度害怕浪费金钱的心理拉锯战。",
         ),
         secret_motivation="用科技产品证明自己的生活品味",
         defense_mechanism="合理化：说服自己这是长期投资",
@@ -324,7 +324,7 @@ def _make_valid_persona() -> PersonaProfile:
             core_anxieties=["时间不够用", "家务分工矛盾"],
             tension_combination=TensionCombination(
                 labels=["追求品质", "精打细算"],
-                narrative_explanation="她追求高品质生活却又极度精打细算，这种表面矛盾实际上是她对自我价值认同的一种保护机制。",
+                narrative_explanation="她追求高品质生活却又极度精打细算，这种表面上的消费矛盾实际上是她对自我价值认同的一种深层心理保护机制，用来平衡理想与现实之间的巨大落差。",
             ),
             secret_motivation="用科技产品证明自己的生活品味",
             defense_mechanism="合理化：说服自己这是长期投资",
@@ -337,8 +337,8 @@ def _make_valid_persona() -> PersonaProfile:
         ),
         language_samples=[
             "洗碗机真的是解放双手的神器，后悔没早买！",
-            "对比了三个品牌，最后还是选了性价比最高的。",
-            "安装师傅很专业，半小时就搞定了。",
+            "对比了三个品牌，最后还是选了性价比最高的那款。",
+            "安装师傅非常专业，只用了半小时就全部搞定了。",
         ],
         dishwasher_context=DishwasherContext(
             purchase_constraints=["厨房空间小", "租房不能大改"],

@@ -11,7 +11,7 @@ class TensionPair(BaseModel):
     tag_a: str = Field(..., description="First tag in the tension pair")
     tag_b: str = Field(..., description="Second tag in the tension pair")
     tension_value: float = Field(
-        ..., ge=0.0, le=1.0, description="Tension strength between 0 and 1"
+        ..., description="Tension strength between 0 and 1"
     )
     narrative: str = Field(
         default="", description="Psychological narrative explaining the tension"
@@ -48,8 +48,6 @@ class SeedConfig(BaseModel):
     )
     tension_score: float = Field(
         default=0.0,
-        ge=0.0,
-        le=1.0,
         description="Overall tension score (0 = no tension, 1 = maximum tension)",
     )
     tension_pairs: list[TensionPair] = Field(

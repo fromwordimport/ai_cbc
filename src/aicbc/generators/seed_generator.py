@@ -203,9 +203,13 @@ TAG_ALIASES: dict[str, list[str]] = {
 }
 
 
-def _weighted_choice(options: list[str], weights: list[float]) -> str:
+def _weighted_choice(
+    options: list[str], weights: list[float], rng: random.Random | None = None
+) -> str:
     """Return a single option sampled according to the given weights."""
-    return random.choices(options, weights=weights, k=1)[0]
+    if rng is None:
+        return random.choices(options, weights=weights, k=1)[0]
+    return rng.choices(options, weights=weights, k=1)[0]
 
 
 def _sample_anxieties(life_stage: str, rng: random.Random) -> list[str]:
@@ -253,7 +257,7 @@ def _sample_income_bracket(
         total = sum(weights)
     weights = [w / total for w in weights]
 
-    return _weighted_choice(INCOME_BRACKETS, weights)
+    return _weighted_choice(INCOME_BRACKETS, weights, rng=rng)
 
 
 class SeedGenerator:
@@ -283,8 +287,8 @@ class SeedGenerator:
             A SeedConfig containing life_stage, anxieties, income_bracket,
             city_tier, tension_score, and tension_pairs.
         """
-        life_stage = _weighted_choice(LIFE_STAGES, LIFE_STAGE_WEIGHTS)
-        city_tier = _weighted_choice(CITY_TIERS, CITY_TIER_WEIGHTS)
+        life_stage = _weighted_choice(LIFE_STAGES, LIFE_STAGE_WEIGHTS, rng=self._rng)
+        city_tier = _weighted_choice(CITY_TIERS, CITY_TIER_WEIGHTS, rng=self._rng)
         anxieties = _sample_anxieties(life_stage, self._rng)
         income_bracket = _sample_income_bracket(city_tier, life_stage, self._rng)
 
@@ -297,7 +301,7 @@ class SeedGenerator:
         # Add a few behavioural tags so that tension detection has
         # something to work with beyond the skeleton triad.
         extra_tags = self._sample_extra_tags(life_stage, income_bracket)
-        tags.update(extra_tags.keys())
+        tags.update(extra_tags.values())
 
         tension_pairs = self.calculate_tension(tags)
         tension_score = self._aggregate_tension(tension_pairs)

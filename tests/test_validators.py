@@ -276,7 +276,7 @@ class TestLogicValidator:
         """RULE-005: language sample > 60 chars should fail."""
         valid_persona.language_samples = [
             "洗碗机真是解放双手的神器，每天省下半小时太值了。",
-            "我比较看重能耗等级，长期使用电费也是一笔不小的开销，必须精打细算才行。",
+            "我比较看重能耗等级，长期使用电费也是一笔不小的开销，必须精打细算才能对得起自己辛苦赚来的每一分钱。",
             "品牌口碑很重要，朋友推荐比广告更让我信任。",
         ]
         result = logic_validator.validate(valid_persona)
