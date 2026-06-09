@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from aicbc.llm.client import LLMClient, LLMResponse, Provider, _estimate_cost
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -221,16 +219,19 @@ def test_generate_retries_and_raises(client, mock_settings):
     """After max_retries failures the client should raise RuntimeError."""
     from anthropic import APIError as AnthropicAPIError
 
-    with patch.object(
-        client._anthropic.messages,
-        "create",
-        side_effect=AnthropicAPIError("Boom", request=MagicMock(), body=None),
-    ), patch("aicbc.llm.client.time.sleep") as mock_sleep:
-        with pytest.raises(RuntimeError, match="failed after 3 attempts"):
-            client.generate(
-                messages=[{"role": "user", "content": "Hi"}],
-                model="claude-sonnet-4-6",
-            )
+    with (
+        patch.object(
+            client._anthropic.messages,
+            "create",
+            side_effect=AnthropicAPIError("Boom", request=MagicMock(), body=None),
+        ),
+        patch("aicbc.llm.client.time.sleep") as mock_sleep,
+        pytest.raises(RuntimeError, match="failed after 3 attempts"),
+    ):
+        client.generate(
+            messages=[{"role": "user", "content": "Hi"}],
+            model="claude-sonnet-4-6",
+        )
 
     # Exponential backoff: 1s, 2s (2^(1), 2^(2) ... attempt-1)
     assert mock_sleep.call_count == 2
@@ -282,12 +283,16 @@ def test_generate_json_raises_on_bad_json(client):
     """generate_json should raise RuntimeError when content is not valid JSON."""
     mock_response = _build_openai_response("not json", 5, 5)
 
-    with patch.object(client._openai.chat.completions, "create", return_value=mock_response):
-        with pytest.raises(RuntimeError, match="Failed to parse LLM response as JSON"):
-            client.generate_json(
-                messages=[{"role": "user", "content": "Info"}],
-                model="gpt-4o",
-            )
+    with (
+        patch.object(
+            client._openai.chat.completions, "create", return_value=mock_response
+        ),
+        pytest.raises(RuntimeError, match="Failed to parse LLM response as JSON"),
+    ):
+        client.generate_json(
+            messages=[{"role": "user", "content": "Info"}],
+            model="gpt-4o",
+        )
 
 
 # ---------------------------------------------------------------------------

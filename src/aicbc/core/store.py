@@ -7,7 +7,6 @@ Production will switch to MongoDB (Beanie) or a persistent store.
 from __future__ import annotations
 
 import threading
-from typing import Any
 
 from aicbc.core.models.persona import PersonaProfile
 

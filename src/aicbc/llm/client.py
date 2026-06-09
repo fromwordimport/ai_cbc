@@ -5,19 +5,21 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import structlog
-from anthropic import Anthropic, APIError as AnthropicAPIError
-from openai import OpenAI, APIError as OpenAIAPIError
+from anthropic import Anthropic
+from anthropic import APIError as AnthropicAPIError
+from openai import APIError as OpenAIAPIError
+from openai import OpenAI
 
 from aicbc.config.settings import get_settings
 
 logger = structlog.get_logger("aicbc.llm")
 
 
-class Provider(str, Enum):
+class Provider(StrEnum):
     """Supported LLM providers."""
 
     ANTHROPIC = "anthropic"

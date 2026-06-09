@@ -7,28 +7,21 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from aicbc.core.models.persona import (
     DishwasherContext,
-    Layer1Demographics,
-    Layer2Behavior,
-    Layer3Psychology,
-    Layer4Scenarios,
     PersonaProfile,
-    TensionCombination,
 )
 from aicbc.core.models.seed_config import SeedConfig, TensionPair
 from aicbc.generators.profile_generator import (
-    DEFAULT_PROMPT_PATH,
+    _LAYER_FALLBACKS,
     ProfileGenerationError,
     ProfileGenerator,
-    _LAYER_FALLBACKS,
 )
 from aicbc.llm.client import LLMResponse, Provider
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

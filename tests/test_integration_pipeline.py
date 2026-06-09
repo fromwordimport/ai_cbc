@@ -16,11 +16,10 @@ import pytest
 
 from aicbc.core.models.persona import PersonaProfile
 from aicbc.core.models.seed_config import SeedConfig
-from aicbc.core.validators import LogicValidator, SchemaValidator, ValidationResult
-from aicbc.generators.profile_generator import ProfileGenerator, _LAYER_FALLBACKS
+from aicbc.core.validators import LogicValidator, SchemaValidator
+from aicbc.generators.profile_generator import _LAYER_FALLBACKS, ProfileGenerator
 from aicbc.generators.seed_generator import SeedGenerator
 from aicbc.llm.client import LLMResponse, Provider
-
 
 # ---------------------------------------------------------------------------
 # Helpers: mock LLM response builders
@@ -136,7 +135,7 @@ def mock_llm_client() -> MagicMock:
 
 
 @pytest.fixture
-def pipeline(mock_llm_client: MagicMock) -> "PersonaPipeline":
+def pipeline(mock_llm_client: MagicMock) -> PersonaPipeline:
     """Return a wired-up pipeline with mock LLM."""
     return PersonaPipeline(llm_client=mock_llm_client)
 
@@ -329,7 +328,7 @@ class TestReproducibility:
                 _mock_response(_auxiliary()),
             ]
             seed_a = seed_gen_a.generate_seed()
-            result_a = pipeline_a.generate_and_validate(f"persona-repr-{i}", seed_a)
+            pipeline_a.generate_and_validate(f"persona-repr-{i}", seed_a)
 
             mock_llm_client.generate.side_effect = [
                 _mock_response(_layer1()),
@@ -339,7 +338,7 @@ class TestReproducibility:
                 _mock_response(_auxiliary()),
             ]
             seed_b = seed_gen_b.generate_seed()
-            result_b = pipeline_b.generate_and_validate(f"persona-repr2-{i}", seed_b)
+            pipeline_b.generate_and_validate(f"persona-repr2-{i}", seed_b)
 
             assert seed_a.life_stage == seed_b.life_stage
             assert seed_a.city_tier == seed_b.city_tier

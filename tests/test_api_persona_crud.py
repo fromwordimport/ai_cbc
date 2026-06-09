@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 from aicbc.api.dependencies import (
@@ -15,7 +13,6 @@ from aicbc.api.dependencies import (
     get_schema_validator,
     get_seed_generator,
 )
-from aicbc.core.models.persona import PersonaProfile
 from aicbc.core.store import PersonaStore, get_store
 from aicbc.core.validators import LogicValidator, SchemaValidator
 from aicbc.generators.profile_generator import ProfileGenerator

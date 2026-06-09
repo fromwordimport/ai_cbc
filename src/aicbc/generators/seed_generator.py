@@ -7,7 +7,6 @@ from typing import Any
 
 from aicbc.core.models.seed_config import SeedConfig, TensionPair
 
-
 # ---------------------------------------------------------------------------
 # Static configuration tables derived from the tag system and design docs.
 # ---------------------------------------------------------------------------

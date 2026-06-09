@@ -14,7 +14,6 @@ from aicbc.core.models.persona import (
 )
 from aicbc.core.validators import LogicValidator, SchemaValidator, ValidationResult
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

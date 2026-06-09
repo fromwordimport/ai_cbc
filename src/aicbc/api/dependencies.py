@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import Request
 
 from aicbc.config.settings import Settings, get_settings
+from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
+from aicbc.core.scoring.bias_auditor import BiasAuditor
+from aicbc.core.simulation.behavior_simulator import BehaviorSimulator
 from aicbc.core.validators import LogicValidator, SchemaValidator
 from aicbc.generators.profile_generator import ProfileGenerator
 from aicbc.generators.seed_generator import SeedGenerator
@@ -20,6 +22,9 @@ _seed_generator: SeedGenerator | None = None
 _profile_generator: ProfileGenerator | None = None
 _schema_validator: SchemaValidator | None = None
 _logic_validator: LogicValidator | None = None
+_authenticity_scorer: AuthenticityScorer | None = None
+_bias_auditor: BiasAuditor | None = None
+_behavior_simulator: BehaviorSimulator | None = None
 
 
 def get_llm_client() -> LLMClient:
@@ -60,6 +65,30 @@ def get_logic_validator() -> LogicValidator:
     if _logic_validator is None:
         _logic_validator = LogicValidator()
     return _logic_validator
+
+
+def get_authenticity_scorer() -> AuthenticityScorer:
+    """Return a singleton AuthenticityScorer instance."""
+    global _authenticity_scorer
+    if _authenticity_scorer is None:
+        _authenticity_scorer = AuthenticityScorer()
+    return _authenticity_scorer
+
+
+def get_bias_auditor() -> BiasAuditor:
+    """Return a singleton BiasAuditor instance."""
+    global _bias_auditor
+    if _bias_auditor is None:
+        _bias_auditor = BiasAuditor()
+    return _bias_auditor
+
+
+def get_behavior_simulator() -> BehaviorSimulator:
+    """Return a singleton BehaviorSimulator instance."""
+    global _behavior_simulator
+    if _behavior_simulator is None:
+        _behavior_simulator = BehaviorSimulator(llm_client=get_llm_client())
+    return _behavior_simulator
 
 
 def get_settings_dep() -> Settings:

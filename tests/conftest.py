@@ -8,15 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from aicbc.api.dependencies import (
-    get_llm_client,
-    get_logic_validator,
-    get_profile_generator,
-    get_schema_validator,
-    get_seed_generator,
-)
-from aicbc.api.routes.personas import router as personas_router
-from aicbc.config.settings import Settings, get_settings
+from aicbc.config.settings import Settings
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,
@@ -27,9 +19,8 @@ from aicbc.core.models.persona import (
     PersonaProfile,
     TensionCombination,
 )
-from aicbc.core.store import PersonaStore, get_store
+from aicbc.core.store import PersonaStore
 from aicbc.llm.client import LLMResponse, Provider
-
 
 # ---------------------------------------------------------------------------
 # Settings

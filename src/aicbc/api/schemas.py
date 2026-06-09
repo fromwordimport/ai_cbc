@@ -16,7 +16,6 @@ from aicbc.core.models.persona import (
 )
 from aicbc.core.validators.validation_result import ValidationResult
 
-
 # ---------------------------------------------------------------------------
 # Batch generation
 # ---------------------------------------------------------------------------
@@ -83,7 +82,7 @@ class PersonaSummary(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_profile(cls, profile: Any) -> "PersonaSummary":
+    def from_profile(cls, profile: Any) -> PersonaSummary:
         """Build a summary from a full PersonaProfile."""
         return cls(
             persona_id=profile.persona_id,
@@ -114,7 +113,7 @@ class PersonaDetail(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_profile(cls, profile: Any) -> "PersonaDetail":
+    def from_profile(cls, profile: Any) -> PersonaDetail:
         """Build a detail view from a full PersonaProfile."""
         return cls(
             persona_id=profile.persona_id,
@@ -155,7 +154,7 @@ class ValidateResponse(BaseModel):
         persona_id: str,
         schema_result: ValidationResult,
         logic_result: ValidationResult,
-    ) -> "ValidateResponse":
+    ) -> ValidateResponse:
         """Build validation response from two ValidationResult objects."""
         return cls(
             persona_id=persona_id,
@@ -206,3 +205,61 @@ class PersonaListQuery(BaseModel):
     bias_status: str | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
+
+
+# ---------------------------------------------------------------------------
+# Behavior simulation
+# ---------------------------------------------------------------------------
+
+
+class ConverseRequest(BaseModel):
+    """Request for a single conversational turn."""
+
+    question: str = Field(..., description="研究员的提问")
+    context: dict[str, Any] = Field(default_factory=dict, description="情境上下文")
+
+
+class ConverseResponse(BaseModel):
+    """Response for a single conversational turn."""
+
+    persona_id: str
+    turn_number: int
+    researcher_question: str
+    consumer_response: str
+    emotion_tag: str
+    inconsistency_flag: bool
+
+
+class InterviewRequest(BaseModel):
+    """Request for a multi-question interview."""
+
+    questions: list[str] = Field(..., min_length=1, max_length=20, description="访谈问题列表")
+    context: dict[str, Any] = Field(default_factory=dict, description="情境上下文")
+
+
+class InterviewResponse(BaseModel):
+    """Response for a multi-question interview."""
+
+    persona_id: str
+    turns: list[ConverseResponse]
+    total_turns: int
+
+
+class PurchaseDecisionRequest(BaseModel):
+    """Request for purchase-decision simulation."""
+
+    product_name: str = Field(..., description="产品名称")
+    price_cny: float = Field(..., ge=0, description="产品价格（人民币）")
+    core_selling_points: list[str] = Field(default_factory=list, description="核心卖点")
+
+
+class PurchaseDecisionResponse(BaseModel):
+    """Response for purchase-decision simulation."""
+
+    persona_id: str
+    product_name: str
+    price_cny: float
+    final_decision: str = Field(..., description="buy / not_buy / defer")
+    confidence: float = Field(..., ge=0, le=1)
+    stages: list[dict[str, Any]]
+    stage_count: int

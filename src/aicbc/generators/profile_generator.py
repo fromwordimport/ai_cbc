@@ -17,7 +17,6 @@ from aicbc.core.models.persona import (
     Layer3Psychology,
     Layer4Scenarios,
     PersonaProfile,
-    TensionCombination,
 )
 from aicbc.core.models.seed_config import SeedConfig
 from aicbc.llm.client import LLMClient, LLMResponse

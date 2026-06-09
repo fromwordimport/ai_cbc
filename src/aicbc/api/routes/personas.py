@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import time
-from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from aicbc.api.dependencies import (
+    get_authenticity_scorer,
+    get_bias_auditor,
     get_logic_validator,
     get_profile_generator,
     get_schema_validator,
@@ -20,12 +21,12 @@ from aicbc.api.schemas import (
     GenerationErrorDetail,
     LayerResponse,
     PersonaDetail,
-    PersonaListQuery,
     PersonaListResponse,
     PersonaSummary,
     ValidateResponse,
 )
-from aicbc.core.models.persona import PersonaProfile
+from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
+from aicbc.core.scoring.bias_auditor import BiasAuditor
 from aicbc.core.store import PersonaStore, get_store
 from aicbc.core.validators import LogicValidator, SchemaValidator
 from aicbc.generators.profile_generator import ProfileGenerator
@@ -53,6 +54,8 @@ async def generate_personas_batch(
     profile_gen: ProfileGenerator = Depends(get_profile_generator),
     schema_validator: SchemaValidator = Depends(get_schema_validator),
     logic_validator: LogicValidator = Depends(get_logic_validator),
+    authenticity_scorer: AuthenticityScorer = Depends(get_authenticity_scorer),
+    bias_auditor: BiasAuditor = Depends(get_bias_auditor),
     store: PersonaStore = Depends(get_store),
 ) -> BatchGenerateResponse:
     """Generate a batch of virtual consumer personas.
@@ -94,6 +97,13 @@ async def generate_personas_batch(
                         schema_errors=schema_result.errors,
                         logic_errors=logic_result.errors,
                     )
+
+            # Run authenticity scoring and bias audit
+            auth_result = authenticity_scorer.score(profile)
+            profile.authenticity_score = auth_result.total_score
+
+            bias_result = bias_auditor.audit(profile)
+            profile.bias_audit_status = bias_result.status
 
             store.save(profile)
             personas.append(PersonaSummary.from_profile(profile))
