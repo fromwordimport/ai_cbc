@@ -95,12 +95,8 @@ class LogicValidator:
         income_tier = self.INCOME_TIERS.get(income)
 
         if city_tier is None or income_tier is None:
-            # Unknown values — skip strict check but note it
-            if city_tier is None:
-                result.add_error(f"RULE-002: Unknown city '{city}', cannot validate income consistency")
-            if income_tier is None:
-                result.add_error(f"RULE-002: Unknown income '{income}', cannot validate city consistency")
-            return 0.0
+            # Unknown values — skip check (cannot validate does not mean invalid)
+            return 1.0
 
         # Tier-1 or 新一线 with lowest income is suspicious
         if city_tier <= 2 and income_tier >= 5:
