@@ -1,0 +1,176 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "AI_CBC 系统监控",
+    "tags": ["aicbc", "production"],
+    "timezone": "Asia/Shanghai",
+    "schemaVersion": 36,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API 请求量与错误率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(aicbc_api_requests_total[5m])",
+            "legendFormat": "{{ endpoint }} - {{ method }}"
+          },
+          {
+            "expr": "rate(aicbc_api_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "Errors"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "API P95 延迟",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(aicbc_api_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{ endpoint }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "LLM API 调用与费用",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(aicbc_llm_api_calls_total[5m])",
+            "legendFormat": "Calls/sec - {{ model }}"
+          },
+          {
+            "expr": "aicbc_cost_per_persona_cny",
+            "legendFormat": "Cost/persona (CNY)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "消费者生成成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(aicbc_personas_generated_total{status=\"success\"}[1h])) / sum(rate(aicbc_personas_generated_total[1h]))",
+            "legendFormat": "成功率"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "真实性评分平均",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "aicbc_authenticity_score_average",
+            "legendFormat": "平均分"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "none",
+            "min": 0,
+            "max": 14
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "单次研究成本趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "aicbc_cost_per_study_cny",
+            "legendFormat": "成本 (CNY)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyCNY"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "安全事件",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "aicbc_injection_attempts_total",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "任务队列长度",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "aicbc_queue_size",
+            "legendFormat": "{{ queue_name }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "LLM Token 使用量",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(aicbc_llm_tokens_total[5m])",
+            "legendFormat": "{{ model }} - {{ type }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "tokps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ]
+  }
+}

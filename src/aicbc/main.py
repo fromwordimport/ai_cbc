@@ -4,8 +4,11 @@ import structlog
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from aicbc.api.routes import health, personas, questionnaires, responses, simulations
+from aicbc.analysis import routes as analysis_routes
+from aicbc.api.routes import personas, questionnaires, responses, simulations
 from aicbc.config.settings import get_settings
+from aicbc.monitoring.health import router as health_router
+from aicbc.monitoring.middleware import MetricsMiddleware, SecurityHeadersMiddleware
 
 settings = get_settings()
 logger = structlog.get_logger()
@@ -18,12 +21,17 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
 )
 
+# Add middleware
+app.add_middleware(MetricsMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Register routes
-app.include_router(health.router, tags=["Health"])
+app.include_router(health_router, tags=["Health"])
 app.include_router(personas.router, prefix="/api/v1", tags=["Personas"])
 app.include_router(simulations.router, prefix="/api/v1", tags=["Simulations"])
 app.include_router(questionnaires.router, prefix="/api/v1", tags=["Questionnaires"])
 app.include_router(responses.router, prefix="/api/v1", tags=["Responses"])
+app.include_router(analysis_routes.router, prefix="/api/v1", tags=["Analysis"])
 
 
 @app.exception_handler(Exception)

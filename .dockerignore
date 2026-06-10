@@ -1,0 +1,59 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Documentation (not needed in image)
+*.md
+docs/
+consumer-simulation/
+cbc-questionnaire-system/
+cbc-analysis-system/
+
+# Test artifacts
+tests/
+htmlcov/
+coverage.xml
+.pytest_cache/
+
+# Local data
+outputs/
+*.json
+*.csv
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Scripts (not needed in production image)
+scripts/

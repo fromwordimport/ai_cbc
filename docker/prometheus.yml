@@ -1,0 +1,80 @@
+# AI_CBC Prometheus Configuration
+# Metrics collection for API, workers, and infrastructure
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: aicbc
+    replica: '{{.ExternalURL}}'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+      # When Alertmanager is deployed, add its target here
+      # - targets: ['alertmanager:9093']
+
+rule_files:
+  # Load alerting rules
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # API Service Metrics
+  # ---------------------------------------------------------------------------
+  - job_name: 'aicbc-api'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # ---------------------------------------------------------------------------
+  # Prometheus Self-monitoring
+  # ---------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ---------------------------------------------------------------------------
+  # Node Exporter (when deployed)
+  # ---------------------------------------------------------------------------
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    # Fallback if node-exporter is not running
+    # Comment out targets above if not available
+
+  # ---------------------------------------------------------------------------
+  # MongoDB Exporter (when deployed)
+  # ---------------------------------------------------------------------------
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+
+  # ---------------------------------------------------------------------------
+  # Redis Exporter (when deployed)
+  # ---------------------------------------------------------------------------
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # ---------------------------------------------------------------------------
+  # Blackbox Exporter — HTTP Probes
+  # ---------------------------------------------------------------------------
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://api:8000/health
+          - http://api:8000/ready
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
