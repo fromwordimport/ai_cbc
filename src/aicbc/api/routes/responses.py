@@ -13,6 +13,7 @@ from aicbc.api.schemas import (
     SimulateResponsesResponse,
 )
 from aicbc.core.simulation.cbc_choice_simulator import CBCChoiceSimulator
+from aicbc.core.simulation.llm_choice_simulator import LLMChoiceSimulator
 from aicbc.core.store import (
     PersonaStore,
     ResponseStore,
@@ -60,10 +61,20 @@ async def simulate_responses(
             detail=f"Study '{study_id}' not found",
         )
 
-    log = logger.bind(study_id=study_id, n_personas=len(request.persona_ids))
+    log = logger.bind(
+        study_id=study_id,
+        n_personas=len(request.persona_ids),
+        mode=request.mode,
+    )
     log.info("batch_simulation_start")
 
-    simulator = CBCChoiceSimulator(attributes=study.attributes)
+    # Select simulator based on mode
+    if request.mode == "llm":
+        simulator: CBCChoiceSimulator | LLMChoiceSimulator = LLMChoiceSimulator(
+            attributes=study.attributes,
+        )
+    else:
+        simulator = CBCChoiceSimulator(attributes=study.attributes)
 
     summaries: list[SimulatedResponseSummary] = []
     failed = 0
@@ -77,12 +88,19 @@ async def simulate_responses(
             continue
 
         try:
-            raw_slice, persona_response = simulator.simulate(
-                persona=persona,
-                questionnaire=questionnaire,
-                deterministic=request.deterministic,
-                seed=(request.seed + idx) if request.seed is not None else None,
-            )
+            if request.mode == "llm":
+                raw_slice, persona_response = simulator.simulate(
+                    persona=persona,
+                    questionnaire=questionnaire,
+                    seed=(request.seed + idx) if request.seed is not None else None,
+                )
+            else:
+                raw_slice, persona_response = simulator.simulate(
+                    persona=persona,
+                    questionnaire=questionnaire,
+                    deterministic=request.deterministic,
+                    seed=(request.seed + idx) if request.seed is not None else None,
+                )
         except Exception as exc:
             log.error("simulation_failed", persona_id=persona_id, error=str(exc))
             failed += 1

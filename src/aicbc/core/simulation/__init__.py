@@ -5,5 +5,13 @@ from aicbc.core.simulation.behavior_simulator import (
     ConversationTurn,
     DecisionTrace,
 )
+from aicbc.core.simulation.cbc_choice_simulator import CBCChoiceSimulator
+from aicbc.core.simulation.llm_choice_simulator import LLMChoiceSimulator
 
-__all__ = ["BehaviorSimulator", "ConversationTurn", "DecisionTrace"]
+__all__ = [
+    "BehaviorSimulator",
+    "ConversationTurn",
+    "DecisionTrace",
+    "CBCChoiceSimulator",
+    "LLMChoiceSimulator",
+]

@@ -431,9 +431,14 @@ class SimulateResponsesRequest(BaseModel):
         ..., min_length=1, max_length=100, description="List of persona IDs to simulate"
     )
     deterministic: bool = Field(
-        default=False, description="If True, always pick max-utility option"
+        default=False, description="If True, always pick max-utility option (rule mode only)"
     )
     seed: int | None = Field(default=None, description="Random seed for reproducibility")
+    mode: str = Field(
+        default="rule",
+        pattern=r"^(rule|llm)$",
+        description="Simulation mode: 'rule' (fast, deterministic) or 'llm' (human-like, slower)",
+    )
 
 
 class SimulatedResponseSummary(BaseModel):
