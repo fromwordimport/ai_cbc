@@ -1,0 +1,141 @@
+# AI_CBC Render Deployment Configuration
+# For ultra-low-cost personal/small-team hosting (~$0/month).
+# This replaces the K8s staging deployment for single-user access.
+#
+# Setup:
+#   1. Fork/push repo to https://github.com/fromwordimport/ai_cbc
+#   2. Connect Render dashboard to this repo
+#   3. Render reads this file automatically on push
+#
+# Required external services (all have free tiers):
+#   - MongoDB Atlas M0 (database)
+#   - Upstash Redis (Celery broker/backend)
+#   - Cloudflare (subdomain + proxy)
+
+services:
+  # FastAPI web service
+  - type: web
+    name: aicbc-api
+    runtime: docker
+    repo: https://github.com/fromwordimport/ai_cbc.git
+    rootDir: .
+    dockerfilePath: ./docker/Dockerfile
+    # Health check endpoint used by Render
+    healthCheckPath: /health
+    # Free plan sleeps after 15 min idle; acceptable for personal use
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: 8000
+      - key: API_WORKERS
+        value: "1"
+      - key: MONGODB_DATABASE
+        value: aicbc
+      - key: MONGODB_MAX_CONNECTIONS
+        value: "20"
+      - key: REDIS_PASSWORD
+        value: ""
+      - key: COST_FUSE_SINGLE_STUDY_CNY
+        value: "100"
+      - key: COST_FUSE_DAILY_CNY
+        value: "200"
+      - key: COST_FUSE_WEEKLY_CNY
+        value: "500"
+      - key: COST_FUSE_MONTHLY_CNY
+        value: "1000"
+      # Secret values are configured in Render dashboard, not here
+      - key: MONGODB_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+        length: 32
+
+  # Celery worker for async analysis tasks
+  - type: worker
+    name: aicbc-worker
+    runtime: docker
+    repo: https://github.com/fromwordimport/ai_cbc.git
+    rootDir: .
+    dockerfilePath: ./docker/Dockerfile
+    dockerCommand: celery -A src.aicbc.analysis.tasks worker --loglevel=info --concurrency=1 -Q analysis,default
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MONGODB_DATABASE
+        value: aicbc
+      - key: MONGODB_MAX_CONNECTIONS
+        value: "20"
+      - key: REDIS_PASSWORD
+        value: ""
+      - key: COST_FUSE_SINGLE_STUDY_CNY
+        value: "100"
+      - key: COST_FUSE_DAILY_CNY
+        value: "200"
+      - key: COST_FUSE_WEEKLY_CNY
+        value: "500"
+      - key: COST_FUSE_MONTHLY_CNY
+        value: "1000"
+      - key: MONGODB_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        fromService:
+          name: aicbc-api
+          type: web
+          envVarKey: SECRET_KEY
+
+  # Celery beat scheduler
+  - type: worker
+    name: aicbc-beat
+    runtime: docker
+    repo: https://github.com/fromwordimport/ai_cbc.git
+    rootDir: .
+    dockerfilePath: ./docker/Dockerfile
+    dockerCommand: celery -A src.aicbc.analysis.tasks beat --loglevel=info --scheduler celery.beat.PersistentScheduler --schedulefile /tmp/celerybeat-schedule
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MONGODB_DATABASE
+        value: aicbc
+      - key: MONGODB_MAX_CONNECTIONS
+        value: "20"
+      - key: REDIS_PASSWORD
+        value: ""
+      - key: MONGODB_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        fromService:
+          name: aicbc-api
+          type: web
+          envVarKey: SECRET_KEY
