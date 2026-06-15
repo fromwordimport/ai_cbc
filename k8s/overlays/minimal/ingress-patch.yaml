@@ -1,0 +1,24 @@
+# Minimal overlay ingress — uses a placeholder domain for single-user access.
+# For real use, replace with your domain or access via NodePort/port-forward.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aicbc-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+spec:
+  tls:
+    - hosts:
+        - minimal.aicbc.example.com
+      secretName: aicbc-tls-minimal
+  rules:
+    - host: minimal.aicbc.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aicbc-api
+                port:
+                  number: 80

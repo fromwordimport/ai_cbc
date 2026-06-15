@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aicbc-minimal
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+images:
+  - name: ghcr.io/fromwordimport/aicbc
+    newTag: 0.1.0
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/environment: minimal
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: aicbc-config
+    path: configmap-patch.yaml
+  - target:
+      kind: Ingress
+      name: aicbc-ingress
+    path: ingress-patch.yaml
+  - target:
+      kind: Deployment
+      name: aicbc-api
+    path: api-resources-patch.yaml
+  - target:
+      kind: Deployment
+      name: aicbc-worker
+    path: worker-resources-patch.yaml
+  - target:
+      kind: Deployment
+      name: aicbc-beat
+    path: beat-resources-patch.yaml
+  - target:
+      kind: Deployment
+      name: redis
+    path: redis-resources-patch.yaml
+  - target:
+      kind: StatefulSet
+      name: mongo
+    path: mongo-resources-patch.yaml
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: aicbc-api-hpa
+    path: remove-hpa-patch.yaml

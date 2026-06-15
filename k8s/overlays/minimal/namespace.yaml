@@ -1,0 +1,10 @@
+# AI_CBC Minimal Namespace
+# Ultra-low-cost single-node deployment for personal access (<10 users).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aicbc-minimal
+  labels:
+    app.kubernetes.io/name: aicbc
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/environment: minimal
