@@ -17,8 +17,7 @@
 - NetworkPolicy 关键资源是否存在
 - 镜像标签与 imagePullPolicy
 
-**结果**：脚本运行成功，发现 5 项预期内提示（非阻塞）：
-- 1 项 `latest` 标签提示（staging overlay，由 CI/CD 在部署时替换为具体 SHA）
+**结果**：脚本运行成功，发现 4 项预期内提示（非阻塞）：
 - 4 项 Secret 占位符提示（由 CI/CD 或外部密钥管理注入真实值）
 
 **真实 manifest 结构问题**：本次静态检查未发现结构缺失或安全字段遗漏。
@@ -30,10 +29,7 @@
 ```
 == AI_CBC K8s Manifest Static Validator ==
 
-Found 5 issue(s):
-
-[kustomize]
-  - k8s\overlays\staging\kustomization.yaml uses tag 'latest': ghcr.io/fromwordimport/aicbc
+Found 4 issue(s):
 
 [secret]
   - Secret/aicbc-secrets: ANTHROPIC_API_KEY still contains placeholder value
@@ -42,17 +38,16 @@ Found 5 issue(s):
   - Secret/aicbc-secrets: REDIS_PASSWORD still contains placeholder value
 ```
 
-**说明**：base kustomization 已使用显式版本 `0.1.0`；prod overlay 同样使用 `0.1.0`；staging overlay 保留 `latest` 供 CI/CD 替换为 commit SHA。Secret 中保留 base64 占位符，供 CI/CD 或外部密钥管理注入。
+**说明**：base kustomization 与 staging/prod overlay 均已使用显式版本标签；CI/CD 部署时通过 sed 将 `newTag` 替换为 commit SHA。Secret 中保留 base64 占位符，供 CI/CD 或外部密钥管理注入。
 
 ---
 
 ## 3. 问题说明
 
-### 3.1 `latest` 标签（预期内）
+### 3.1 镜像标签（预期内）
 
-- **位置**: `k8s/overlays/staging/kustomization.yaml`
-- **设计**: staging overlay 使用 `latest` 作为占位符，由 CI/CD 在部署阶段通过 sed 替换为具体 commit SHA；base 与 prod overlay 已使用显式版本 `0.1.0`
-- **部署前检查项**: 确认 CI/CD 已将 staging overlay 中的 `newTag: latest` 替换为 `newTag: <git-sha>`
+- **设计**: base kustomization 与 staging/prod overlay 均使用显式版本 `0.1.0`，由 CI/CD 在部署阶段通过 sed 替换为具体 commit SHA
+- **部署前检查项**: 确认 CI/CD 已将 overlay 中的 `newTag: 0.1.0` 替换为 `newTag: <git-sha>`
 
 ### 3.2 Secret 占位符（预期内）
 
