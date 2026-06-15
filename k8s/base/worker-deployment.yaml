@@ -41,7 +41,7 @@ spec:
           command:
             - celery
             - -A
-            - aicbc.analysis.tasks
+            - src.aicbc.analysis.tasks
             - worker
             - --loglevel=info
             - --concurrency=2
@@ -78,7 +78,7 @@ spec:
               command:
                 - celery
                 - -A
-                - aicbc.analysis.tasks
+                - src.aicbc.analysis.tasks
                 - inspect
                 - ping
                 - -d

@@ -39,7 +39,7 @@ spec:
           command:
             - celery
             - -A
-            - aicbc.analysis.tasks
+            - src.aicbc.analysis.tasks
             - beat
             - --loglevel=info
             - --scheduler
