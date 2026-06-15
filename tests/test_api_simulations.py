@@ -72,9 +72,9 @@ def _make_test_persona(persona_id: str = "persona-simtest-001") -> PersonaProfil
 def _clean_store():
     """Clear the store before each test."""
     store = get_store()
-    store._data.clear()
+    store.clear()
     yield
-    store._data.clear()
+    store.clear()
 
 
 class TestConverseEndpoint:

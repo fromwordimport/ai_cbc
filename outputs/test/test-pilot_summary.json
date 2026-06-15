@@ -1,0 +1,36 @@
+{
+  "study_id": "test-pilot",
+  "n_personas_requested": 2,
+  "n_personas_generated": 2,
+  "n_personas_failed": 0,
+  "n_simulated": 2,
+  "d_efficiency": 0.7804140712625159,
+  "a_efficiency": 0.12096774193548389,
+  "authenticity": {
+    "scores": [
+      8,
+      7
+    ],
+    "mean": 7.5,
+    "min": 7,
+    "max": 8
+  },
+  "bias_audit": {
+    "total_audited": 2,
+    "passed": 2,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "total_findings": 1,
+    "findings_by_category": {
+      "gender": 1
+    },
+    "high_severity_findings": 0
+  },
+  "elapsed_seconds": 448.025,
+  "output_files": {
+    "personas": "outputs\\test\\test-pilot_personas.json",
+    "questionnaire": "outputs\\test\\test-pilot_questionnaire.json",
+    "dataset": "outputs\\test\\test-pilot_raw_dataset.json",
+    "bias_audit": "outputs\\test\\test-pilot_bias_audit.json"
+  }
+}

@@ -1,0 +1,5 @@
+ERROR: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]
+__main__.py: error: unrecognized arguments: --cov=src --cov-report=term-missing --cov-report=html --timeout=60
+  inifile: E:\machine_learning_study\AI_CBC\pyproject.toml
+  rootdir: E:\machine_learning_study\AI_CBC
+

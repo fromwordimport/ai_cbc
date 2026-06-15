@@ -54,10 +54,10 @@ def test_tag_json_valid(schema_name: str) -> None:
     assert len(data["dimensions"]) > 0
 
 
-def test_demographics_has_eight_dimensions() -> None:
-    """Demographics schema must contain exactly 8 dimensions."""
+def test_demographics_has_ten_dimensions() -> None:
+    """Demographics schema must contain exactly 10 dimensions."""
     data = load_tag_schema("demographics")
-    assert len(data["dimensions"]) == 8
+    assert len(data["dimensions"]) == 10
     dim_ids = {d["id"] for d in data["dimensions"]}
     assert dim_ids == {
         "age",
@@ -68,6 +68,8 @@ def test_demographics_has_eight_dimensions() -> None:
         "education",
         "marital_status",
         "living_type",
+        "life_stage",
+        "brand_relationship_stage",
     }
 
 

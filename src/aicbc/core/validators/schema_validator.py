@@ -16,7 +16,11 @@ class SchemaValidator:
     """
 
     VALID_GENDERS = ["男", "女", "其他"]
-    VALID_CITIES = ["一线城市", "新一线", "二线", "三线", "四线"]
+    VALID_CITIES = [
+        "一线城市", "新一线城市", "二线城市",
+        "三线城市", "四线城市", "五线城市",
+        "县城/乡镇", "农村", "海外",
+    ]
 
     def validate(self, persona: PersonaProfile) -> ValidationResult:
         """Run all schema validations and return a ValidationResult."""
@@ -115,4 +119,16 @@ class SchemaValidator:
                 result.add_error(
                     f"layer3_psychology.tension_combination.narrative_explanation "
                     f"must be at least 50 characters, got {len(stripped)}"
+                )
+
+        # Check language_samples length (20-60 chars per sample)
+        for i, sample in enumerate(persona.language_samples):
+            stripped = sample.strip()
+            if len(stripped) < 20:
+                result.add_error(
+                    f"language_samples[{i}] must be at least 20 characters, got {len(stripped)}"
+                )
+            if len(stripped) > 60:
+                result.add_error(
+                    f"language_samples[{i}] must be at most 60 characters, got {len(stripped)}"
                 )

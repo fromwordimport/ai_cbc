@@ -12,6 +12,8 @@ from aicbc.api.schemas import (
     SimulateResponsesRequest,
     SimulateResponsesResponse,
 )
+from aicbc.config.settings import get_settings
+from aicbc.core.security import sanitize_id, sanitize_string_list
 from aicbc.core.simulation.cbc_choice_simulator import CBCChoiceSimulator
 from aicbc.core.simulation.llm_choice_simulator import LLMChoiceSimulator
 from aicbc.core.store import (
@@ -21,10 +23,19 @@ from aicbc.core.store import (
     get_response_store,
     get_store,
 )
+from aicbc.cost.fuse import CostFuseError
 from aicbc.questionnaire.response_models import CBCRawDataset, DatasetMetadata
 
 router = APIRouter()
 logger = structlog.get_logger("aicbc.api.responses")
+settings = get_settings()
+
+
+def _safe_error_message(exc: Exception) -> str:
+    """Return safe error detail for client exposure."""
+    if settings.is_production and not isinstance(exc, CostFuseError):
+        return "Simulation failed. Please try again or contact support."
+    return str(exc)
 
 
 @router.post(
@@ -47,23 +58,42 @@ async def simulate_responses(
     stored as both individual PersonaResponse records and an aggregated
     CBCRawDataset.
     """
-    questionnaire = questionnaire_store.get_questionnaire(study_id)
+    # SEC-003: Validate and sanitize study_id and persona_ids
+    try:
+        safe_study_id = sanitize_id(study_id, field_name="study_id")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    try:
+        safe_persona_ids = sanitize_string_list(
+            request.persona_ids, field_name="persona_ids"
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    questionnaire = questionnaire_store.get_questionnaire(safe_study_id)
     if questionnaire is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No questionnaire found for study '{study_id}'",
+            detail=f"No questionnaire found for study '{safe_study_id}'",
         )
 
-    study = questionnaire_store.get_study(study_id)
+    study = questionnaire_store.get_study(safe_study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Study '{study_id}' not found",
+            detail=f"Study '{safe_study_id}' not found",
         )
 
     log = logger.bind(
-        study_id=study_id,
-        n_personas=len(request.persona_ids),
+        study_id=safe_study_id,
+        n_personas=len(safe_persona_ids),
         mode=request.mode,
     )
     log.info("batch_simulation_start")
@@ -72,6 +102,7 @@ async def simulate_responses(
     if request.mode == "llm":
         simulator: CBCChoiceSimulator | LLMChoiceSimulator = LLMChoiceSimulator(
             attributes=study.attributes,
+            study_id=safe_study_id,
         )
     else:
         simulator = CBCChoiceSimulator(attributes=study.attributes)
@@ -80,7 +111,7 @@ async def simulate_responses(
     failed = 0
     all_records: list = []
 
-    for idx, persona_id in enumerate(request.persona_ids):
+    for idx, persona_id in enumerate(safe_persona_ids):
         persona = persona_store.get(persona_id)
         if persona is None:
             log.warning("persona_not_found", persona_id=persona_id)
@@ -101,6 +132,11 @@ async def simulate_responses(
                     deterministic=request.deterministic,
                     seed=(request.seed + idx) if request.seed is not None else None,
                 )
+        except CostFuseError as exc:
+            log.error("simulation_cost_fuse", persona_id=persona_id, error=str(exc))
+            failed += 1
+            # Stop batch simulation on cost fuse
+            break
         except Exception as exc:
             log.error("simulation_failed", persona_id=persona_id, error=str(exc))
             failed += 1

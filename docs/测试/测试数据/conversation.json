@@ -1,0 +1,38 @@
+{
+  "购买动机": {
+    "question": "你为什么会考虑买洗碗机？",
+    "context": [],
+    "_expected_emotion": "理性/真诚",
+    "_expected_keywords": ["时间", "方便", "家庭", "解放双手"],
+    "_expected_inconsistency": false
+  },
+  "预算限制": {
+    "question": "如果预算只有3000元，你会怎么选？",
+    "context": [],
+    "_expected_emotion": "务实/精打细算",
+    "_expected_keywords": ["性价比", "品牌", "功能"],
+    "_expected_inconsistency": false
+  },
+  "顾虑追问": {
+    "question": "你觉得洗碗机最让你担心的是什么？",
+    "context": [],
+    "_expected_emotion": "担忧/犹豫",
+    "_expected_keywords": ["安装", "空间", "老人", "维修"],
+    "_expected_inconsistency": false
+  },
+  "功能偏好": {
+    "question": "你最看重洗碗机的什么功能？",
+    "context": [],
+    "_expected_emotion": "理性/务实",
+    "_expected_keywords": ["清洁", "能耗", "容量"],
+    "_expected_inconsistency": false
+  },
+  "多轮对话": {
+    "rounds": [
+      { "question": "你平时做饭频率高吗？", "_expected_keywords": ["每天", "周末", "加班"] },
+      { "question": "那你觉得洗碗机省下的时间值得吗？", "_expected_keywords": ["值得", "时间", "陪伴"] },
+      { "question": "你家厨房空间够吗？会不会很挤？", "_expected_keywords": ["空间", "尺寸", "改造"] }
+    ],
+    "_note": "验证多轮对话的上下文一致性：turn_number 递增，人格前后不矛盾"
+  }
+}

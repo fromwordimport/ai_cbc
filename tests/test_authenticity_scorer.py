@@ -23,7 +23,7 @@ def _make_base_persona(**overrides: Any) -> PersonaProfile:
         "persona_id": "persona-test-001",
         "segment": "测试群体",
         "layer1_demographics": Layer1Demographics(
-            age="28岁", gender="女", city="新一线", income="15-30万元",
+            age="28岁", gender="女", city="新一线城市", income="15-30万元",
             occupation="互联网产品经理", education="本科",
             marital_status="已婚无孩", living_type="自有住房（89㎡）",
         ),

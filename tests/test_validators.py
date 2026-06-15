@@ -182,8 +182,8 @@ class TestLogicValidator:
     def test_valid_persona_passes_all_rules(self, logic_validator: LogicValidator, valid_persona: PersonaProfile) -> None:
         """A fully valid persona should score 6/6."""
         result = logic_validator.validate(valid_persona)
-        assert result.score == 6.0
-        assert result.details["max_possible_score"] == 6.0
+        assert result.score == 7.0
+        assert result.details["max_possible_score"] == 7.0
         assert all(s == 1.0 for s in result.details["rule_scores"].values())
 
     def test_rule_001_narrative_too_short(self, logic_validator: LogicValidator, valid_persona: PersonaProfile) -> None:
@@ -203,7 +203,7 @@ class TestLogicValidator:
 
     def test_rule_002_xinyixian_low_income(self, logic_validator: LogicValidator, valid_persona: PersonaProfile) -> None:
         """RULE-002: 新一线 + 月收入<5K should also fail."""
-        valid_persona.layer1_demographics.city = "新一线"
+        valid_persona.layer1_demographics.city = "新一线城市"
         valid_persona.layer1_demographics.income = "月收入<5K"
         result = logic_validator.validate(valid_persona)
         assert result.details["rule_scores"]["RULE-002"] == 0.0
@@ -310,7 +310,7 @@ class TestLogicValidator:
         valid_persona.layer2_behavior.price_sensitivity = "极端节俭"
         valid_persona.layer2_behavior.decision_style = "冲动消费"
         result = logic_validator.validate(valid_persona)
-        assert result.score == 4.0  # RULE-001, 003, 005, 006 pass; 002, 004 fail
+        assert result.score == 5.0  # RULE-001, 003, 005, 006, 007 pass; 002, 004 fail
         assert len(result.errors) == 2
 
 

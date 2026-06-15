@@ -1,13 +1,18 @@
-"""Unified LLM client with retry, logging, and cost tracking."""
+"""Unified LLM client with retry, logging, cost tracking, and LRU response cache."""
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
+import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+import httpx
 import structlog
 from anthropic import Anthropic
 from anthropic import APIError as AnthropicAPIError
@@ -15,8 +20,13 @@ from openai import APIError as OpenAIAPIError
 from openai import OpenAI
 
 from aicbc.config.settings import get_settings
+from aicbc.config.pricing import estimate_cost_usd, PRICE_TABLE
+from aicbc.cost.fuse import CostFuse, CostFuseError
 
 logger = structlog.get_logger("aicbc.llm")
+
+# Default LRU cache size
+_DEFAULT_CACHE_SIZE = 128
 
 
 class Provider(StrEnum):
@@ -26,28 +36,19 @@ class Provider(StrEnum):
     OPENAI = "openai"
 
 
-# Approximate cost per 1K tokens (USD) — update as pricing changes.
-_COST_PER_1K: dict[str, dict[str, tuple[float, float]]] = {
-    "anthropic": {
-        "claude-sonnet-4-6": (3.0, 15.0),
-        "claude-haiku-4-5": (0.25, 1.25),
-        "claude-opus-4-6": (15.0, 75.0),
-    },
-    "openai": {
-        "gpt-4o": (5.0, 15.0),
-        "gpt-4o-mini": (0.15, 0.60),
-        "gpt-4-turbo": (10.0, 30.0),
-    },
-}
-
+# Leakage indicators that suggest system prompt content escaped into output
+_LEAKAGE_INDICATORS = (
+    "你是", "系统指令", "You are a helpful",
+    "System instruction", "Constraints:", "约束条件",
+    "虚拟消费者生成专家", "角色定义", "张力组合",
+)
 
 def _estimate_cost(provider: Provider, model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    """Estimate API call cost in USD."""
-    pricing = _COST_PER_1K.get(provider.value, {}).get(model)
-    if pricing is None:
+    """Estimate API call cost in USD — reads from unified pricing registry."""
+    try:
+        return estimate_cost_usd(model, prompt_tokens, completion_tokens)
+    except KeyError:
         return 0.0
-    input_price, output_price = pricing
-    return (prompt_tokens * input_price + completion_tokens * output_price) / 1000.0
 
 
 @dataclass(frozen=True)
@@ -68,23 +69,41 @@ class LLMResponse:
 class LLMClient:
     """Unified LLM client supporting Anthropic and OpenAI with retries and logging."""
 
-    def __init__(self) -> None:
-        """Initialize clients from settings."""
+    def __init__(self, cost_fuse: CostFuse | None = None) -> None:
+        """Initialize clients from settings.
+
+        Args:
+            cost_fuse: Optional CostFuse instance for cost tracking and
+                automatic model degradation. If None, a default fuse is used.
+        """
         settings = get_settings()
+        self._http_client = httpx.Client(
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            timeout=httpx.Timeout(settings.llm.timeout_seconds),
+        )
         self._anthropic: Anthropic | None = None
         self._openai: OpenAI | None = None
+        self._cost_fuse = cost_fuse or CostFuse()
+
+        # LRU response cache (thread-safe)
+        self._cache: OrderedDict[str, LLMResponse] = OrderedDict()
+        self._cache_lock = threading.Lock()
+        self._cache_hits: int = 0
+        self._cache_misses: int = 0
 
         if settings.anthropic.api_key:
             self._anthropic = Anthropic(
                 api_key=settings.anthropic.api_key,
                 base_url=settings.anthropic.base_url,
                 timeout=settings.llm.timeout_seconds,
+                http_client=self._http_client,
             )
         if settings.openai.api_key:
             self._openai = OpenAI(
                 api_key=settings.openai.api_key,
                 base_url=settings.openai.base_url,
                 timeout=settings.llm.timeout_seconds,
+                http_client=self._http_client,
             )
 
     def _get_client(self, provider: Provider) -> Anthropic | OpenAI:
@@ -109,6 +128,77 @@ class LLMClient:
             return Provider.OPENAI
         # Default to anthropic for unknown models to preserve backward compat.
         return Provider.ANTHROPIC
+
+    # ------------------------------------------------------------------
+    # Response cache (LRU, thread-safe)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _make_cache_key(
+        provider: Provider,
+        model: str,
+        messages: list[dict[str, str]],
+    ) -> str:
+        """Build a deterministic cache key from provider, model, and message content.
+
+        Only hashes system and user prompts -- completion content and metadata
+        (temperature, max_tokens) are intentionally excluded so that identical
+        prompts from different call sites share cache entries.
+        """
+        system_prompts: list[str] = []
+        user_prompts: list[str] = []
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "system":
+                system_prompts.append(content)
+            elif role == "user":
+                user_prompts.append(content)
+
+        seed = f"{provider.value}|{model}|{hashlib.sha256('|'.join(system_prompts).encode()).hexdigest()}|{hashlib.sha256('|'.join(user_prompts).encode()).hexdigest()}"
+        return hashlib.sha256(seed.encode()).hexdigest()
+
+    @property
+    def cache_hits(self) -> int:
+        """Number of cache hits since initialization or last clear."""
+        return self._cache_hits
+
+    @property
+    def cache_misses(self) -> int:
+        """Number of cache misses since initialization or last clear."""
+        return self._cache_misses
+
+    @property
+    def cache_size(self) -> int:
+        """Current number of entries in the cache."""
+        with self._cache_lock:
+            return len(self._cache)
+
+    def clear_cache(self) -> None:
+        """Clear the response cache and reset hit/miss counters.
+
+        Useful for test isolation or when cached responses become stale.
+        """
+        with self._cache_lock:
+            self._cache.clear()
+            self._cache_hits = 0
+            self._cache_misses = 0
+            logger.info("llm_cache_cleared")
+
+    def _store_in_cache(self, cache_key: str, response: LLMResponse) -> None:
+        """Store an LLMResponse in the LRU cache (thread-safe).
+
+        Evicts the oldest entry if the cache has reached max_size.
+        """
+        with self._cache_lock:
+            if cache_key in self._cache:
+                # Already cached (possible race); move to end
+                self._cache.move_to_end(cache_key)
+                return
+            if len(self._cache) >= _DEFAULT_CACHE_SIZE:
+                evicted_key, _ = self._cache.popitem(last=False)
+                logger.debug("llm_cache_evicted", evicted_key=evicted_key[:16])
+            self._cache[cache_key] = response
 
     def _call_anthropic(
         self,
@@ -138,16 +228,39 @@ class LLMClient:
             "temperature": temperature,
         }
         if system_msg:
-            kwargs["system"] = system_msg
+            # Ephemeral cache: CBC system prompts (~2000 tokens) repeat
+            # across choice sets.  Caching saves 60-80% of system-prompt cost.
+            kwargs["system"] = [
+                {"type": "text", "text": system_msg, "cache_control": {"type": "ephemeral"}}
+            ]
         if json_mode:
-            kwargs["system"] = (kwargs.get("system", "") + "\nYou must respond with valid JSON only.").strip()
+            extra = "\nYou must respond with valid JSON only."
+            if system_msg:
+                kwargs["system"].append({"type": "text", "text": extra, "cache_control": {"type": "ephemeral"}})
+            else:
+                kwargs["system"] = [
+                    {"type": "text", "text": extra, "cache_control": {"type": "ephemeral"}}
+                ]
+            # Prefill the assistant response with "{" to force valid JSON output
+            # instead of relying on a textual instruction alone.
+            chat_messages.append({"role": "assistant", "content": "{"})
 
         response = client.messages.create(**kwargs)
         latency = time.perf_counter() - start
 
         content = ""
         if response.content:
-            content = response.content[0].text if hasattr(response.content[0], "text") else str(response.content[0])
+            raw = response.content[0]
+            content = raw.text if hasattr(raw, "text") else str(raw)
+            # Strip markdown code fences if present
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            elif content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
 
         usage = response.usage
         prompt_tokens = usage.input_tokens if usage else 0
@@ -216,6 +329,7 @@ class LLMClient:
         max_tokens: int | None = None,
         json_mode: bool = False,
         provider: Provider | None = None,
+        study_id: str | None = None,
     ) -> LLMResponse:
         """Generate a completion with unified interface and exponential backoff retries.
 
@@ -238,6 +352,49 @@ class LLMClient:
         resolved_temperature = temperature if temperature is not None else settings.llm.temperature
         resolved_max_tokens = max_tokens if max_tokens is not None else settings.llm.max_tokens
         resolved_provider = provider or self._detect_provider(resolved_model)
+
+        # ------------------------------------------------------------------
+        # Cache check (before cost fuse -- cached responses incur no new cost)
+        # ------------------------------------------------------------------
+        cache_key = self._make_cache_key(resolved_provider, resolved_model, messages)
+        with self._cache_lock:
+            if cache_key in self._cache:
+                self._cache_hits += 1
+                cached = self._cache[cache_key]
+                # Move to end (LRU promotion)
+                self._cache.move_to_end(cache_key)
+                logger.debug(
+                    "llm_cache_hit",
+                    provider=resolved_provider.value,
+                    model=resolved_model,
+                    total_hits=self._cache_hits,
+                    total_misses=self._cache_misses,
+                )
+                return cached
+            self._cache_misses += 1
+
+        # ------------------------------------------------------------------
+        # Cost fuse check (pre-call)
+        # ------------------------------------------------------------------
+        allowed, fuse_status, effective_model = self._cost_fuse.pre_call_check(
+            study_id=study_id,
+            requested_model=resolved_model,
+        )
+        if not allowed:
+            raise CostFuseError(
+                f"Cost fuse triggered ({fuse_status.value}): LLM call blocked. "
+                "Please contact project lead (小P) to review budget."
+            )
+        # Use degraded model if fuse returned one
+        if effective_model and effective_model != resolved_model:
+            resolved_model = effective_model
+            resolved_provider = self._detect_provider(resolved_model)
+            log_degrade = logger.bind(
+                original_model=model,
+                degraded_model=resolved_model,
+                fuse_status=fuse_status.value,
+            )
+            log_degrade.warning("llm_model_degraded_by_cost_fuse")
 
         client = self._get_client(resolved_provider)
         max_retries = settings.llm.max_retries
@@ -283,6 +440,36 @@ class LLMClient:
                     estimated_cost_usd=round(result.estimated_cost_usd, 6),
                     latency_seconds=round(result.latency_seconds, 3),
                 )
+                # SEC-011: Detect prompt leakage in response content
+                leaked, indicator = self._detect_prompt_leakage(result.content)
+                if leaked:
+                    log.warning(
+                        "prompt_leakage_detected",
+                        indicator=indicator,
+                        content_preview=result.content[:200],
+                    )
+                    # Return a sanitized response instead of the leaked content
+                    return LLMResponse(
+                        content="[SECURITY: Response contained potentially leaked system instructions and was blocked. Please retry.]",
+                        model=result.model,
+                        provider=result.provider,
+                        prompt_tokens=result.prompt_tokens,
+                        completion_tokens=0,
+                        total_tokens=result.prompt_tokens,
+                        estimated_cost_usd=result.estimated_cost_usd,
+                        latency_seconds=result.latency_seconds,
+                        raw_response=None,  # Do not propagate leaked response
+                    )
+
+                # Post-call cost recording
+                self._cost_fuse.record_call(
+                    result,
+                    study_id=study_id,
+                    task_phase="llm_generate",
+                    degraded=(resolved_model != (model or settings.anthropic.model_persona)),
+                )
+                # Store in LRU cache
+                self._store_in_cache(cache_key, result)
                 return result
 
             except (AnthropicAPIError, OpenAIAPIError) as exc:
@@ -302,6 +489,195 @@ class LLMClient:
             f"LLM API call failed after {max_retries} attempts: {last_exception}"
         ) from last_exception
 
+    async def generate_async(
+        self,
+        messages: list[dict[str, str]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        provider: Provider | None = None,
+        study_id: str | None = None,
+    ) -> LLMResponse:
+        """Async version of generate() with asyncio.sleep exponential backoff.
+
+        This method offloads the actual synchronous API calls to a thread pool
+        via ``asyncio.to_thread`` so that the event loop is not blocked during
+        HTTP round-trips.  Retry backoff uses ``asyncio.sleep`` instead of
+        ``time.sleep``.
+
+        Args:
+            messages: List of message dicts with "role" and "content" keys.
+            model: Model identifier. Defaults to ANTHROPIC_MODEL_PERSONA from settings.
+            temperature: Sampling temperature. Defaults to LLM_TEMPERATURE from settings.
+            max_tokens: Max tokens to generate. Defaults to LLM_MAX_TOKENS from settings.
+            json_mode: Whether to request JSON-only output.
+            provider: Explicit provider override. Auto-detected from model name if omitted.
+            study_id: Optional study identifier for cost tracking.
+
+        Returns:
+            Structured LLMResponse.
+
+        Raises:
+            RuntimeError: If the API call fails after all retries.
+        """
+        settings = get_settings()
+        resolved_model = model or settings.anthropic.model_persona
+        resolved_temperature = temperature if temperature is not None else settings.llm.temperature
+        resolved_max_tokens = max_tokens if max_tokens is not None else settings.llm.max_tokens
+        resolved_provider = provider or self._detect_provider(resolved_model)
+
+        # ------------------------------------------------------------------
+        # Cache check (before cost fuse -- cached responses incur no new cost)
+        # ------------------------------------------------------------------
+        cache_key = self._make_cache_key(resolved_provider, resolved_model, messages)
+        with self._cache_lock:
+            if cache_key in self._cache:
+                self._cache_hits += 1
+                cached = self._cache[cache_key]
+                # Move to end (LRU promotion)
+                self._cache.move_to_end(cache_key)
+                logger.debug(
+                    "llm_cache_hit_async",
+                    provider=resolved_provider.value,
+                    model=resolved_model,
+                    total_hits=self._cache_hits,
+                    total_misses=self._cache_misses,
+                )
+                return cached
+            self._cache_misses += 1
+
+        # ------------------------------------------------------------------
+        # Cost fuse check (pre-call)
+        # ------------------------------------------------------------------
+        allowed, fuse_status, effective_model = self._cost_fuse.pre_call_check(
+            study_id=study_id,
+            requested_model=resolved_model,
+        )
+        if not allowed:
+            raise CostFuseError(
+                f"Cost fuse triggered ({fuse_status.value}): LLM call blocked. "
+                "Please contact project lead (小P) to review budget."
+            )
+        # Use degraded model if fuse returned one
+        if effective_model and effective_model != resolved_model:
+            resolved_model = effective_model
+            resolved_provider = self._detect_provider(resolved_model)
+            log_degrade = logger.bind(
+                original_model=model,
+                degraded_model=resolved_model,
+                fuse_status=fuse_status.value,
+            )
+            log_degrade.warning("llm_model_degraded_by_cost_fuse")
+
+        client = self._get_client(resolved_provider)
+        max_retries = settings.llm.max_retries
+        last_exception: Exception | None = None
+
+        log = logger.bind(
+            provider=resolved_provider.value,
+            model=resolved_model,
+            temperature=resolved_temperature,
+            max_tokens=resolved_max_tokens,
+            json_mode=json_mode,
+        )
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                log.info("llm_request_start", attempt=attempt, message_count=len(messages))
+
+                if resolved_provider == Provider.ANTHROPIC:
+                    result = await asyncio.to_thread(
+                        self._call_anthropic,
+                        client=client,  # type: ignore[arg-type]
+                        model=resolved_model,
+                        messages=messages,
+                        temperature=resolved_temperature,
+                        max_tokens=resolved_max_tokens,
+                        json_mode=json_mode,
+                    )
+                else:
+                    result = await asyncio.to_thread(
+                        self._call_openai,
+                        client=client,  # type: ignore[arg-type]
+                        model=resolved_model,
+                        messages=messages,
+                        temperature=resolved_temperature,
+                        max_tokens=resolved_max_tokens,
+                        json_mode=json_mode,
+                    )
+
+                log.info(
+                    "llm_request_success",
+                    attempt=attempt,
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                    total_tokens=result.total_tokens,
+                    estimated_cost_usd=round(result.estimated_cost_usd, 6),
+                    latency_seconds=round(result.latency_seconds, 3),
+                )
+                # SEC-011: Detect prompt leakage in response content
+                leaked, indicator = self._detect_prompt_leakage(result.content)
+                if leaked:
+                    log.warning(
+                        "prompt_leakage_detected",
+                        indicator=indicator,
+                        content_preview=result.content[:200],
+                    )
+                    # Return a sanitized response instead of the leaked content
+                    return LLMResponse(
+                        content="[SECURITY: Response contained potentially leaked system instructions and was blocked. Please retry.]",
+                        model=result.model,
+                        provider=result.provider,
+                        prompt_tokens=result.prompt_tokens,
+                        completion_tokens=0,
+                        total_tokens=result.prompt_tokens,
+                        estimated_cost_usd=result.estimated_cost_usd,
+                        latency_seconds=result.latency_seconds,
+                        raw_response=None,  # Do not propagate leaked response
+                    )
+
+                # Post-call cost recording
+                self._cost_fuse.record_call(
+                    result,
+                    study_id=study_id,
+                    task_phase="llm_generate",
+                    degraded=(resolved_model != (model or settings.anthropic.model_persona)),
+                )
+                # Store in LRU cache
+                self._store_in_cache(cache_key, result)
+                return result
+
+            except (AnthropicAPIError, OpenAIAPIError) as exc:
+                last_exception = exc
+                log.warning(
+                    "llm_request_error",
+                    attempt=attempt,
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                )
+                if attempt < max_retries:
+                    sleep_seconds = 2 ** (attempt - 1)
+                    log.info("llm_retry_backoff", sleep_seconds=sleep_seconds)
+                    await asyncio.sleep(sleep_seconds)
+
+        raise RuntimeError(
+            f"LLM API call failed after {max_retries} attempts: {last_exception}"
+        ) from last_exception
+
+    def _detect_prompt_leakage(self, content: str) -> tuple[bool, str | None]:
+        """Detect if the LLM response contains leaked system prompt content.
+
+        Returns (leaked, matched_indicator).
+        """
+        if not content:
+            return False, None
+        content_lower = content.lower()
+        for indicator in _LEAKAGE_INDICATORS:
+            if indicator.lower() in content_lower:
+                return True, indicator
+        return False, None
+
     def generate_json(
         self,
         messages: list[dict[str, str]],
@@ -309,6 +685,7 @@ class LLMClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
         provider: Provider | None = None,
+        study_id: str | None = None,
     ) -> dict[str, Any]:
         """Convenience wrapper that parses the response content as JSON.
 
@@ -332,6 +709,7 @@ class LLMClient:
             max_tokens=max_tokens,
             json_mode=True,
             provider=provider,
+            study_id=study_id,
         )
         try:
             return json.loads(response.content)

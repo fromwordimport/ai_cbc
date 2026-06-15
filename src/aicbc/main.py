@@ -1,17 +1,64 @@
 """FastAPI application entry point."""
 
+import os
+from contextlib import asynccontextmanager
+
 import structlog
-from fastapi import FastAPI
+from beanie import init_beanie
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+from motor.motor_asyncio import AsyncIOMotorClient
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from aicbc.analysis import routes as analysis_routes
-from aicbc.api.routes import personas, questionnaires, responses, simulations
+from aicbc.api.middleware.audit_log import AuditLogMiddleware
+from aicbc.api.middleware.rate_limit import RateLimitMiddleware
+from aicbc.api.middleware.rbac import RBACMiddleware
+from aicbc.api.routes import admin, personas, questionnaires, responses, simulations
 from aicbc.config.settings import get_settings
+from aicbc.core.models.db_documents import ALL_DOCUMENT_MODELS
 from aicbc.monitoring.health import router as health_router
 from aicbc.monitoring.middleware import MetricsMiddleware, SecurityHeadersMiddleware
 
 settings = get_settings()
 logger = structlog.get_logger()
+
+# MongoDB client lifecycle (None when running in memory-only mode)
+_mongo_client: AsyncIOMotorClient | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: initialize MongoDB/Beanie and clean up on shutdown."""
+    logger.info("AI_CBC API starting up", environment=settings.environment)
+
+    use_memory = os.environ.get("USE_MEMORY_STORE", "").lower() in ("1", "true", "yes")
+    env = settings.environment.lower()
+    is_dev_without_mongo = env in ("development", "dev", "testing", "test") and (
+        not settings.database.mongodb_url
+        or settings.database.mongodb_url == "mongodb://localhost:27017"
+    )
+
+    if not (use_memory or is_dev_without_mongo):
+        global _mongo_client
+        _mongo_client = AsyncIOMotorClient(
+            settings.database.mongodb_url,
+            maxPoolSize=settings.database.mongodb_max_connections,
+        )
+        await init_beanie(
+            database=_mongo_client[settings.database.mongodb_database],
+            document_models=ALL_DOCUMENT_MODELS,
+        )
+        logger.info("MongoDB/Beanie initialized")
+    else:
+        logger.info("Using in-memory stores; MongoDB initialization skipped")
+
+    yield
+
+    if _mongo_client is not None:
+        _mongo_client.close()
+    logger.info("AI_CBC API shutting down")
+
 
 app = FastAPI(
     title="AI_CBC API",
@@ -19,14 +66,49 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
+    lifespan=lifespan,
 )
+app.state.debug = settings.debug
 
-# Add middleware
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """Simple API key authentication middleware.
+
+    Requires ``X-API-Key`` header for all routes except exempt paths.
+    Enforcement is skipped in debug mode to support local development
+    and test clients.
+    """
+
+    EXEMPT_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/ready", "/metrics"}
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path in self.EXEMPT_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
+            return await call_next(request)
+
+        if settings.debug:
+            return await call_next(request)
+
+        api_key = request.headers.get("X-API-Key")
+        if not api_key or api_key != settings.api_key:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"error": "Unauthorized"},
+            )
+        return await call_next(request)
+
+
+# Add middleware (order matters: rate limit first, then metrics, then security headers, then auth, then RBAC, then audit)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(APIKeyMiddleware)
+app.add_middleware(RBACMiddleware)
+app.add_middleware(AuditLogMiddleware)
 
 # Register routes
 app.include_router(health_router, tags=["Health"])
+app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
 app.include_router(personas.router, prefix="/api/v1", tags=["Personas"])
 app.include_router(simulations.router, prefix="/api/v1", tags=["Simulations"])
 app.include_router(questionnaires.router, prefix="/api/v1", tags=["Questionnaires"])
@@ -35,22 +117,19 @@ app.include_router(analysis_routes.router, prefix="/api/v1", tags=["Analysis"])
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc: Exception) -> JSONResponse:
-    """Handle unhandled exceptions."""
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle unhandled exceptions.
+
+    In production (debug=False) only a generic message is returned to avoid
+    information leakage. Detailed errors are exposed only in debug mode.
+    """
     logger.error("Unhandled exception", exc_info=exc, path=request.url.path)
+    if settings.debug:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(exc)},
+        )
     return JSONResponse(
         status_code=500,
-        content={"error": "Internal server error", "detail": str(exc)},
+        content={"error": "Internal server error"},
     )
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Application startup handler."""
-    logger.info("AI_CBC API starting up", environment=settings.environment)
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    """Application shutdown handler."""
-    logger.info("AI_CBC API shutting down")

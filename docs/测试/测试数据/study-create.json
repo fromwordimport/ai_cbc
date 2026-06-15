@@ -1,0 +1,29 @@
+{
+  "有效创建": {
+    "study_id": "dishwasher-001",
+    "product_category": "洗碗机",
+    "research_goal": "评估消费者对不同品牌、容量、安装方式和价格档位洗碗机的偏好，确定最优产品组合",
+    "target_segments": ["一线城市年轻家庭", "新一线品质追求者", "二线务实家庭"]
+  },
+  "最小配置": {
+    "study_id": "robot-vac-001",
+    "product_category": "扫地机器人",
+    "research_goal": "新产品线定价策略调研",
+    "target_segments": ["年轻白领", "宠物家庭"]
+  },
+  "边界-空目标": {
+    "study_id": "edge-empty-goal",
+    "product_category": "洗碗机",
+    "research_goal": "",
+    "target_segments": ["测试"],
+    "_expected_status": 422,
+    "_note": "空 research_goal 可能导致后端校验失败"
+  },
+  "边界-无人群": {
+    "study_id": "edge-no-segments",
+    "product_category": "洗碗机",
+    "research_goal": "测试无目标人群",
+    "target_segments": [],
+    "_note": "空 target_segments 检查前端是否允许提交"
+  }
+}

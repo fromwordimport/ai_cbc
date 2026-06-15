@@ -15,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import copy
 import json
 import time
 from dataclasses import dataclass
@@ -24,7 +25,9 @@ from typing import Any
 
 import structlog
 
+from aicbc.config.pricing import QUALITY_TIER, MAX_CONTEXT
 from aicbc.config.settings import get_settings
+from aicbc.cost.fuse import CostFuse
 
 logger = structlog.get_logger("aicbc.llm.router")
 
@@ -93,44 +96,32 @@ class ModelRouter:
     - docs/成本管控方案.md (Section 3.1)
     """
 
-    # Default model configurations (can be overridden via config file)
+    # Default model configurations — sourced from unified pricing registry.
+    # Input/output costs are per-1K-token in USD (matching PRICE_TABLE).
+    # fmt: off
     DEFAULT_MODELS: dict[str, ModelConfig] = {
-        "claude-opus-4-8": ModelConfig(
-            provider="anthropic",
-            input_cost_per_1k=0.015,
-            output_cost_per_1k=0.075,
-            max_tokens=200_000,
-            quality_tier="highest",
-        ),
         "claude-sonnet-4-6": ModelConfig(
             provider="anthropic",
-            input_cost_per_1k=0.003,
-            output_cost_per_1k=0.015,
-            max_tokens=200_000,
-            quality_tier="high",
+            input_cost_per_1k=3.0, output_cost_per_1k=15.0,
+            max_tokens=200_000, quality_tier="high",
         ),
         "claude-haiku-4-5": ModelConfig(
             provider="anthropic",
-            input_cost_per_1k=0.00025,
-            output_cost_per_1k=0.00125,
-            max_tokens=50_000,
-            quality_tier="medium",
+            input_cost_per_1k=0.25, output_cost_per_1k=1.25,
+            max_tokens=200_000, quality_tier="medium",
         ),
         "gpt-4o": ModelConfig(
             provider="openai",
-            input_cost_per_1k=0.005,
-            output_cost_per_1k=0.015,
-            max_tokens=128_000,
-            quality_tier="high",
+            input_cost_per_1k=5.0, output_cost_per_1k=15.0,
+            max_tokens=128_000, quality_tier="high",
         ),
         "gpt-4o-mini": ModelConfig(
             provider="openai",
-            input_cost_per_1k=0.00015,
-            output_cost_per_1k=0.00060,
-            max_tokens=128_000,
-            quality_tier="medium",
+            input_cost_per_1k=0.15, output_cost_per_1k=0.60,
+            max_tokens=128_000, quality_tier="medium",
         ),
     }
+    # fmt: on
 
     DEFAULT_ROUTES: dict[str, RoutingRule] = {
         TaskType.PERSONA_GENERATION: RoutingRule(
@@ -175,8 +166,8 @@ class ModelRouter:
         Args:
             config_path: Optional path to a YAML/JSON config file for model configs.
         """
-        self.models: dict[str, ModelConfig] = dict(self.DEFAULT_MODELS)
-        self.routes: dict[str, RoutingRule] = dict(self.DEFAULT_ROUTES)
+        self.models: dict[str, ModelConfig] = copy.deepcopy(self.DEFAULT_MODELS)
+        self.routes: dict[str, RoutingRule] = copy.deepcopy(self.DEFAULT_ROUTES)
         self.budget_threshold = BudgetThreshold()
         self._current_budget_status = BudgetStatus.NORMAL
         self._current_daily_cost = 0.0
@@ -300,8 +291,15 @@ class ModelRouter:
         # Get routing rule for task type
         rule = self.routes.get(task_type, self.routes[TaskType.DEFAULT])
 
-        # Determine model based on budget status
-        if self._current_budget_status == BudgetStatus.EMERGENCY:
+        # Determine model based on budget status.
+        # CostFuse is the single source of truth for budget state;
+        # pre_call_check() auto-updates its internal tracker with the
+        # latest cumulative costs, so we read the live status from it.
+        cost_fuse = CostFuse()  # uses singleton CostTracker
+        allowed, fuse_status, degraded_model = cost_fuse.pre_call_check(study_id=None)
+        budget_status = BudgetStatus(fuse_status.lower())
+
+        if budget_status == BudgetStatus.EMERGENCY:
             logger.error("budget_emergency_all_calls_blocked")
             raise RuntimeError(
                 "Budget emergency: All LLM calls are blocked. "
@@ -309,17 +307,15 @@ class ModelRouter:
                 f"Budget: ¥{self._daily_budget}"
             )
 
-        if self._current_budget_status == BudgetStatus.FUSE:
+        if budget_status == BudgetStatus.FUSE:
             logger.error("budget_fuse_all_calls_blocked")
             raise RuntimeError(
-                "Budget fuse triggered: All LLM calls are paused. "
-                f"Current cost: ¥{self._current_daily_cost}, "
-                f"Budget: ¥{self._daily_budget}"
+                "Budget fuse triggered: All LLM calls are paused."
             )
 
-        if self._current_budget_status == BudgetStatus.DEGRADE:
-            # Force degraded model
-            model = rule.degrade_model or self._degrade_model
+        if budget_status == BudgetStatus.DEGRADE:
+            # Use CostFuse-recommended degraded model if available
+            model = degraded_model or rule.degrade_model or self._degrade_model
             if model and model in self.models and self.models[model].enabled:
                 logger.info(
                     "model_degraded",
@@ -338,7 +334,7 @@ class ModelRouter:
             return rule.default_model
 
         if (
-            self._current_budget_status == BudgetStatus.WARNING
+            budget_status == BudgetStatus.WARNING
             and (complexity == "low" or urgency == "low")
         ):
             # For non-critical tasks, use degrade model

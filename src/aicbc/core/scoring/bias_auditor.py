@@ -3,6 +3,10 @@
 Flags associations between protected attributes (gender, region, etc.)
 and behavioural traits that may reflect model bias rather than true
 population diversity.
+
+v2.0 — Replaces 5 hardcoded keyword rules with a 24-pattern stereotype
+library (stereotype_patterns.py) covering gender, age, region, occupation,
+ethnicity, and income.
 """
 
 from __future__ import annotations
@@ -11,9 +15,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from aicbc.core.models.persona import PersonaProfile
+from aicbc.core.scoring.stereotype_patterns import STEREOTYPE_PATTERNS
 
 # ---------------------------------------------------------------------------
-# Result type
+# Result types
 # ---------------------------------------------------------------------------
 
 
@@ -23,7 +28,7 @@ class BiasFinding:
 
     rule_id: str
     category: str  # e.g. "gender", "region", "occupation-income"
-    severity: str  # "high" | "medium" | "low"
+    severity: str  # "critical" | "high" | "medium" | "low"
     description: str
 
 
@@ -42,6 +47,35 @@ class BiasAuditResult:
     def high_severity_count(self) -> int:
         return sum(1 for f in self.findings if f.severity == "high")
 
+    @property
+    def critical_severity_count(self) -> int:
+        return sum(1 for f in self.findings if f.severity == "critical")
+
+
+# ---------------------------------------------------------------------------
+# Legacy rule-id mapping (backward compatibility with tests)
+# ---------------------------------------------------------------------------
+
+# Categories that map to old BIAS-xxx rule IDs (for test compatibility).
+# New categories (age, ethnicity, income) use the pattern's own SP-xxx id.
+_CATEGORY_TO_OLD_RULE_PREFIX: dict[str, str] = {
+    "gender": "BIAS-GEN",
+    "region": "BIAS-REG",
+    "occupation-income": "BIAS-OCC",
+    "occupation": "BIAS-OCC",
+    "language": "BIAS-LANG",
+    "diversity": "BIAS-DIV",
+}
+
+
+def _make_rule_id(category: str, counter: int) -> str:
+    """Generate a rule_id with backward-compatible naming."""
+    prefix = _CATEGORY_TO_OLD_RULE_PREFIX.get(category)
+    if prefix is not None:
+        return f"{prefix}-{counter:03d}"
+    # New categories use SP-xxx pattern id (handled by caller)
+    return ""
+
 
 # ---------------------------------------------------------------------------
 # Auditor
@@ -51,58 +85,40 @@ class BiasAuditResult:
 class BiasAuditor:
     """Audit PersonaProfile for systematic bias patterns.
 
-    Rules are heuristic-based and designed to catch the most common
-    LLM-generation biases in Chinese consumer personas.
+    Uses a 24-pattern stereotype library loaded from stereotype_patterns.py
+    plus explicit language-bias and demographic-diversity checks.
     """
 
-    # Gender → behaviour stereotypes
-    GENDER_BEHAVIOUR_STEREOTYPES: dict[str, list[str]] = {
-        "女": [
-            "感性消费", "冲动消费", "颜值至上", "只看外观",
-            "不关注参数", "容易被种草", "情绪化决策",
-        ],
-        "男": [
-            "理性消费", "参数党", "只看性能", "不关心价格",
-            "技术专家", "不做功课",
-        ],
-    }
-
-    # Region → income stereotypes
-    REGION_INCOME_STEREOTYPES: dict[str, list[str]] = {
-        "县城": ["低收入", "节俭", "3万元以下", "价格敏感"],
-        "乡镇": ["低收入", "节俭", "3万元以下", "价格敏感"],
-        "三四线": ["低消费", "保守", "不重视品质"],
-    }
-
-    # Occupation → unlikely high-income combinations
-    OCCUPATION_UNLIKELY_HIGH_INCOME: dict[str, list[str]] = {
-        "学生": ["30-50万元", "50-100万元", "100万元以上", "月收入30K+"],
-        "退休": ["30-50万元", "50-100万元", "100万元以上", "月收入30K+"],
-        "自由职业": ["100万元以上"],
-    }
-
-    # Bias terms in language samples (should not appear)
+    # Bias terms in language samples (should never appear)
     BIASED_TERMS: list[str] = [
         "男人就应该", "女人天生", "典型的男性", "典型的女性",
         "我们男的", "我们女的", "男的不懂", "女的不会",
         "穷人思维", "富人思维", "乡下人", "土包子",
     ]
 
+    def __init__(self) -> None:
+        self._patterns: list[dict] = STEREOTYPE_PATTERNS
+
+    # ------------------------------------------------------------------
+    # Main audit entry point
+    # ------------------------------------------------------------------
+
     def audit(self, persona: PersonaProfile) -> BiasAuditResult:
         """Run all bias detection rules and return result."""
         findings: list[BiasFinding] = []
 
-        findings.extend(self._check_gender_stereotypes(persona))
-        findings.extend(self._check_region_income_stereotypes(persona))
-        findings.extend(self._check_occupation_income_anomaly(persona))
+        findings.extend(self._check_stereotype_patterns(persona))
         findings.extend(self._check_language_bias_terms(persona))
         findings.extend(self._check_demographic_diversity(persona))
 
         # Determine overall status
+        critical_count = sum(1 for f in findings if f.severity == "critical")
         high_count = sum(1 for f in findings if f.severity == "high")
         medium_count = sum(1 for f in findings if f.severity == "medium")
 
-        if high_count > 0 or medium_count > 1:
+        if critical_count > 0:
+            status = "FAILED"  # CRITICAL triggers 小伦 veto — batch must pause
+        elif high_count > 0 or medium_count > 0:
             status = "FAILED"
         elif len(findings) > 0:
             status = "PASSED"  # Minor findings don't fail
@@ -112,96 +128,217 @@ class BiasAuditor:
         return BiasAuditResult(status=status, findings=findings)
 
     # ------------------------------------------------------------------
-    # Rule 1: Gender stereotypes
+    # Unified stereotype pattern check (replaces 3 old hardcoded rules)
     # ------------------------------------------------------------------
 
-    def _check_gender_stereotypes(self, persona: PersonaProfile) -> list[BiasFinding]:
-        """Flag if gender is stereotypically correlated with behaviour."""
+    def _check_stereotype_patterns(
+        self, persona: PersonaProfile
+    ) -> list[BiasFinding]:
+        """Iterate over the 24-pattern library and flag any matches.
+
+        For each pattern:
+        1. Check demographic constraints (if any)
+        2. Build the relevant text corpus from persona fields
+        3. Substring-match keywords against that corpus
+        4. Create a BiasFinding on match
+
+        Backward-compatible rule_ids are generated for categories that
+        overlap with the old hardcoded rules.
+        """
         findings: list[BiasFinding] = []
-        gender = persona.layer1_demographics.gender
+        # Per-category counters for backward-compatible rule_id generation
+        cat_counters: dict[str, int] = {}
+
+        l1 = persona.layer1_demographics
         l2 = persona.layer2_behavior
         l3 = persona.layer3_psychology
+        l4 = persona.layer4_scenarios
 
-        if gender not in self.GENDER_BEHAVIOUR_STEREOTYPES:
-            return findings
+        for pattern in self._patterns:
+            # --- Step 1: demographic constraint check ---
+            demo_match = pattern.get("demographic_match")
+            if demo_match is not None:
+                if not self._demographic_matches(persona, demo_match):
+                    continue
 
-        stereotypes = self.GENDER_BEHAVIOUR_STEREOTYPES[gender]
-        text_to_check = " ".join([
-            l2.price_sensitivity,
-            l2.decision_style,
-            l2.brand_loyalty,
-            l3.secret_motivation,
-            l3.defense_mechanism,
-        ]).lower()
+            # --- Step 2: build text corpus based on match_fields ---
+            match_fields = pattern.get("match_fields", [])
+            text_corpus = self._build_text_corpus(
+                persona, match_fields, pattern
+            )
 
-        matched = [s for s in stereotypes if s in text_to_check]
-        if len(matched) >= 3:
+            # --- Step 3: keyword matching ---
+            keywords = pattern.get("keywords_cn", [])
+            matched = [kw for kw in keywords if kw in text_corpus]
+
+            if not matched:
+                continue
+
+            # --- Step 4: increment counter and create finding ---
+            cat = pattern["category"]
+            cat_counters[cat] = cat_counters.get(cat, 0) + 1
+            rule_id = self._get_or_generate_rule_id(pattern, cat_counters[cat])
             findings.append(BiasFinding(
-                rule_id="BIAS-GEN-001",
-                category="gender",
-                severity="medium",
-                description=f"性别'{gender}'与{len(matched)}项刻板行为强关联: {', '.join(matched[:3])}",
-            ))
-        elif len(matched) >= 1:
-            findings.append(BiasFinding(
-                rule_id="BIAS-GEN-002",
-                category="gender",
-                severity="low",
-                description=f"性别'{gender}'与刻板行为有关联: {', '.join(matched)}",
+                rule_id=rule_id,
+                category=pattern["category"],
+                severity=pattern["severity"],
+                description=(
+                    f"[{pattern['id']}] {pattern['description']}"
+                    f" — 匹配关键词: {', '.join(matched[:3])}"
+                ),
             ))
 
         return findings
 
+    def _demographic_matches(
+        self, persona: PersonaProfile, demo_match: dict
+    ) -> bool:
+        """Check if persona demographics satisfy the pattern's constraints."""
+        l1 = persona.layer1_demographics
+
+        # Simple exact field match
+        for field, expected in demo_match.items():
+            if field in ("city_keywords", "occupation_keywords", "age_keywords", "income_keywords"):
+                continue  # handled below
+            if field == "check_field":
+                continue  # meta-field, not a demographic
+            actual = getattr(l1, field, "")
+            # Handle list fields (e.g. purchase_channels, information_source)
+            if isinstance(actual, list):
+                if not any(expected in str(item) for item in actual):
+                    return False
+            elif expected not in actual:
+                return False
+
+        # City keyword match
+        city_kws = demo_match.get("city_keywords")
+        if city_kws is not None:
+            if not any(kw in l1.city for kw in city_kws):
+                return False
+
+        # Occupation keyword match
+        occ_kws = demo_match.get("occupation_keywords")
+        if occ_kws is not None:
+            if not any(kw in l1.occupation for kw in occ_kws):
+                return False
+
+        # Age keyword match
+        age_kws = demo_match.get("age_keywords")
+        if age_kws is not None:
+            if not any(kw in l1.age for kw in age_kws):
+                return False
+
+        # Income keyword match
+        income_kws = demo_match.get("income_keywords")
+        if income_kws is not None:
+            if not any(kw in l1.income for kw in income_kws):
+                return False
+
+        # check_field: used to limit which field the keywords are checked against
+        # (handled in _build_text_corpus — no rejection here)
+
+        return True
+
+    def _build_text_corpus(
+        self,
+        persona: PersonaProfile,
+        match_fields: list[str],
+        pattern: dict,
+    ) -> str:
+        """Build a searchable text corpus from the specified persona fields.
+
+        match_fields values:
+          - "demographics" → Layer 1 fields
+          - "behavior"     → Layer 2 fields
+          - "psychology"   → Layer 3 fields
+          - "scenarios"    → Layer 4 fields
+          - "language"     → language_samples
+          - empty/None     → all text fields (comprehensive scan)
+        """
+        l1 = persona.layer1_demographics
+        l2 = persona.layer2_behavior
+        l3 = persona.layer3_psychology
+        l4 = persona.layer4_scenarios
+
+        # If the pattern uses check_field in demographic_match, narrow to
+        # only that field for keyword matching.
+        demo_match = pattern.get("demographic_match")
+        check_field = demo_match.get("check_field") if demo_match else None
+
+        if check_field is not None:
+            # Only check the specified demographic field
+            field_value = getattr(l1, check_field, "")
+            return f" {field_value} ".lower()
+
+        parts: list[str] = []
+
+        if not match_fields:
+            # Scan all fields
+            match_fields = [
+                "demographics", "behavior", "psychology",
+                "scenarios", "language",
+            ]
+
+        for mf in match_fields:
+            if mf == "demographics":
+                parts.extend([
+                    l1.age, l1.gender, l1.city, l1.income,
+                    l1.occupation, l1.education, l1.marital_status,
+                    l1.living_type,
+                ])
+            elif mf == "behavior":
+                parts.extend([
+                    l2.price_sensitivity,
+                    l2.decision_style,
+                    l2.brand_loyalty,
+                    " ".join(l2.purchase_channels),
+                    " ".join(l2.information_source),
+                ])
+            elif mf == "psychology":
+                parts.extend([
+                    " ".join(l3.core_values),
+                    " ".join(l3.core_anxieties),
+                    " ".join(l3.tension_combination.labels),
+                    l3.tension_combination.narrative_explanation,
+                    l3.secret_motivation,
+                    l3.defense_mechanism,
+                ])
+            elif mf == "scenarios":
+                parts.extend([
+                    l4.daily_routine,
+                    l4.purchase_trigger,
+                    l4.stress_response,
+                    l4.social_behavior,
+                ])
+            elif mf == "language":
+                parts.extend(persona.language_samples)
+
+        return (" " + " ".join(parts) + " ").lower()
+
+    def _get_or_generate_rule_id(
+        self, pattern: dict, counter: int
+    ) -> str:
+        """Return the rule_id for a pattern.
+
+        Uses backward-compatible BIAS-xxx-NNN format for categories that
+        overlap with old hardcoded rules.  Uses SP-xxx pattern id for new
+        categories (age, ethnicity, income).
+        """
+        category = pattern["category"]
+        prefix = _CATEGORY_TO_OLD_RULE_PREFIX.get(category)
+        if prefix is not None:
+            # Sequential numbering per-category (backward compat)
+            return f"{prefix}-{counter:03d}"
+        # New categories: use pattern id directly
+        return pattern["id"]
+
     # ------------------------------------------------------------------
-    # Rule 2: Region → income stereotypes
+    # Language bias terms (explicit slurs — kept as dedicated check)
     # ------------------------------------------------------------------
 
-    def _check_region_income_stereotypes(self, persona: PersonaProfile) -> list[BiasFinding]:
-        """Flag if low-tier cities are automatically assigned low income."""
-        findings: list[BiasFinding] = []
-        city = persona.layer1_demographics.city
-        income = persona.layer1_demographics.income
-
-        for region_key, income_markers in self.REGION_INCOME_STEREOTYPES.items():
-            if region_key in city and any(m in income for m in income_markers):
-                # It's OK for low-tier cities to have low income, but flag
-                # if it's *automatically* paired without nuance
-                # We use a simple heuristic: if income is the very lowest bracket
-                findings.append(BiasFinding(
-                        rule_id="BIAS-REG-001",
-                        category="region",
-                        severity="low",
-                        description=f"城市'{city}'自动匹配最低收入档位'{income}'，可能缺乏多样性",
-                    ))
-
-        return findings
-
-    # ------------------------------------------------------------------
-    # Rule 3: Occupation → unrealistic income
-    # ------------------------------------------------------------------
-
-    def _check_occupation_income_anomaly(self, persona: PersonaProfile) -> list[BiasFinding]:
-        """Flag occupation-income combinations that are extremely unlikely."""
-        findings: list[BiasFinding] = []
-        occupation = persona.layer1_demographics.occupation
-        income = persona.layer1_demographics.income
-
-        for occ_key, unlikely_incomes in self.OCCUPATION_UNLIKELY_HIGH_INCOME.items():
-            if occ_key in occupation and any(inc in income for inc in unlikely_incomes):
-                findings.append(BiasFinding(
-                        rule_id="BIAS-OCC-001",
-                        category="occupation-income",
-                        severity="high",
-                        description=f"职业'{occupation}'与收入'{income}'组合极不常见，可能存在模型偏见",
-                    ))
-
-        return findings
-
-    # ------------------------------------------------------------------
-    # Rule 4: Biased language in samples
-    # ------------------------------------------------------------------
-
-    def _check_language_bias_terms(self, persona: PersonaProfile) -> list[BiasFinding]:
+    def _check_language_bias_terms(
+        self, persona: PersonaProfile
+    ) -> list[BiasFinding]:
         """Flag explicit bias terms in language samples."""
         findings: list[BiasFinding] = []
         samples_text = " ".join(persona.language_samples)
@@ -218,10 +355,12 @@ class BiasAuditor:
         return findings
 
     # ------------------------------------------------------------------
-    # Rule 5: Demographic diversity
+    # Demographic diversity (overly-average template detection)
     # ------------------------------------------------------------------
 
-    def _check_demographic_diversity(self, persona: PersonaProfile) -> list[BiasFinding]:
+    def _check_demographic_diversity(
+        self, persona: PersonaProfile
+    ) -> list[BiasFinding]:
         """Check for overly 'average' demographics that lack diversity."""
         findings: list[BiasFinding] = []
         l1 = persona.layer1_demographics
@@ -244,7 +383,10 @@ class BiasAuditor:
                 rule_id="BIAS-DIV-001",
                 category="diversity",
                 severity="low",
-                description=f"画像呈现高度'平均化'特征({average_markers}/5项)，可能反映模型输出集中在典型模板",
+                description=(
+                    f"画像呈现高度'平均化'特征({average_markers}/5项)，"
+                    f"可能反映模型输出集中在典型模板"
+                ),
             ))
 
         return findings
@@ -253,7 +395,9 @@ class BiasAuditor:
     # Batch audit helper
     # ------------------------------------------------------------------
 
-    def audit_batch(self, personas: list[PersonaProfile]) -> dict[str, Any]:
+    def audit_batch(
+        self, personas: list[PersonaProfile]
+    ) -> dict[str, Any]:
         """Audit a batch and report aggregate statistics."""
         results = [self.audit(p) for p in personas]
 
@@ -268,7 +412,9 @@ class BiasAuditor:
         # Count by category
         category_counts: dict[str, int] = {}
         for f in all_findings:
-            category_counts[f.category] = category_counts.get(f.category, 0) + 1
+            category_counts[f.category] = (
+                category_counts.get(f.category, 0) + 1
+            )
 
         return {
             "total_audited": total,
@@ -277,5 +423,10 @@ class BiasAuditor:
             "pass_rate": round(passed / total, 3) if total else 0,
             "total_findings": len(all_findings),
             "findings_by_category": category_counts,
-            "high_severity_findings": sum(1 for f in all_findings if f.severity == "high"),
+            "critical_severity_findings": sum(
+                1 for f in all_findings if f.severity == "critical"
+            ),
+            "high_severity_findings": sum(
+                1 for f in all_findings if f.severity == "high"
+            ),
         }

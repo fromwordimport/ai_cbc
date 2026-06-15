@@ -1,0 +1,14 @@
+step 1: sys.path
+step 2: FastAPI
+step 3: dependencies
+step 4: personas
+step 5: store
+step 6: validators
+step 7: profile_generator
+step 8: seed_generator
+step 9: llm.client
+step 10: health_router
+step 11: app created
+step 12: health router included
+step 13: personas router included
+ALL OK

@@ -1,0 +1,86 @@
+{
+  "summary": {
+    "total": 11,
+    "pass": 10,
+    "fail": 1
+  },
+  "results": [
+    {
+      "section": "1.画像生成",
+      "test": "Modal表单字段",
+      "status": "PASS",
+      "detail": "study_id + count 字段存在",
+      "timestamp": "2026-06-12T09:52:20.226Z"
+    },
+    {
+      "section": "1.画像生成",
+      "test": "生成3个虚拟消费者",
+      "status": "PASS",
+      "detail": "Modal已自动关闭",
+      "timestamp": "2026-06-12T09:52:27.302Z"
+    },
+    {
+      "section": "1.画像生成",
+      "test": "画像列表显示",
+      "status": "PASS",
+      "detail": "表格行数=3",
+      "timestamp": "2026-06-12T09:52:28.314Z"
+    },
+    {
+      "section": "2.对话实验室",
+      "test": "选择画像",
+      "status": "PASS",
+      "detail": "选择: persona-dishwasher-001-001 (中年空巢（子女独立）-一线城市)",
+      "timestamp": "2026-06-12T09:52:33.756Z"
+    },
+    {
+      "section": "2.对话实验室",
+      "test": "输入问题",
+      "status": "PASS",
+      "detail": "",
+      "timestamp": "2026-06-12T09:52:34.297Z"
+    },
+    {
+      "section": "2.对话实验室",
+      "test": "第1轮对话",
+      "status": "PASS",
+      "detail": "已发送并获得回复",
+      "timestamp": "2026-06-12T09:52:39.578Z"
+    },
+    {
+      "section": "2.对话实验室",
+      "test": "第2轮对话",
+      "status": "PASS",
+      "detail": "",
+      "timestamp": "2026-06-12T09:52:45.282Z"
+    },
+    {
+      "section": "3.市场模拟",
+      "test": "页面结构",
+      "status": "PASS",
+      "detail": "14个Select组件, 1个可用按钮",
+      "timestamp": "2026-06-12T09:52:48.409Z"
+    },
+    {
+      "section": "4.系统设置",
+      "test": "模型选择器",
+      "status": "PASS",
+      "detail": "5个选项",
+      "timestamp": "2026-06-12T09:52:52.304Z"
+    },
+    {
+      "section": "5.作答模拟",
+      "test": "页面加载",
+      "status": "PASS",
+      "detail": "页面已加载",
+      "timestamp": "2026-06-12T09:52:55.428Z"
+    },
+    {
+      "section": "全局",
+      "test": "脚本执行",
+      "status": "FAIL",
+      "detail": "page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL\nCall log:\n\u001b[2m  - navigating to \"/\", waiting until \"networkidle\"\u001b[22m\n",
+      "timestamp": "2026-06-12T09:52:55.636Z"
+    }
+  ]
+}

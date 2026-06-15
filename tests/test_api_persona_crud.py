@@ -179,8 +179,8 @@ class TestValidatePersona:
             assert data["schema_passed"] is True
             assert data["logic_passed"] is True
             assert data["overall_passed"] is True
-            assert data["logic_score"] == 6.0
-            assert data["logic_max_score"] == 6.0
+            assert data["logic_score"] == 7.0
+            assert data["logic_max_score"] == 7.0
         finally:
             _clear_overrides()
 

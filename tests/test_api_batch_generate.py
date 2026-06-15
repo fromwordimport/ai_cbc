@@ -9,18 +9,28 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from aicbc.api.dependencies import (
+    get_authenticity_scorer,
+    get_bias_auditor,
     get_llm_client,
     get_logic_validator,
     get_profile_generator,
     get_schema_validator,
     get_seed_generator,
 )
+from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
+from aicbc.core.scoring.bias_auditor import BiasAuditResult, BiasAuditor
 from aicbc.core.store import PersonaStore, get_store
 from aicbc.core.validators import LogicValidator, SchemaValidator
 from aicbc.generators.profile_generator import ProfileGenerator
 from aicbc.generators.seed_generator import SeedGenerator
 from aicbc.llm.client import LLMResponse, Provider
 from aicbc.main import app
+
+
+# Lenient bias auditor that always passes for API integration tests
+class _LenientBiasAuditor(BiasAuditor):
+    def audit(self, persona):
+        return BiasAuditResult(status="PASSED", findings=[])
 
 
 def _mock_llm_response(content: dict[str, Any] | str, model: str = "claude-sonnet-4-6") -> LLMResponse:
@@ -53,6 +63,8 @@ def _override_deps(mock_llm_client: MagicMock, clean_store: PersonaStore) -> Non
     app.dependency_overrides[get_schema_validator] = SchemaValidator
     app.dependency_overrides[get_logic_validator] = LogicValidator
     app.dependency_overrides[get_store] = lambda: clean_store
+    app.dependency_overrides[get_bias_auditor] = lambda: _LenientBiasAuditor()
+    app.dependency_overrides[get_authenticity_scorer] = AuthenticityScorer
 
 
 def _clear_overrides() -> None:
@@ -216,16 +228,16 @@ class TestBatchGenerateErrors:
         """If one persona fails, others should still be generated."""
         _override_deps(mock_llm_client, clean_store)
 
-        def _l1() -> dict[str, Any]:
-            return {"age": "28岁", "gender": "女", "city": "新一线", "income": "15-30万元", "occupation": "产品经理", "education": "本科", "marital_status": "已婚", "living_type": "自有住房"}
-        def _l2() -> dict[str, Any]:
+        def _l1(idx: int = 0) -> dict[str, Any]:
+            return {"age": f"{28 + idx}岁", "gender": "女", "city": "新一线城市", "income": "15-30万元", "occupation": "产品经理", "education": "本科", "marital_status": "已婚", "living_type": "自有住房"}
+        def _l2(idx: int = 0) -> dict[str, Any]:
             return {"price_sensitivity": "中等敏感", "purchase_channels": ["京东"], "decision_style": "理性", "brand_loyalty": "中等", "information_source": ["小红书"]}
-        def _l3() -> dict[str, Any]:
-            return {"core_values": ["效率"], "core_anxieties": ["时间"], "tension_combination": {"labels": ["A", "B"], "narrative_explanation": "她追求精致生活却总在凑单后退掉不需要的商品，这种矛盾源于她既想享受品质又害怕浪费金钱的深层焦虑，小时候家境普通让她对浪费极度敏感。"}, "secret_motivation": "测试", "defense_mechanism": "测试"}
-        def _l4() -> dict[str, Any]:
-            return {"daily_routine": "早9晚6", "purchase_trigger": "种草", "stress_response": "购物", "social_behavior": "活跃"}
-        def _aux() -> dict[str, Any]:
-            return {"language_samples": ["洗碗机真的是解放双手的神器，后悔没早买！", "对比了三个品牌，最后还是选了性价比最高的那款。", "安装师傅非常专业，只用了半小时就全部搞定了。"], "dishwasher_context": {"purchase_constraints": ["空间小"], "decision_factors": ["价格"], "ignored_factors": ["外观"]}}
+        def _l3(idx: int = 0) -> dict[str, Any]:
+            return {"core_values": ["效率"], "core_anxieties": ["时间"], "tension_combination": {"labels": ["A", "B"], "narrative_explanation": f"她追求精致生活却总在凑单后退掉不需要的商品，这种矛盾源于她既想享受品质又害怕浪费金钱的深层焦虑，小时候家境普通让她对浪费极度敏感（样本{idx + 1}）。"}, "secret_motivation": f"测试动机{idx + 1}", "defense_mechanism": "测试"}
+        def _l4(idx: int = 0) -> dict[str, Any]:
+            return {"daily_routine": f"早9晚{6 + idx}", "purchase_trigger": "种草", "stress_response": "购物", "social_behavior": "活跃"}
+        def _aux(idx: int = 0) -> dict[str, Any]:
+            return {"language_samples": [f"洗碗机样本{idx + 1}真的是解放双手的神器，后悔没早买！", "对比了三个品牌，最后还是选了性价比最高的那款。", "安装师傅非常专业，只用了半小时就全部搞定了。"], "dishwasher_context": {"purchase_constraints": ["空间小"], "decision_factors": ["价格"], "ignored_factors": ["外观"]}}
 
         try:
             call_count = 0
@@ -234,10 +246,11 @@ class TestBatchGenerateErrors:
             def _failing_side_effect(*args: Any, **kwargs: Any) -> Any:
                 nonlocal call_count
                 call_count += 1
+                idx = (call_count - 1) // 5
                 if call_count == 10:  # 2nd persona, auxiliary call (5 calls per persona)
                     raise RuntimeError("Simulated LLM failure")
                 layer_fn = layers[(call_count - 1) % 5]
-                return _mock_llm_response(layer_fn())
+                return _mock_llm_response(layer_fn(idx))
 
             mock_llm_client.generate.side_effect = _failing_side_effect
 

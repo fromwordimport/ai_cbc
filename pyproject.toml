@@ -19,6 +19,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "prometheus-client>=0.20.0",
     "scipy>=1.17.1",
+    "cryptography>=49.0.0",
 ]
 
 [project.optional-dependencies]
@@ -77,16 +78,28 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "--cov=src --cov-report=term-missing --cov-report=html"
+addopts = "-v -m \"not slow\""
+# Coverage is CI-only. To run locally: uv run pytest --cov=src --cov-report=term-missing
+norecursedirs = ["tests/performance", ".git", ".tox", "dist", "build"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.coverage.run]
 source = ["src"]
 omit = ["*/tests/*", "*/test_*"]
 
 [tool.bandit]
-exclude_dirs = ["tests"]
-skips = ["B101"]  # assert_used in tests
+exclude_dirs = ["tests", ".venv"]
+skips = ["B101"]
+severity = "MEDIUM"
+confidence = "MEDIUM"
 
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple/"
 default = true
+
+[dependency-groups]
+dev = [
+    "locust>=2.44.3",
+]

@@ -1,6 +1,6 @@
 """Persona profile Pydantic models — four-layer consumer persona."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -17,6 +17,8 @@ class Layer1Demographics(BaseModel):
     education: str = Field(..., description="教育程度")
     marital_status: str = Field(..., description="婚姻状况")
     living_type: str = Field(..., description="居住形态")
+    life_stage: str = Field(default="", description="人生阶段，如'初入职场单身'、'养育幼儿'")
+    brand_relationship_stage: str = Field(default="", description="品牌关系阶段，如'初次了解'、'忠诚拥护'")
 
     model_config = {"json_schema_extra": {"layer": 1, "layer_name": "demographics"}}
 
@@ -74,6 +76,31 @@ class Layer4Scenarios(BaseModel):
     model_config = {"json_schema_extra": {"layer": 4, "layer_name": "scenarios"}}
 
 
+class SceneReactions(BaseModel):
+    """Consumer reactions in five key purchase scenarios.
+
+    Defined in 02-阶段一-画像生成.md — captures persona-specific responses
+    to common purchase-life situations.
+    """
+
+    under_pressure: str = Field(..., description="压力大时的购买反应")
+    friend_recommendation: str = Field(..., description="朋友推荐时的反应")
+    flash_sale_limited: str = Field(..., description="大促限时限量时的反应")
+    found_cheaper_elsewhere: str = Field(..., description="发现买贵了时的反应")
+    product_fault_after_sales: str = Field(..., description="产品故障售后时的反应")
+
+
+class MiniBiography(BaseModel):
+    """Three-part mini-biography (过去/现在/未来) for narrative depth.
+
+    Defined in 02-阶段一-画像生成.md — gives each persona a story arc.
+    """
+
+    past: str = Field(..., description="过去：成长经历、关键转折事件")
+    present: str = Field(..., description="现在：当前生活状态与核心矛盾")
+    future: str = Field(..., description="未来：理想生活、期望与恐惧")
+
+
 class DishwasherContext(BaseModel):
     """Dishwasher purchase context — product-specific situation."""
 
@@ -97,16 +124,24 @@ class PersonaProfile(BaseModel):
     persona_id: str = Field(
         ...,
         description="全局唯一画像标识，格式：前缀 + study_id + 序号",
-        pattern=r"^persona-[a-z0-9]+-\d+$",
+        pattern=r"^persona-[a-z0-9_-]+-\d+$",
     )
     segment: str = Field(..., description="所属细分群体")
     layer1_demographics: Layer1Demographics = Field(..., description="人口统计层")
     layer2_behavior: Layer2Behavior = Field(..., description="消费行为层")
     layer3_psychology: Layer3Psychology = Field(..., description="心理动机层")
     layer4_scenarios: Layer4Scenarios = Field(..., description="情境叙事层")
+    scene_reactions: SceneReactions | None = Field(
+        default=None,
+        description="五个关键购买场景中的反应",
+    )
+    mini_biography: MiniBiography | None = Field(
+        default=None,
+        description="人物小传（过去/现在/未来三段式）",
+    )
     language_samples: list[str] = Field(
         default_factory=list,
-        description="代表性发言（3条），单条20-60字",
+        description="代表性发言（3-5条），单条20-60字",
     )
     dishwasher_context: DishwasherContext = Field(..., description="洗碗机购买情境")
     authenticity_score: float | None = Field(
@@ -120,12 +155,21 @@ class PersonaProfile(BaseModel):
         description="偏见审计状态",
         pattern=r"^(PASSED|FAILED|PENDING)$",
     )
+    status: str = Field(
+        default="DRAFT",
+        description="画像生命周期状态",
+        pattern=r"^(DRAFT|REVIEWED|PUBLISHED|ARCHIVED|DEPRECATED)$",
+    )
+    version: str = Field(
+        default="0.1.0",
+        description="语义化版本号",
+    )
     generation_metadata: GenerationMetadata = Field(
         default_factory=GenerationMetadata,
         description="生成元信息",
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(UTC),
         description="创建时间（UTC）",
     )
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import UTC, datetime
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from aicbc.api.dependencies import (
     get_authenticity_scorer,
     get_bias_auditor,
+    get_llm_client,
     get_logic_validator,
     get_profile_generator,
     get_schema_validator,
@@ -21,16 +23,23 @@ from aicbc.api.schemas import (
     GenerationErrorDetail,
     LayerResponse,
     PersonaDetail,
+    PersonaExportResponse,
     PersonaListResponse,
     PersonaSummary,
     ValidateResponse,
 )
+from aicbc.config.settings import get_settings
+from aicbc.core.privacy import redact_dict
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
-from aicbc.core.store import PersonaStore, get_store
+from aicbc.core.security import sanitize_id
+from aicbc.core.store import PersonaStore, ResponseStore, get_response_store, get_store
 from aicbc.core.validators import LogicValidator, SchemaValidator
+from aicbc.cost.fuse import CostFuseError
 from aicbc.generators.profile_generator import ProfileGenerator
 from aicbc.generators.seed_generator import SeedGenerator
+
+settings = get_settings()
 
 router = APIRouter()
 logger = structlog.get_logger("aicbc.api.personas")
@@ -73,13 +82,34 @@ async def generate_personas_batch(
     personas: list[PersonaSummary] = []
     errors: list[GenerationErrorDetail] = []
     total_cost = 0.0
+    bias_failed_count = 0
 
     # Fix seed for reproducibility if provided
     if request.seed is not None:
         seed_gen = SeedGenerator(seed=request.seed)
 
-    # Sanitize study_id for persona_id pattern compliance
-    safe_study_id = request.study_id.replace("-", "_")
+    # Sanitize study_id for persona_id pattern compliance (SEC-001)
+    try:
+        safe_study_id = sanitize_id(request.study_id, field_name="study_id")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # P0-001: Pass study_id to ProfileGenerator for per-study cost tracking.
+    # Use the DI-injected profile_gen's llm_client so that test overrides apply.
+    if safe_study_id:
+        profile_gen = ProfileGenerator(
+            llm_client=profile_gen._llm, study_id=safe_study_id
+        )
+
+    def _safe_error_message(exc: Exception) -> str:
+        """Return safe error detail for client exposure."""
+        if settings.is_production and not isinstance(exc, CostFuseError):
+            return "Generation failed. Please try again or contact support."
+        return str(exc)
+
     for i in range(request.count):
         persona_id = f"persona-{safe_study_id}-{i + 1:03d}"
         try:
@@ -105,19 +135,76 @@ async def generate_personas_batch(
             bias_result = bias_auditor.audit(profile)
             profile.bias_audit_status = bias_result.status
 
-            store.save(profile)
+            # Reject-and-regenerate: retry with new seeds when bias audit fails
+            # Max 3 total attempts (1 original + 2 retries) per P0-SEC-001
+            if bias_result.status == "FAILED":
+                retry_count = 0
+                max_retries = 2  # 3 attempts total
+                while bias_result.status == "FAILED" and retry_count < max_retries:
+                    retry_count += 1
+                    log.warning(
+                        "persona_bias_rejected_retrying",
+                        persona_id=persona_id,
+                        attempt=retry_count,
+                        bias_high_count=bias_result.high_severity_count,
+                        bias_critical_count=bias_result.critical_severity_count,
+                        bias_total_findings=len(bias_result.findings),
+                    )
+                    total_cost += profile.generation_metadata.cost_cny
+                    # Regenerate with fresh seed
+                    retry_seed = seed_gen.generate_seed()
+                    profile = profile_gen.generate(persona_id, retry_seed)
+                    # Re-run scoring and audit on regenerated profile
+                    auth_result = authenticity_scorer.score(profile)
+                    profile.authenticity_score = auth_result.total_score
+                    bias_result = bias_auditor.audit(profile)
+                    profile.bias_audit_status = bias_result.status
+
+                if bias_result.status == "FAILED":
+                    # All retries exhausted — reject this persona
+                    bias_failed_count += 1
+                    log.warning(
+                        "persona_bias_rejected_final",
+                        persona_id=persona_id,
+                        total_attempts=retry_count + 1,
+                        bias_high_count=bias_result.high_severity_count,
+                        bias_critical_count=bias_result.critical_severity_count,
+                        bias_total_findings=len(bias_result.findings),
+                    )
+                    total_cost += profile.generation_metadata.cost_cny
+                    continue
+
+            if not store.save(profile):
+                # Duplicate content detected — skip silently but track cost
+                log.info("persona_duplicate_skipped", persona_id=profile.persona_id)
+                total_cost += profile.generation_metadata.cost_cny
+                continue
             personas.append(PersonaSummary.from_profile(profile))
             total_cost += profile.generation_metadata.cost_cny
 
+        except CostFuseError as exc:
+            log.error("persona_generation_cost_fuse", index=i, error=str(exc))
+            errors.append(GenerationErrorDetail(index=i, error=_safe_error_message(exc)))
+            # Stop batch generation on cost fuse — do not proceed with remaining personas
+            break
         except Exception as exc:
             log.error("persona_generation_failed", index=i, error=str(exc))
-            errors.append(GenerationErrorDetail(index=i, error=str(exc)))
+            errors.append(GenerationErrorDetail(index=i, error=_safe_error_message(exc)))
+
+    # Build bias warning when too many personas fail bias audit
+    bias_warning: str | None = None
+    if bias_failed_count >= 3:
+        bias_warning = (
+            f"批次偏见审计警告: {bias_failed_count}个画像因偏见检测失败被跳过。"
+            f"建议检查生成参数、提示模板或调整目标人群分布。"
+        )
 
     elapsed = round(time.perf_counter() - start_time, 3)
     log.info(
         "batch_generation_complete",
         generated=len(personas),
         failed=len(errors),
+        bias_rejected=bias_failed_count,
         cost_cny=round(total_cost, 4),
         elapsed_seconds=elapsed,
     )
@@ -131,6 +218,8 @@ async def generate_personas_batch(
         errors=errors,
         total_cost_cny=round(total_cost, 4),
         generation_time_seconds=elapsed,
+        bias_failed_count=bias_failed_count,
+        bias_warning=bias_warning,
     )
 
 
@@ -274,6 +363,47 @@ async def get_persona_layer(
 
 
 # ---------------------------------------------------------------------------
+# Data subject rights — export
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/personas/{persona_id}/export",
+    response_model=PersonaExportResponse,
+    summary="Export persona data (data portability)",
+    response_description="Complete persona data in a portable format",
+)
+async def export_persona(
+    persona_id: str,
+    store: PersonaStore = Depends(get_store),
+) -> PersonaExportResponse:
+    """Export all data held about a single virtual consumer persona.
+
+    Supports data subject access / portability requests under GDPR/PIPL.
+    """
+    profile = store.get(persona_id)
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Persona '{persona_id}' not found",
+        )
+
+    return PersonaExportResponse(
+        persona_id=persona_id,
+        exported_at=datetime.now(UTC),
+        profile=redact_dict(profile.model_dump(mode="json")),
+        generation_metadata=redact_dict(profile.generation_metadata.model_dump(mode="json")),
+        audit_trail={
+            "authenticity_score": profile.authenticity_score,
+            "bias_audit_status": profile.bias_audit_status,
+            "status": profile.status,
+            "version": profile.version,
+            "created_at": profile.created_at.isoformat(),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Deletion (admin/testing)
 # ---------------------------------------------------------------------------
 
@@ -281,16 +411,19 @@ async def get_persona_layer(
 @router.delete(
     "/personas/{persona_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Delete a persona",
 )
 async def delete_persona(
     persona_id: str,
     store: PersonaStore = Depends(get_store),
+    response_store: ResponseStore = Depends(get_response_store),
 ) -> None:
-    """Delete a persona from the store."""
+    """Delete a persona and all associated responses from the store."""
     deleted = store.delete(persona_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Persona '{persona_id}' not found",
         )
+    response_store.delete_by_persona(persona_id)

@@ -40,7 +40,7 @@ class DatasetMetadata(BaseModel):
     """Metadata for a CBCRawDataset."""
 
     study_id: str = Field(..., description="Study identifier")
-    n_respondents: int = Field(..., ge=1, description="Number of respondents")
+    n_respondents: int = Field(..., ge=0, description="Number of respondents")
     n_choice_sets: int = Field(..., ge=1, description="Choice sets per respondent")
     n_alternatives: int = Field(..., ge=2, description="Alternatives per set (excl. none)")
     attributes: list[dict[str, Any]] = Field(

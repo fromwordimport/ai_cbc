@@ -92,7 +92,7 @@ HUMAN_REVIEW_REQUIRED  → REV → ORCH   # 需要人工介入
       "severity": "MAJOR",  // CRITICAL | MAJOR | MINOR
       "field_path": "layer3.psychology.tension_combination",
       "description": "矛盾标签缺少叙事解释",
-      "expected": "至少30字的内心独白式解释"
+      "expected": "至少50字的内心独白式解释"
     }
   ],
   "recommendations": ["补充矛盾张力的心理解释"]
@@ -468,7 +468,21 @@ REV Agent 需要知道之前的审校历史，避免重复提出相同问题：
 - action: 如果 NEEDS_FIX，提供具体修改建议
 ```
 
-### 7.2 人工审核队列
+### 7.2 人工审核队列与 SLA
+
+**优先级定义**：
+
+| 优先级 | 触发条件 | 响应 SLA | 超时处理 |
+|--------|---------|---------|---------|
+| HIGH | 偏见检测高危 / authenticity_score < 7 | 2 小时 | 升级至小伦+小P，超时自动拒绝 |
+| MEDIUM | 连续 3 次 FIX 未通过 / 分数退化 | 8 小时 | 保留队列，升级通知 |
+| LOW | 总分 7-8 分（需审查但非紧急） | 24 小时 | 超时自动通过（仅限总分 ≥ 9 者） |
+
+**队列健康监控**：
+- 每 4 小时检查队列积压量，积压 > 10 条触发告警
+- 队列深度硬上限 50 条，触发后暂停新画像生成
+
+**审核队列数据结构**：
 
 ```json
 {

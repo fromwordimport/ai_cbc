@@ -45,3 +45,4 @@ Thumbs.db
 
 # UV
 uv.lock
+node_modules

@@ -148,7 +148,10 @@ def test_generate_anthropic_with_system_message(client):
         )
 
     call_kwargs = create_spy.call_args.kwargs
-    assert call_kwargs["system"] == "You are a test assistant."
+    # system is a list of content blocks (Anthropic prompt caching format)
+    system_blocks = call_kwargs["system"]
+    assert isinstance(system_blocks, list)
+    assert any("You are a test assistant." in b.get("text", "") for b in system_blocks)
     assert call_kwargs["messages"] == [{"role": "user", "content": "Go"}]
 
 
@@ -165,7 +168,10 @@ def test_generate_anthropic_json_mode(client):
         )
 
     call_kwargs = create_spy.call_args.kwargs
-    assert "You must respond with valid JSON only" in call_kwargs["system"]
+    # system is a list of content blocks; check all block texts for the JSON instruction
+    system_blocks = call_kwargs["system"]
+    assert isinstance(system_blocks, list)
+    assert any("You must respond with valid JSON only" in b.get("text", "") for b in system_blocks)
 
 
 # ---------------------------------------------------------------------------

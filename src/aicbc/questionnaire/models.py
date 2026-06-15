@@ -26,7 +26,8 @@ class AttributeType(StrEnum):
 class DesignAlgorithm(StrEnum):
     """Experimental design algorithm options."""
 
-    ORTHOGONAL = "orthogonal"
+    BALANCED = "balanced"
+    ORTHOGONAL = "orthogonal"  # deprecated — maps to BALANCED
     D_OPTIMAL = "d_optimal"
 
 
@@ -112,11 +113,50 @@ class DesignParameters(BaseModel):
     )
 
 
-class ProhibitedPair(BaseModel):
-    """A prohibited attribute-level combination."""
+class Condition(BaseModel):
+    """A single attribute-level constraint — one leg of a prohibited combination."""
 
     attribute_id: str = Field(..., description="Attribute identifier")
-    level_value: Any = Field(..., description="Prohibited level value")
+    level_value: Any = Field(..., description="Forbidden level value")
+
+
+class ProhibitedPair(BaseModel):
+    """One or more attribute-level conditions that must NOT appear together.
+
+    ``conditions`` are AND-ed: *every* condition must match for a profile
+    to be rejected.  Multiple ``ProhibitedPair`` entries in a study are
+    OR-ed: any matching pair blocks the profile.
+
+    Legacy single-attribute format is auto-converted on construction::
+
+        ProhibitedPair(attribute_id="brand", level_value="美的")
+        → ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="美的")])
+    """
+
+    conditions: list[Condition] = Field(
+        default_factory=list,
+        min_length=1,
+        description="AND-ed conditions; all must match to trigger rejection",
+    )
+    # Legacy fields — accepted during construction, converted to conditions[0]
+    attribute_id: str | None = Field(default=None, exclude=True)
+    level_value: Any = Field(default=None, exclude=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Legacy single-attribute form → wrap into conditions
+            if "conditions" not in data and "attribute_id" in data:
+                data["conditions"] = [
+                    {"attribute_id": data.pop("attribute_id", None),
+                     "level_value": data.pop("level_value", None)}
+                ]
+            # Drop leftover legacy keys if conditions already present
+            if "conditions" in data:
+                data.pop("attribute_id", None)
+                data.pop("level_value", None)
+        return data
 
 
 class CBCStudy(BaseModel):
@@ -127,6 +167,16 @@ class CBCStudy(BaseModel):
     research_goal: str = Field(..., description="Research objective")
     target_segments: list[str] = Field(
         default_factory=list, description="Target consumer segments"
+    )
+    sample_size: int = Field(
+        default=200,
+        ge=30,
+        description="Target number of respondents (required by cost fusing)",
+    )
+    cost_budget_cny: float = Field(
+        default=50.0,
+        ge=0,
+        description="Per-study cost budget in CNY (used by cost fuse)",
     )
     attributes: list[Attribute] = Field(..., description="Product attributes")
     design_parameters: DesignParameters = Field(
@@ -183,6 +233,10 @@ class CBCQuestionnaire(BaseModel):
 
     questionnaire_id: str = Field(..., description="Unique questionnaire identifier")
     study_id: str = Field(..., description="Parent study identifier")
+    attributes: list[Attribute] = Field(
+        default_factory=list,
+        description="Product attributes used in this questionnaire",
+    )
     choice_sets: list[ChoiceSet] = Field(..., description="List of choice sets")
     design_parameters: DesignParameters = Field(..., description="Design parameters used")
     d_efficiency: float | None = Field(

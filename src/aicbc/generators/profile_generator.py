@@ -158,12 +158,20 @@ class ProfileGenerator:
     Error handling is per-layer: if a single layer fails to parse, a
     statically-defined fallback dict is substituted and generation
     continues so that the overall flow is not interrupted.
+
+    **LLM Response Caching**: The underlying ``LLMClient`` maintains an
+    in-memory LRU cache (128 entries, thread-safe).  Because all layer
+    prompts are fully deterministic given a ``SeedConfig``, repeating a
+    ``generate()`` call with the same seed configuration will hit the cache
+    for every layer + auxiliary call, reducing latency to near-zero and
+    eliminating duplicate API costs.
     """
 
     def __init__(
         self,
         llm_client: LLMClient | None = None,
         prompt_template_path: Path | str | None = None,
+        study_id: str | None = None,
     ) -> None:
         """Initialize the profile generator.
 
@@ -171,32 +179,32 @@ class ProfileGenerator:
             llm_client: An LLMClient instance. If None, a new one is created.
             prompt_template_path: Path to the Jinja2-style prompt template file.
                 Defaults to ``configs/prompts/persona_generation.txt``.
+            study_id: Optional study identifier for cost tracking.
         """
         self._llm = llm_client or LLMClient()
         self._prompt_path = Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
         self._template = self._load_template()
+        self._study_id = study_id
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def generate(self, persona_id: str, seed_config: SeedConfig) -> PersonaProfile:
+    def generate(
+        self, persona_id: str, seed_config: SeedConfig, feedback: str | None = None
+    ) -> PersonaProfile:
         """Generate a complete four-layer persona profile.
-
-        The method iterates through layers 1-4, building up context at each
-        step.  If a layer fails (LLM error or JSON parse error), a fallback
-        default is used for that layer and generation continues.
 
         Args:
             persona_id: Globally unique persona identifier.
             seed_config: Seed configuration produced by SeedGenerator.
+            feedback: Optional correction feedback from the evaluation chain.
+                When provided, it is injected into the layer-generation prompts
+                so the LLM can address specific quality issues (e.g. low
+                authenticity scores, contradictory traits).
 
         Returns:
             A fully populated PersonaProfile.
-
-        Raises:
-            ProfileGenerationError: If a fundamentally unrecoverable error
-                occurs (e.g. the prompt template is missing).
         """
         log = logger.bind(persona_id=persona_id)
         log.info("profile_generation_start", seed=seed_config.model_dump())
@@ -206,7 +214,12 @@ class ProfileGenerator:
         model_used = ""
 
         for layer_num in range(1, 5):
-            layer_data, response = self._generate_layer(layer_num, seed_config, layer_results)
+            # Only layer 1 receives correction feedback; it cascades through
+            # previous_layers context to subsequent layers.
+            layer_feedback = feedback if layer_num == 1 else None
+            layer_data, response = self._generate_layer(
+                layer_num, seed_config, layer_results, feedback=layer_feedback
+            )
             layer_results[layer_num] = layer_data
             if response:
                 total_cost_usd += response.estimated_cost_usd
@@ -248,6 +261,9 @@ class ProfileGenerator:
             "profile_generation_complete",
             segment=segment,
             cost_cny=profile.generation_metadata.cost_cny,
+            llm_cache_hits=self._llm.cache_hits,
+            llm_cache_misses=self._llm.cache_misses,
+            llm_cache_size=self._llm.cache_size,
         )
         return profile
 
@@ -266,6 +282,7 @@ class ProfileGenerator:
         layer_num: int,
         seed_config: SeedConfig,
         previous_layers: dict[int, dict[str, Any]],
+        feedback: str | None = None,
     ) -> str:
         """Construct the prompt for a specific layer using simple string substitution.
 
@@ -273,6 +290,7 @@ class ProfileGenerator:
             layer_num: The layer to generate (1-4).
             seed_config: The seed configuration.
             previous_layers: Dict of already-generated layer data.
+            feedback: Optional correction feedback injected as a prompt block.
 
         Returns:
             A fully rendered prompt string.
@@ -292,6 +310,15 @@ class ProfileGenerator:
                     parts.append(f"    {k}: {v}")
             previous_layers_str = "\n".join(parts)
 
+        # Build correction feedback block (only for layer 1 — it cascades via previous_layers)
+        feedback_block = ""
+        if feedback and layer_num == 1:
+            feedback_block = (
+                "\n【上一轮生成的质量反馈 — 请在本次生成中修正以下问题】\n"
+                f"{feedback}\n"
+                "请确保本次生成的画像能够解决上述问题，同时保持人格的一致性和真实感。\n"
+            )
+
         # Simple variable substitution (Jinja2-style {{var}})
         prompt = self._template
         replacements = {
@@ -301,6 +328,7 @@ class ProfileGenerator:
             "{{city_tier}}": seed_config.city_tier,
             "{{tension_pairs}}": "\n" + tension_pairs_str,
             "{{previous_layers}}": previous_layers_str,
+            "{{correction_feedback}}": feedback_block,
             "{{target_layer}}": f"{meta['name']}\n{meta['description']}",
             "{{json_schema}}": _LAYER_JSON_SCHEMA[layer_num],
         }
@@ -323,19 +351,11 @@ class ProfileGenerator:
         layer_num: int,
         seed_config: SeedConfig,
         previous_layers: dict[int, dict[str, Any]],
+        feedback: str | None = None,
     ) -> tuple[dict[str, Any], LLMResponse | None]:
-        """Generate a single layer via LLM with fallback on failure.
-
-        Args:
-            layer_num: Layer number (1-4).
-            seed_config: Seed configuration.
-            previous_layers: Already generated layers for context.
-
-        Returns:
-            Tuple of (parsed_layer_dict, llm_response_or_none).
-        """
+        """Generate a single layer via LLM with fallback on failure."""
         log = logger.bind(layer=layer_num)
-        prompt = self._build_prompt(layer_num, seed_config, previous_layers)
+        prompt = self._build_prompt(layer_num, seed_config, previous_layers, feedback)
 
         try:
             response = self._llm.generate(
@@ -344,6 +364,7 @@ class ProfileGenerator:
                     {"role": "user", "content": prompt},
                 ],
                 json_mode=True,
+                study_id=self._study_id,
             )
         except Exception as exc:
             log.warning("llm_layer_generation_failed", error=str(exc), layer=layer_num)
@@ -443,6 +464,7 @@ class ProfileGenerator:
                     {"role": "user", "content": auxiliary_prompt},
                 ],
                 json_mode=True,
+                study_id=self._study_id,
             )
             parsed = json.loads(response.content)
         except Exception as exc:

@@ -1,0 +1,33 @@
+{
+  "小批量": {
+    "study_id": "dishwasher-001",
+    "count": 3,
+    "skip_validation": false,
+    "_expected": "generated >= 1，每个画像含 4 层数据"
+  },
+  "中批量": {
+    "study_id": "dishwasher-001",
+    "count": 10,
+    "skip_validation": false,
+    "_expected": "generated >= 8，authenticity_score 在 0-14 范围"
+  },
+  "大批量": {
+    "study_id": "dishwasher-001",
+    "count": 50,
+    "skip_validation": false,
+    "_expected": "generated >= 40，无 API 超时或熔断"
+  },
+  "跳过验证": {
+    "study_id": "dishwasher-001",
+    "count": 5,
+    "skip_validation": true,
+    "_expected": "generated == 5，速度明显快于验证模式"
+  },
+  "固定种子": {
+    "study_id": "dishwasher-001",
+    "count": 2,
+    "seed": 42,
+    "skip_validation": false,
+    "_expected": "两次调用相同 seed 应生成相同 segment"
+  }
+}

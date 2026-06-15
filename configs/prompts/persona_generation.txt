@@ -18,6 +18,30 @@
 4. 设定一个"秘密"——一个不愿公开承认的消费动机（表面动机 vs 真实动机）。
 5. 写出"过去-现在-未来"三段式小传（各100字以内）。
 
+【公平性约束（强制）】
+生成画像时必须遵守以下7条公平性硬规则，任何违反都将被判定为偏见并触发重生成。
+判定标准（效应量优先）：Cramér's V ≥ 0.2 即触发处置，无论 p 值是否显著；p < 0.05 但 Cramér's V < 0.2 时记为警告，不触发重生成。
+
+1. RULE-FAIR-001：禁止将性别与消费决策能力建立因果关联。不得因性别而预设理性/感性、技术理解力或价格敏感度。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+2. RULE-FAIR-002：禁止将民族与消费行为、品牌偏好或价格敏感度建立关联。民族标签不得作为任何消费特征的解释变量。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+3. RULE-FAIR-003：禁止将地域/城市等级与消费能力简单绑定。不得因城市层级推断收入或消费品位。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+4. RULE-FAIR-004：禁止将年龄与科技接受度反向关联。不得因年龄预设”不会用智能产品”或”拒绝新技术”。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+5. RULE-FAIR-005：禁止将职业与社会阶层/消费品位绑定。不得因职业贬低或抬高消费判断。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+6. RULE-FAIR-006：禁止将收入与价格敏感度线性关联。高收入者可以精打细算，低收入者也可以追求品质。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+7. RULE-FAIR-007：禁止将婚姻状况与家庭决策角色刻板分配。不得因已婚/未婚预设”谁说了算”或”只为自己/只为家庭消费”。审计阈值：卡方 p < 0.05 或 Cramér's V ≥ 0.2。
+
+【公平性自检输出】
+生成完成后，请在返回的JSON中增加以下字段（供偏见审计管线自动解析）：
+- `fairness_check.gender_bias_risk`: 评估性别关联风险（none/low/medium/high）
+- `fairness_check.ethnicity_bias_risk`: 评估民族关联风险（none/low/medium/high）
+- `fairness_check.region_bias_risk`: 评估地域关联风险（none/low/medium/high）
+- `fairness_check.age_bias_risk`: 评估年龄关联风险（none/low/medium/high）
+- `fairness_check.occupation_bias_risk`: 评估职业关联风险（none/low/medium/high）
+- `fairness_check.income_bias_risk`: 评估收入关联风险（none/low/medium/high）
+- `fairness_check.marital_bias_risk`: 评估婚姻状况关联风险（none/low/medium/high）
+- `fairness_check.narrative_quality`: 叙事个性化评分（1-10，10为完全基于个体经历）
+- `fairness_check.stereotype_flags`: 命中刻板印象模式列表（如有）
+
 【当前生成层】
 {{target_layer}}
 

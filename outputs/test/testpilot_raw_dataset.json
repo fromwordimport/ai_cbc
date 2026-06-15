@@ -1,0 +1,1264 @@
+{
+  "metadata": {
+    "study_id": "testpilot",
+    "n_respondents": 2,
+    "n_choice_sets": 12,
+    "n_alternatives": 3,
+    "attributes": [
+      {
+        "id": "price",
+        "name": "价格",
+        "type": "price",
+        "levels": [
+          {
+            "value": 2999,
+            "label": "¥2,999",
+            "description": "入门级"
+          },
+          {
+            "value": 3999,
+            "label": "¥3,999",
+            "description": "主流价位"
+          },
+          {
+            "value": 4999,
+            "label": "¥4,999",
+            "description": "中高端"
+          },
+          {
+            "value": 5999,
+            "label": "¥5,999",
+            "description": "旗舰级"
+          }
+        ],
+        "description": null
+      },
+      {
+        "id": "capacity",
+        "name": "容量",
+        "type": "categorical",
+        "levels": [
+          {
+            "value": "6套",
+            "label": "6套（1-2人）",
+            "description": "单身/情侣"
+          },
+          {
+            "value": "10套",
+            "label": "10套（3-4人）",
+            "description": "小家庭"
+          },
+          {
+            "value": "13套",
+            "label": "13套（5人以上）",
+            "description": "大家庭"
+          }
+        ],
+        "description": null
+      },
+      {
+        "id": "installation",
+        "name": "安装方式",
+        "type": "categorical",
+        "levels": [
+          {
+            "value": "台式",
+            "label": "台式（免安装）",
+            "description": "灵活、租房友好"
+          },
+          {
+            "value": "嵌入式",
+            "label": "嵌入式",
+            "description": "省空间、美观"
+          },
+          {
+            "value": "水槽式",
+            "label": "水槽式",
+            "description": "替换水槽、不占地"
+          }
+        ],
+        "description": null
+      },
+      {
+        "id": "features",
+        "name": "核心功能",
+        "type": "categorical",
+        "levels": [
+          {
+            "value": "基础",
+            "label": "标准洗+热风烘干",
+            "description": "满足基本洗碗需求"
+          },
+          {
+            "value": "智能",
+            "label": "智能洗+烘干+72℃高温除菌",
+            "description": "智能识别脏污程度"
+          },
+          {
+            "value": "全能",
+            "label": "AI智能洗+烘干+UV除菌+智能投放",
+            "description": "全自动、最省心"
+          }
+        ],
+        "description": null
+      },
+      {
+        "id": "brand",
+        "name": "品牌",
+        "type": "categorical",
+        "levels": [
+          {
+            "value": "美的",
+            "label": "美的",
+            "description": "国民品牌、性价比"
+          },
+          {
+            "value": "西门子",
+            "label": "西门子",
+            "description": "德系精工、高端"
+          },
+          {
+            "value": "方太",
+            "label": "方太",
+            "description": "厨电专家、本土化"
+          },
+          {
+            "value": "小米",
+            "label": "小米",
+            "description": "智能生态、年轻"
+          }
+        ],
+        "description": null
+      },
+      {
+        "id": "energy",
+        "name": "能耗等级",
+        "type": "categorical",
+        "levels": [
+          {
+            "value": "二级",
+            "label": "二级能效",
+            "description": "约¥180/年"
+          },
+          {
+            "value": "一级",
+            "label": "一级能效",
+            "description": "约¥120/年"
+          },
+          {
+            "value": "超一级",
+            "label": "超一级能效",
+            "description": "约¥80/年"
+          }
+        ],
+        "description": null
+      }
+    ]
+  },
+  "choice_records": [
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 1,
+      "choice_set_index": 0,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 2,
+      "choice_set_index": 1,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 3,
+      "choice_set_index": 2,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 4,
+      "choice_set_index": 3,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 5,
+      "choice_set_index": 4,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 6,
+      "choice_set_index": 5,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 7,
+      "choice_set_index": 6,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 8,
+      "choice_set_index": 7,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 9,
+      "choice_set_index": 8,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 10,
+      "choice_set_index": 9,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 11,
+      "choice_set_index": 10,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-001",
+      "respondent_index": 0,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 12,
+      "choice_set_index": 11,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 1,
+      "choice_set_index": 0,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 2,
+      "choice_set_index": 1,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 3,
+      "choice_set_index": 2,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 4,
+      "choice_set_index": 3,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 5,
+      "choice_set_index": 4,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 6,
+      "choice_set_index": 5,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 7,
+      "choice_set_index": 6,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 8,
+      "choice_set_index": 7,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 9,
+      "choice_set_index": 8,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 10,
+      "choice_set_index": 9,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 11,
+      "choice_set_index": 10,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    },
+    {
+      "respondent_id": "persona-testpilot-002",
+      "respondent_index": 1,
+      "segment": "中年空巢（子女独立）-一线城市",
+      "choice_set_id": 12,
+      "choice_set_index": 11,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "chosen": true,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "chosen": false,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "chosen": false,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        }
+      ],
+      "none_chosen": false
+    }
+  ]
+}

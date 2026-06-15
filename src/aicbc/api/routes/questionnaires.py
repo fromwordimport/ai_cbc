@@ -3,23 +3,94 @@
 from __future__ import annotations
 
 import structlog
+from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from aicbc.api.schemas import (
     CreateStudyRequest,
     GenerateQuestionnaireResponse,
     QuestionnaireDetailResponse,
+    StudyDesignResponse,
     StudyDetailResponse,
+    StudyExportResponse,
     StudyListResponse,
     StudySummary,
+    StudyUpdateRequest,
+    UpdateStudyDesignRequest,
 )
-from aicbc.core.store import QuestionnaireStore, get_questionnaire_store
+from aicbc.core.privacy import redact_dict
+from aicbc.core.security.input_sanitizer import sanitize_id
+from aicbc.core.store import (
+    PersonaStore,
+    QuestionnaireStore,
+    ResponseStore,
+    get_questionnaire_store,
+    get_response_store,
+    get_store,
+)
 from aicbc.questionnaire.generator import QuestionnaireGenerator
-from aicbc.questionnaire.models import StudyStatus
+from aicbc.questionnaire.models import (
+    Attribute,
+    AttributeLevel,
+    Condition,
+    DesignParameters,
+    ProhibitedPair,
+    StudyStatus,
+)
 from aicbc.questionnaire.validators import QuestionnaireValidator
+from pydantic import ValidationError
+
+from aicbc.analysis.store import AnalysisStore, get_analysis_store
 
 router = APIRouter()
 logger = structlog.get_logger("aicbc.api.questionnaires")
+
+
+def parse_custom_attributes(raw: list[dict] | None) -> list[Attribute] | None:
+    """Parse custom attributes from request payload."""
+    if raw is None:
+        return None
+    attrs: list[Attribute] = []
+    for item in raw:
+        levels_raw = item.get("levels", [])
+        levels = [
+            AttributeLevel(
+                value=lv["value"],
+                label=lv.get("label", str(lv["value"])),
+                description=lv.get("description"),
+            )
+            for lv in levels_raw
+        ]
+        attrs.append(Attribute(
+            id=item["id"],
+            name=item.get("name", item["id"]),
+            type=item.get("type") or "categorical",
+            levels=levels,
+            description=item.get("description"),
+        ))
+    return attrs
+
+
+def parse_prohibited_pairs(raw: list[dict] | None) -> list[ProhibitedPair]:
+    """Parse raw prohibited pairs into ProhibitedPair objects."""
+    if not raw:
+        return []
+    result: list[ProhibitedPair] = []
+    for item in raw:
+        conditions = item.get("conditions", [])
+        parsed_conditions = [
+            Condition(attribute_id=c["attribute_id"], level_value=c["level_value"])
+            for c in conditions
+        ]
+        result.append(ProhibitedPair(conditions=parsed_conditions))
+    return result
+
+
+def _parse_design_params(raw: dict | None) -> DesignParameters | None:
+    """Parse custom design parameters from request payload."""
+    if raw is None:
+        return None
+    return DesignParameters(**raw)
 
 
 # ---------------------------------------------------------------------------
@@ -39,15 +110,30 @@ async def create_study(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyDetailResponse:
     """Create a new CBC study with product attributes and design parameters."""
+    # Sanitize study_id
+    safe_study_id = sanitize_id(request.study_id, field_name="study_id")
+
+    # Conflict detection: reject duplicate study_id
+    if store.get_study(safe_study_id) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Study '{safe_study_id}' already exists",
+        )
+
+    attributes = parse_custom_attributes(request.attributes)
+    design_params = _parse_design_params(request.design_parameters)
+
     generator = QuestionnaireGenerator()
     study = generator.create_study(
-        study_id=request.study_id,
+        study_id=safe_study_id,
         product_category=request.product_category,
         research_goal=request.research_goal,
+        attributes=attributes,
+        design_parameters=design_params,
         target_segments=request.target_segments,
     )
     store.save_study(study)
-    logger.info("study_created", study_id=study.study_id)
+    logger.info("study_created", study_id=study.study_id, n_attributes=len(study.attributes))
     return StudyDetailResponse.from_study(study)
 
 
@@ -97,22 +183,116 @@ async def get_study(
     return StudyDetailResponse.from_study(study)
 
 
+@router.put(
+    "/studies/{study_id}",
+    response_model=StudyDetailResponse,
+    summary="Update a study",
+    response_description="Updated study definition",
+)
+async def update_study(
+    study_id: str,
+    request: StudyUpdateRequest,
+    store: QuestionnaireStore = Depends(get_questionnaire_store),
+) -> StudyDetailResponse:
+    """Update an existing CBC study's configuration."""
+    study = store.get_study(study_id)
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study '{study_id}' not found",
+        )
+
+    updates = request.model_dump(exclude_none=True)
+    for field, value in updates.items():
+        if field == "design_parameters" and value is not None:
+            for dp_field, dp_value in value.items():
+                setattr(study.design_parameters, dp_field, dp_value)
+        elif hasattr(study, field):
+            setattr(study, field, value)
+
+    store.save_study(study)
+    logger.info("study_updated", study_id=study_id)
+    return StudyDetailResponse.from_study(study)
+
+
 @router.delete(
     "/studies/{study_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Delete a study",
 )
 async def delete_study(
     study_id: str,
     store: QuestionnaireStore = Depends(get_questionnaire_store),
+    persona_store: PersonaStore = Depends(get_store),
+    response_store: ResponseStore = Depends(get_response_store),
+    analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> None:
-    """Delete a study and its associated questionnaire."""
-    deleted = store.delete_study(study_id)
-    if not deleted:
+    """Delete a study and cascade-delete all derived artefacts."""
+    study = store.get_study(study_id)
+    if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Study '{study_id}' not found",
         )
+
+    # Cascade delete in dependency order: analyses → responses → personas → study.
+    analysis_store.delete_by_study(study_id)
+    response_store.delete_by_study(study_id)
+    persona_store.delete_by_study(study_id)
+    store.delete_study(study_id)
+
+    logger.info("study_deleted_cascade", study_id=study_id)
+
+
+# ---------------------------------------------------------------------------
+# Data subject rights — export
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/studies/{study_id}/export",
+    response_model=StudyExportResponse,
+    summary="Export all study data",
+    response_description="Complete study data including personas, responses and analyses",
+)
+async def export_study(
+    study_id: str,
+    store: QuestionnaireStore = Depends(get_questionnaire_store),
+    persona_store: PersonaStore = Depends(get_store),
+    response_store: ResponseStore = Depends(get_response_store),
+    analysis_store: AnalysisStore = Depends(get_analysis_store),
+) -> StudyExportResponse:
+    """Export all data held for a study.
+
+    Returns the study definition, questionnaire, personas, simulated responses,
+    raw dataset and analysis results in a portable JSON structure suitable for
+    data-subject access / portability requests.
+    """
+    study = store.get_study(study_id)
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study '{study_id}' not found",
+        )
+
+    questionnaire = store.get_questionnaire(study_id)
+
+    personas, _ = persona_store.list_all(study_id=study_id, page=1, page_size=10_000)
+    responses, _ = response_store.list_responses_by_study(study_id, page=1, page_size=10_000)
+    dataset = response_store.get_dataset(study_id)
+    analyses = analysis_store.list_jobs_by_study(study_id)
+
+    return StudyExportResponse(
+        study_id=study_id,
+        exported_at=datetime.now(UTC),
+        study=redact_dict(study.model_dump(mode="json")),
+        questionnaire=redact_dict(questionnaire.model_dump(mode="json")) if questionnaire else None,
+        personas=[redact_dict(p.model_dump(mode="json")) for p in personas],
+        responses=[redact_dict(r.model_dump(mode="json")) for r in responses],
+        dataset=redact_dict(dataset.model_dump(mode="json")) if dataset else None,
+        analyses=[redact_dict(a.model_dump(mode="json")) for a in analyses],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -198,3 +378,167 @@ async def get_questionnaire(
             detail=f"No questionnaire found for study '{study_id}'",
         )
     return QuestionnaireDetailResponse.from_questionnaire(questionnaire)
+
+
+# ---------------------------------------------------------------------------
+# Study attribute design
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/studies/{study_id}/design",
+    response_model=StudyDesignResponse,
+    summary="Get study attribute design",
+    response_description="Study attributes design",
+)
+async def get_study_design(
+    study_id: str,
+    store: QuestionnaireStore = Depends(get_questionnaire_store),
+) -> StudyDesignResponse:
+    """Retrieve the attribute design of a CBC study."""
+    study = store.get_study(study_id)
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study '{study_id}' not found",
+        )
+    return StudyDesignResponse(
+        study_id=study_id,
+        attributes=[a.model_dump(mode="json") for a in study.attributes],
+        prohibited_pairs=[
+            {
+                "conditions": [
+                    {"attribute_id": c.attribute_id, "level_value": c.level_value}
+                    for c in pair.conditions
+                ]
+            }
+            for pair in study.prohibited_pairs
+        ],
+    )
+
+
+@router.put(
+    "/studies/{study_id}/design",
+    response_model=StudyDesignResponse,
+    summary="Update study attribute design",
+    response_description="Updated study attributes design",
+)
+async def update_study_design(
+    study_id: str,
+    request: UpdateStudyDesignRequest,
+    store: QuestionnaireStore = Depends(get_questionnaire_store),
+) -> StudyDesignResponse:
+    """Update the attributes of a CBC study."""
+    study = store.get_study(study_id)
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study '{study_id}' not found",
+        )
+
+    # Parse raw dicts into Attribute objects (triggers Attribute-level validators)
+    try:
+        attributes = parse_custom_attributes(request.attributes)
+    except ValidationError as exc:
+        logger.warning(
+            "study_design_validation_failed",
+            study_id=study_id,
+            errors=exc.errors(),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid attribute data: {exc.errors()}",
+        )
+
+    if attributes is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="attributes cannot be null",
+        )
+
+    # Additional validation: at least 2 attributes
+    if len(attributes) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CBC study must have at least 2 attributes",
+        )
+
+    # Additional validation: unique attribute ids
+    ids = [attr.id for attr in attributes]
+    if len(ids) != len(set(ids)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="attribute ids must be unique",
+        )
+
+    # Additional validation: level values non-empty
+    for attr in attributes:
+        for lv in attr.levels:
+            if lv.value is None or (
+                isinstance(lv.value, str) and lv.value.strip() == ""
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"level value cannot be empty for attribute '{attr.id}'",
+                )
+
+    # Parse and validate prohibited pairs
+    prohibited_pairs = parse_prohibited_pairs(request.prohibited_pairs)
+    valid_attr_ids = {attr.id for attr in attributes}
+    valid_levels: dict[str, set[Any]] = {
+        attr.id: {lv.value for lv in attr.levels} for attr in attributes
+    }
+
+    for pair in prohibited_pairs:
+        if len(pair.conditions) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="each prohibited pair must contain at least 2 conditions",
+            )
+
+        pair_attr_ids = [c.attribute_id for c in pair.conditions]
+        if len(pair_attr_ids) != len(set(pair_attr_ids)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="duplicate attribute_ids are not allowed within a prohibited pair",
+            )
+
+        for cond in pair.conditions:
+            if cond.attribute_id not in valid_attr_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"attribute_id '{cond.attribute_id}' in prohibited pair does not exist",
+                )
+
+            if cond.level_value not in valid_levels.get(cond.attribute_id, set()):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"level_value '{cond.level_value}' for attribute '{cond.attribute_id}' in prohibited pair is invalid",
+                )
+
+    # Update study
+    study.attributes = attributes
+    study.prohibited_pairs = prohibited_pairs
+    if study.status in (StudyStatus.INIT, StudyStatus.READY):
+        study.status = StudyStatus.DESIGNING
+
+    store.save_study(study)
+    logger.info(
+        "study_design_updated",
+        study_id=study_id,
+        n_attributes=len(attributes),
+    )
+
+    return StudyDesignResponse(
+        study_id=study_id,
+        attributes=[a.model_dump(mode="json") for a in study.attributes],
+        prohibited_pairs=[
+            {
+                "conditions": [
+                    {"attribute_id": c.attribute_id, "level_value": c.level_value}
+                    for c in pair.conditions
+                ]
+            }
+            for pair in study.prohibited_pairs
+        ],
+    )

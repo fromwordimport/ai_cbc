@@ -5,7 +5,7 @@ from __future__ import annotations
 import structlog
 
 from aicbc.questionnaire.design.d_optimal import generate_d_optimal_questionnaire
-from aicbc.questionnaire.design.orthogonal import generate_orthogonal_questionnaire
+from aicbc.questionnaire.design.orthogonal import generate_balanced_questionnaire
 from aicbc.questionnaire.models import (
     Attribute,
     AttributeLevel,
@@ -21,47 +21,17 @@ logger = structlog.get_logger("aicbc.questionnaire.generator")
 
 
 def _dishwasher_default_attributes() -> list[Attribute]:
-    """Return the default dishwasher CBC attributes from the design spec."""
+    """Return the default dishwasher CBC attributes."""
     return [
         Attribute(
             id="price",
             name="价格",
             type=AttributeType.PRICE,
             levels=[
-                AttributeLevel(value=2999, label="¥2,999", description="入门级"),
-                AttributeLevel(value=3999, label="¥3,999", description="主流价位"),
-                AttributeLevel(value=4999, label="¥4,999", description="中高端"),
-                AttributeLevel(value=5999, label="¥5,999", description="旗舰级"),
-            ],
-        ),
-        Attribute(
-            id="capacity",
-            name="容量",
-            type=AttributeType.CATEGORICAL,
-            levels=[
-                AttributeLevel(value="6套", label="6套（1-2人）", description="单身/情侣"),
-                AttributeLevel(value="10套", label="10套（3-4人）", description="小家庭"),
-                AttributeLevel(value="13套", label="13套（5人以上）", description="大家庭"),
-            ],
-        ),
-        Attribute(
-            id="installation",
-            name="安装方式",
-            type=AttributeType.CATEGORICAL,
-            levels=[
-                AttributeLevel(value="台式", label="台式（免安装）", description="灵活、租房友好"),
-                AttributeLevel(value="嵌入式", label="嵌入式", description="省空间、美观"),
-                AttributeLevel(value="水槽式", label="水槽式", description="替换水槽、不占地"),
-            ],
-        ),
-        Attribute(
-            id="features",
-            name="核心功能",
-            type=AttributeType.CATEGORICAL,
-            levels=[
-                AttributeLevel(value="基础", label="标准洗+热风烘干", description="满足基本洗碗需求"),
-                AttributeLevel(value="智能", label="智能洗+烘干+72℃高温除菌", description="智能识别脏污程度"),
-                AttributeLevel(value="全能", label="AI智能洗+烘干+UV除菌+智能投放", description="全自动、最省心"),
+                AttributeLevel(value="1999", label="1999元", description="入门级"),
+                AttributeLevel(value="3999", label="3999元", description="主流性价比"),
+                AttributeLevel(value="5999", label="5999元", description="中高端"),
+                AttributeLevel(value="8999", label="8999元", description="高端旗舰"),
             ],
         ),
         Attribute(
@@ -69,9 +39,63 @@ def _dishwasher_default_attributes() -> list[Attribute]:
             name="品牌",
             type=AttributeType.CATEGORICAL,
             levels=[
-                AttributeLevel(value="美的", label="美的", description="国民品牌、性价比"),
-                AttributeLevel(value="西门子", label="西门子", description="德系精工、高端"),
-                AttributeLevel(value="方太", label="方太", description="厨电专家、本土化"),
+                AttributeLevel(value="brand_1", label="华菱", description="极致性价比"),
+                AttributeLevel(value="brand_2", label="美的", description="国民品牌"),
+                AttributeLevel(value="brand_3", label="方太", description="本土高端"),
+                AttributeLevel(value="brand_4", label="西门子", description="欧系高端"),
+            ],
+        ),
+        Attribute(
+            id="capacity",
+            name="容量",
+            type=AttributeType.CATEGORICAL,
+            levels=[
+                AttributeLevel(value="capacity_1", label="8套", description="2-3人家庭，紧凑型"),
+                AttributeLevel(value="capacity_2", label="14套", description="主流4-6人家庭，可洗锅"),
+                AttributeLevel(value="capacity_3", label="18套", description="多代同堂或餐具很多"),
+                AttributeLevel(value="capacity_4", label="24套", description="接近商用级，经常聚餐"),
+            ],
+        ),
+        Attribute(
+            id="energy",
+            name="能效等级",
+            type=AttributeType.CATEGORICAL,
+            levels=[
+                AttributeLevel(value="energy_1", label="一级", description="最节能"),
+                AttributeLevel(value="energy_2", label="二级", description="中等能耗"),
+                AttributeLevel(value="energy_3", label="三级", description="偏低端"),
+            ],
+        ),
+        Attribute(
+            id="spray_arm",
+            name="喷淋臂类型",
+            type=AttributeType.CATEGORICAL,
+            levels=[
+                AttributeLevel(value="spray_arm_1", label="上下双层", description="基础配置，仅中层+底层"),
+                AttributeLevel(value="spray_arm_2", label="三层", description="增加顶部喷淋，覆盖面更全"),
+                AttributeLevel(value="spray_arm_3", label="多向旋喷", description="360°旋转喷淋，死角无残留"),
+            ],
+        ),
+        Attribute(
+            id="installation",
+            name="安装方式",
+            type=AttributeType.CATEGORICAL,
+            levels=[
+                AttributeLevel(value="installation_1", label="嵌入式", description="需定制橱柜，美观统一"),
+                AttributeLevel(value="installation_2", label="独立式", description="摆放灵活，免改装"),
+                AttributeLevel(value="installation_3", label="台式", description="小体积，免安装，适合出租或小厨房"),
+                AttributeLevel(value="installation_4", label="水槽式", description="不占橱柜空间，替换原水槽"),
+            ],
+        ),
+        Attribute(
+            id="drying",
+            name="烘干方式",
+            type=AttributeType.CATEGORICAL,
+            levels=[
+                AttributeLevel(value="drying_1", label="余热", description="依靠高温余温蒸发水分"),
+                AttributeLevel(value="drying_2", label="热交换", description="通过冷水壁冷凝"),
+                AttributeLevel(value="drying_3", label="热风", description="主动热风循环，餐具干爽"),
+                AttributeLevel(value="drying_4", label="晶蕾", description="吸湿放热，省电且全干"),
             ],
         ),
     ]
@@ -124,12 +148,16 @@ class QuestionnaireGenerator:
             algorithm=study.design_parameters.algorithm.value,
         )
 
-        if study.design_parameters.algorithm == DesignAlgorithm.ORTHOGONAL:
-            questionnaire = generate_orthogonal_questionnaire(
+        # Use explicit seed if provided, otherwise fall back to study's seed.
+        # Must use `is not None` — seed=0 is a valid value but falsy.
+        effective_seed = seed if seed is not None else study.design_parameters.seed
+
+        if study.design_parameters.algorithm in (DesignAlgorithm.BALANCED, DesignAlgorithm.ORTHOGONAL):
+            questionnaire = generate_balanced_questionnaire(
                 study_id=study.study_id,
                 attributes=study.attributes,
                 design_parameters=study.design_parameters,
-                seed=seed or study.design_parameters.seed,
+                seed=effective_seed,
             )
         else:
             questionnaire = generate_d_optimal_questionnaire(
@@ -137,7 +165,7 @@ class QuestionnaireGenerator:
                 attributes=study.attributes,
                 design_parameters=study.design_parameters,
                 prohibited_pairs=study.prohibited_pairs,
-                seed=seed or study.design_parameters.seed,
+                seed=effective_seed,
             )
 
         log.info(

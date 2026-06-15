@@ -1,6 +1,7 @@
 """LogicValidator — cross-field business rule validation for PersonaProfile."""
 
 from aicbc.core.models.persona import PersonaProfile
+from aicbc.core.security.input_sanitizer import validate_persona_text
 from aicbc.core.validators.validation_result import ValidationResult
 
 
@@ -14,17 +15,22 @@ class LogicValidator:
       RULE-004: Psychology-behavior consistency (e.g. extreme frugality + impulse buying)
       RULE-005: Each language sample must be 20-60 characters
       RULE-006: Forbidden terms must not appear in language samples
+      RULE-007: Injection / role-switch markers must not appear in persona text fields
     """
 
     FORBIDDEN_TERMS = ["AI", "算法", "模型", "神经网络", "深度学习", "大模型", "LLM"]
 
-    # City tier mapping for RULE-002
+    # City tier mapping for RULE-002 (must match SchemaValidator.VALID_CITIES)
     CITY_TIERS: dict[str, int] = {
         "一线城市": 1,
-        "新一线": 2,
-        "二线": 3,
-        "三线": 4,
-        "四线": 5,
+        "新一线城市": 2,
+        "二线城市": 3,
+        "三线城市": 4,
+        "四线城市": 5,
+        "五线城市": 6,
+        "县城/乡镇": 7,
+        "农村": 8,
+        "海外": 9,
     }
 
     # Income tier mapping (lower number = higher income)
@@ -65,10 +71,14 @@ class LogicValidator:
         score = self._rule_006(persona, result)
         rule_scores["RULE-006"] = score
 
+        # RULE-007
+        score = self._rule_007(persona, result)
+        rule_scores["RULE-007"] = score
+
         total_score = sum(rule_scores.values())
         result.score = total_score
         result.details["rule_scores"] = rule_scores
-        result.details["max_possible_score"] = 6.0
+        result.details["max_possible_score"] = 7.0
 
         return result
 
@@ -201,4 +211,13 @@ class LogicValidator:
                 result.add_error(f"RULE-006: {msg}")
             return 0.0
 
+        return 1.0
+
+    def _rule_007(self, persona: PersonaProfile, result: ValidationResult) -> float:
+        """Injection / role-switch markers must not appear in persona text fields."""
+        errors = validate_persona_text(persona)
+        if errors:
+            for msg in errors:
+                result.add_error(msg)
+            return 0.0
         return 1.0

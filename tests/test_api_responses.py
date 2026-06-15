@@ -149,7 +149,10 @@ class TestSimulateResponses:
 
         store = app.dependency_overrides[get_store]()
         for i in range(2):
-            persona = _make_persona()
+            persona = _make_persona(
+                price_sensitivity="低敏感" if i == 0 else "高敏感",
+                brand_loyalty="忠诚" if i == 0 else "尝试新品牌",
+            )
             persona.persona_id = f"persona-multi-{i}"
             store.save(persona)
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field
 
@@ -62,6 +62,14 @@ class BatchGenerateResponse(BaseModel):
     errors: list[GenerationErrorDetail]
     total_cost_cny: float
     generation_time_seconds: float
+    bias_failed_count: int = Field(
+        default=0,
+        description="Number of personas rejected due to bias audit failure",
+    )
+    bias_warning: str | None = Field(
+        default=None,
+        description="Bias audit warning when too many personas fail bias check (>=3)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -87,8 +95,8 @@ class PersonaSummary(BaseModel):
         return cls(
             persona_id=profile.persona_id,
             segment=profile.segment,
-            life_stage=profile.layer1_demographics.city,
-            city_tier=profile.layer4_scenarios.daily_routine[:20] + "...",
+            life_stage=profile.layer1_demographics.life_stage,
+            city_tier=profile.layer1_demographics.city,
             income_bracket=profile.layer1_demographics.income,
             authenticity_score=profile.authenticity_score,
             bias_audit_status=profile.bias_audit_status,
@@ -207,6 +215,40 @@ class PersonaListQuery(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
 
 
+class PersonaExportResponse(BaseModel):
+    """GDPR/PIPL-style data export for a single persona."""
+
+    persona_id: str
+    export_schema_version: str = "1.0"
+    exported_at: datetime
+    data_controller: str = Field(
+        default="AI_CBC Platform",
+        description="数据控制者名称",
+    )
+    data_subject_type: str = Field(
+        default="virtual_consumer_profile",
+        description="数据主体类型：虚拟消费者画像",
+    )
+    profile: dict[str, Any]
+    generation_metadata: dict[str, Any]
+    audit_trail: dict[str, Any]
+
+
+class StudyExportResponse(BaseModel):
+    """Complete data export for a study and its derived artefacts."""
+
+    study_id: str
+    export_schema_version: str = "1.0"
+    exported_at: datetime
+    data_controller: str = "AI_CBC Platform"
+    study: dict[str, Any]
+    questionnaire: dict[str, Any] | None
+    personas: list[dict[str, Any]]
+    responses: list[dict[str, Any]]
+    dataset: dict[str, Any] | None
+    analyses: list[dict[str, Any]]
+
+
 # ---------------------------------------------------------------------------
 # Behavior simulation
 # ---------------------------------------------------------------------------
@@ -215,7 +257,7 @@ class PersonaListQuery(BaseModel):
 class ConverseRequest(BaseModel):
     """Request for a single conversational turn."""
 
-    question: str = Field(..., description="研究员的提问")
+    question: str = Field(..., max_length=2000, description="研究员的提问")
     context: dict[str, Any] = Field(default_factory=dict, description="情境上下文")
 
 
@@ -233,7 +275,7 @@ class ConverseResponse(BaseModel):
 class InterviewRequest(BaseModel):
     """Request for a multi-question interview."""
 
-    questions: list[str] = Field(..., min_length=1, max_length=20, description="访谈问题列表")
+    questions: list[Annotated[str, Field(max_length=2000)]] = Field(..., min_length=1, max_length=20, description="访谈问题列表")
     context: dict[str, Any] = Field(default_factory=dict, description="情境上下文")
 
 
@@ -266,6 +308,33 @@ class PurchaseDecisionResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Admin / audit log
+# ---------------------------------------------------------------------------
+
+
+class AuditLogEntry(BaseModel):
+    """A single audit log entry."""
+
+    timestamp: datetime
+    user_id: str
+    action: str
+    resource: str
+    resource_id: str
+    result: str
+    ip_address: str
+    data: dict[str, Any]
+
+
+class AuditLogListResponse(BaseModel):
+    """Paginated audit log query response."""
+
+    total: int
+    page: int
+    page_size: int
+    entries: list[AuditLogEntry]
+
+
+# ---------------------------------------------------------------------------
 # CBC Studies
 # ---------------------------------------------------------------------------
 
@@ -273,10 +342,50 @@ class PurchaseDecisionResponse(BaseModel):
 class CreateStudyRequest(BaseModel):
     """Request to create a new CBC study."""
 
-    study_id: str = Field(..., description="Unique study identifier")
+    study_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Unique study identifier (alphanumeric, hyphens, underscores)",
+    )
     product_category: str = Field(..., description="Product category")
     research_goal: str = Field(..., description="Research objective")
     target_segments: list[str] = Field(default_factory=list, description="Target consumer segments")
+    attributes: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Custom product attributes (defaults to dishwasher if None)",
+    )
+    design_parameters: dict[str, Any] | None = Field(
+        default=None,
+        description="Custom design parameters (defaults to 12 sets × 3 alts if None)",
+    )
+
+
+class StudyUpdateRequest(BaseModel):
+    """Request to update an existing CBC study."""
+
+    product_category: str | None = None
+    research_goal: str | None = None
+    target_segments: list[str] | None = None
+    sample_size: int | None = Field(default=None, ge=30)
+    cost_budget_cny: float | None = Field(default=None, ge=0)
+    design_parameters: dict[str, Any] | None = None
+
+
+class StudyDesignResponse(BaseModel):
+    """Response for study attribute design."""
+
+    study_id: str
+    attributes: list[dict[str, Any]]  # 直接序列化后的 Attribute 字典
+    prohibited_pairs: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class UpdateStudyDesignRequest(BaseModel):
+    """Request to update study attributes."""
+
+    attributes: list[dict[str, Any]]
+    prohibited_pairs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class StudySummary(BaseModel):
@@ -285,6 +394,7 @@ class StudySummary(BaseModel):
     study_id: str
     product_category: str
     research_goal: str
+    target_segments: list[str] = Field(default_factory=list)
     status: str
     created_at: datetime
 
@@ -295,6 +405,7 @@ class StudySummary(BaseModel):
             study_id=study.study_id,
             product_category=study.product_category,
             research_goal=study.research_goal,
+            target_segments=study.target_segments,
             status=study.status.value,
             created_at=study.created_at,
         )
@@ -307,7 +418,10 @@ class StudyDetailResponse(BaseModel):
     product_category: str
     research_goal: str
     target_segments: list[str]
+    sample_size: int
+    cost_budget_cny: float
     status: str
+    attributes: list[dict[str, Any]]
     n_attributes: int
     n_choice_sets: int
     n_alternatives: int
@@ -323,7 +437,10 @@ class StudyDetailResponse(BaseModel):
             product_category=study.product_category,
             research_goal=study.research_goal,
             target_segments=study.target_segments,
+            sample_size=getattr(study, "sample_size", 200),
+            cost_budget_cny=getattr(study, "cost_budget_cny", 50.0),
             status=study.status.value,
+            attributes=[a.model_dump(mode="json") for a in study.attributes],
             n_attributes=len(study.attributes),
             n_choice_sets=study.design_parameters.n_choice_sets,
             n_alternatives=study.design_parameters.n_alternatives,
@@ -384,6 +501,7 @@ class QuestionnaireDetailResponse(BaseModel):
     algorithm: str
     d_efficiency: float | None
     a_efficiency: float | None
+    n_attributes: int
     n_choice_sets: int
     n_alternatives: int
     include_none: bool
@@ -399,6 +517,7 @@ class QuestionnaireDetailResponse(BaseModel):
             algorithm=q.design_parameters.algorithm.value,
             d_efficiency=q.d_efficiency,
             a_efficiency=q.a_efficiency,
+            n_attributes=len(q.attributes),
             n_choice_sets=len(q.choice_sets),
             n_alternatives=q.design_parameters.n_alternatives,
             include_none=q.design_parameters.include_none,

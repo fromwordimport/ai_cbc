@@ -85,11 +85,13 @@ class TestDatasetMetadata:
         )
         assert meta.n_respondents == 10
 
-    def test_n_respondents_must_be_positive(self) -> None:
+    def test_n_respondents_must_be_non_negative(self) -> None:
+        # Empty datasets are allowed (e.g. partial-failure fallback), but
+        # negative respondent counts are never valid.
         with pytest.raises(ValidationError):
             DatasetMetadata(
                 study_id="s-1",
-                n_respondents=0,
+                n_respondents=-1,
                 n_choice_sets=12,
                 n_alternatives=3,
             )

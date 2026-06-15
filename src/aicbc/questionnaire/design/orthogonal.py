@@ -1,15 +1,18 @@
-"""Orthogonal experimental design for CBC questionnaires.
+"""Balanced experimental design for CBC questionnaires.
 
-Generates choice sets where attribute levels are balanced (each level appears
-roughly equally often) and level combinations are uniformly distributed.
+Generates choice sets where each attribute level appears roughly equally
+often (marginal balance).  Note that this is *not* a true orthogonal array
+— it guarantees single-attribute balance but not joint two-attribute
+orthogonality (every level-pair appearing at equal frequency).
+
+For true orthogonal designs use tagged-array constructions (L4, L8, L9,
+etc.) or D-optimal optimisation.
 """
 
 from __future__ import annotations
 
 from itertools import product
 from typing import Any
-
-import numpy as np
 
 from aicbc.questionnaire.design.effects_coding import encode_design_matrix
 from aicbc.questionnaire.design.efficiency import (
@@ -47,6 +50,8 @@ def _select_balanced_subset(
     At each step, pick the profile that most improves the balance
     (minimises the max level frequency deviation).
     """
+    import numpy as np
+
     rng = np.random.default_rng(seed)
 
     # Initialise frequency counters
@@ -105,9 +110,16 @@ def _distribute_to_choice_sets(
     seed: int | None = None,
 ) -> list[ChoiceSet]:
     """Distribute profiles into choice sets, avoiding duplicates within a set."""
+    import numpy as np
+
     rng = np.random.default_rng(seed)
     shuffled = list(profiles)
     rng.shuffle(shuffled)
+
+    # Cycle profiles if we don't have enough for all choice sets
+    total_needed = num_sets * alts_per_set
+    while len(shuffled) < total_needed:
+        shuffled.extend(shuffled[:total_needed - len(shuffled)])
 
     choice_sets: list[ChoiceSet] = []
     for i in range(num_sets):
@@ -129,13 +141,15 @@ def _distribute_to_choice_sets(
     return choice_sets
 
 
-def _check_orthogonality(
+def _check_balance(
     choice_sets: list[ChoiceSet], attributes: list[Attribute]
 ) -> float:
-    """Compute an orthogonality score based on level frequency balance.
+    """Compute a balance score based on level frequency evenness.
 
     Returns a score in [0, 1] where 1 = perfectly balanced.
     """
+    import numpy as np
+
     total_alts = sum(len(cs.alternatives) for cs in choice_sets)
     if total_alts == 0:
         return 0.0
@@ -160,22 +174,22 @@ def _check_orthogonality(
     return float(np.mean(scores))
 
 
-def generate_orthogonal_questionnaire(
+# Alias for backward compatibility with tests
+_check_orthogonality = _check_balance
+
+
+
+def generate_balanced_questionnaire(
     study_id: str,
     attributes: list[Attribute],
     design_parameters: DesignParameters,
     seed: int | None = None,
 ) -> CBCQuestionnaire:
-    """Generate a CBC questionnaire using orthogonal design.
+    """Generate a CBC questionnaire using balanced design.
 
-    Args:
-        study_id: Parent study identifier.
-        attributes: Product attributes with levels.
-        design_parameters: Design control parameters.
-        seed: Random seed for reproducibility.
-
-    Returns:
-        Generated CBC questionnaire.
+    Each attribute level appears roughly equally often across the
+    questionnaire, but two-attribute combinations are *not* guaranteed
+    to be orthogonal.
     """
     num_sets = design_parameters.n_choice_sets
     alts_per_set = design_parameters.n_alternatives
@@ -208,11 +222,25 @@ def generate_orthogonal_questionnaire(
     a_eff = a_efficiency(info) if n_obs > 0 else None
 
     return CBCQuestionnaire(
-        questionnaire_id=f"q-{study_id}-orth",
+        questionnaire_id=f"q-{study_id}-bal",
         study_id=study_id,
+        attributes=attributes,
         choice_sets=choice_sets,
         design_parameters=design_parameters,
         d_efficiency=d_eff,
         a_efficiency=a_eff,
         iterations=1,
     )
+
+# Backward-compatibility alias — use generate_balanced_questionnaire instead.
+def generate_orthogonal_questionnaire(
+    study_id: str,
+    attributes: list[Attribute],
+    design_parameters: DesignParameters,
+    seed: int | None = None,
+) -> CBCQuestionnaire:
+    """Generate a CBC questionnaire using orthogonal design (alias for balanced)."""
+    q = generate_balanced_questionnaire(study_id, attributes, design_parameters, seed)
+    # Override ID to match legacy test expectations
+    q.questionnaire_id = f"q-{study_id}-orth"
+    return q

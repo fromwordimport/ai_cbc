@@ -2,52 +2,68 @@
 
 from __future__ import annotations
 
-import numpy as np
-
-
-def d_efficiency(info_matrix: np.ndarray) -> float:
+def d_efficiency(info_matrix: np.ndarray, n_choice_sets: int | None = None) -> float:
     """Compute D-efficiency from an information matrix.
 
-    Uses the ratio of the geometric mean to the arithmetic mean of
-    the eigenvalues (equivalently: det^(1/p) / (trace/p)).
+    Standard formula: det(M)^(1/p) / N, where N is the number of
+    choice sets (the effective sample size per parameter).
 
-    By the AM-GM inequality this is always in [0, 1], with 1.0
-    achieved when all eigenvalues are equal (perfectly balanced design).
+    When *n_choice_sets* is None, falls back to the AM-GM ratio
+    det^(1/p) / (trace/p), which is always in [0,1].
 
     Args:
         info_matrix: Information matrix X'WX (p x p).
+        n_choice_sets: Number of choice sets for standard normalisation.
 
     Returns:
-        D-efficiency in [0, 1]. Higher is better.
+        D-efficiency. Higher is better.  Values >= 0.85 are excellent;
+        values below 0.80 are unacceptable.
     """
+    import numpy as np
+
     p = info_matrix.shape[0]
     if p == 0:
         return 0.0
     det = np.linalg.det(info_matrix)
-    tr = np.trace(info_matrix)
-    if det <= 0 or tr <= 0 or not np.isfinite(det) or not np.isfinite(tr):
+    if det <= 0 or not np.isfinite(det):
         return 0.0
-    return float((det ** (1.0 / p)) / (tr / p))
+    geom_mean = float(det ** (1.0 / p))
+    if n_choice_sets and n_choice_sets > 0:
+        return geom_mean / n_choice_sets
+    # Fallback: AM-GM normalisation (always in [0, 1])
+    tr = np.trace(info_matrix)
+    if tr <= 0 or not np.isfinite(tr):
+        return 0.0
+    return geom_mean / (tr / p)
 
 
 def a_efficiency(info_matrix: np.ndarray) -> float:
     """Compute A-efficiency from an information matrix.
 
-    A-efficiency = p / trace(X'WX)
+    Standard formula: A-efficiency = p / trace(M^(-1))
 
-    where p = number of parameters. Higher is better.
+    where p = number of parameters and M^(-1) is the inverse of the
+    information matrix.  Higher is better; reflects the average variance
+    of the parameter estimates.
 
     Args:
         info_matrix: Information matrix X'WX (p x p).
 
     Returns:
-        A-efficiency in [0, 1].
+        A-efficiency (0 to 1, higher is better).
     """
-    tr = np.trace(info_matrix)
-    if tr <= 0 or not np.isfinite(tr):
-        return 0.0
+    import numpy as np
+
     p = info_matrix.shape[0]
-    return float(p / tr)
+    if p == 0:
+        return 0.0
+    try:
+        inv_trace = np.trace(np.linalg.inv(info_matrix))
+    except np.linalg.LinAlgError:
+        return 0.0
+    if inv_trace <= 0 or not np.isfinite(inv_trace):
+        return 0.0
+    return float(p / inv_trace)
 
 
 def calculate_information_matrix(
@@ -70,6 +86,8 @@ def calculate_information_matrix(
     Returns:
         Information matrix (n_params x n_params).
     """
+    import numpy as np
+
     if design_matrix.size == 0:
         return np.array([[0.0]])
 
@@ -95,4 +113,6 @@ def calculate_information_matrix(
         w = np.diag(probs) - np.outer(probs, probs)
         total_info += x_set.T @ w @ x_set
 
-    return total_info
+    # Normalise by the number of choice sets so that efficiency metrics are
+    # scale-invariant and bounded in [0, 1].
+    return total_info / max(n_sets, 1)

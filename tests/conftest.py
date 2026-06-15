@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from pathlib import Path
+from typing import Any, Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,8 +20,156 @@ from aicbc.core.models.persona import (
     PersonaProfile,
     TensionCombination,
 )
-from aicbc.core.store import PersonaStore
+from aicbc.core.store import PersonaStore, reset_stores
+from aicbc.cost.tracker import reset_cost_tracker
 from aicbc.llm.client import LLMResponse, Provider
+
+# ---------------------------------------------------------------------------
+# Session-level state cleanup
+# ---------------------------------------------------------------------------
+
+_COST_STATE_FILE = Path("./data/cost_state.json")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _clean_cost_state_on_disk() -> Generator[None, None, None]:
+    """Delete persisted cost state file before any tests run.
+
+    This prevents stale cost data from previous test runs from leaking into
+    CostTracker instances that call _load_state() in __init__.
+    """
+    try:
+        if _COST_STATE_FILE.exists():
+            _COST_STATE_FILE.unlink()
+    except Exception:
+        pass
+    yield
+    # Clean up after session as well
+    try:
+        if _COST_STATE_FILE.exists():
+            _COST_STATE_FILE.unlink()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Per-function state cleanup (autouse)
+# ---------------------------------------------------------------------------
+
+# Lazy imports for modules that pull in heavy deps (pandas, prometheus_client).
+# These are resolved once and cached so the fixture body avoids re-importing
+# them on every test function.
+_reset_dependencies_fn = None
+_reset_analysis_store_fn = None
+_app_obj = None  # FastAPI app — only loaded for tests that need it
+_reset_rate_limits_fn = None
+
+
+def _lazy_reset_dependencies() -> None:
+    global _reset_dependencies_fn
+    if _reset_dependencies_fn is None:
+        from aicbc.api.dependencies import reset_dependencies as fn
+        _reset_dependencies_fn = fn
+    _reset_dependencies_fn()
+
+
+def _lazy_reset_analysis_store() -> None:
+    global _reset_analysis_store_fn
+    if _reset_analysis_store_fn is None:
+        from aicbc.analysis.store import reset_analysis_store as fn
+        _reset_analysis_store_fn = fn
+    _reset_analysis_store_fn()
+
+
+def _lazy_clear_app_overrides() -> None:
+    global _app_obj
+    if _app_obj is None:
+        from aicbc.main import app as _app
+        _app_obj = _app
+    _app_obj.dependency_overrides.clear()
+
+
+def _lazy_reset_rate_limits() -> None:
+    global _reset_rate_limits_fn
+    if _reset_rate_limits_fn is None:
+        from aicbc.api.middleware.rate_limit import reset_rate_limits as fn
+        _reset_rate_limits_fn = fn
+    _reset_rate_limits_fn()
+
+
+@pytest.fixture(autouse=True)
+def _clean_global_state() -> Generator[None, None, None]:
+    """Reset all module-level global singletons before each test.
+
+    Prevents state leakage between test files caused by:
+    - store.py:  _store, _questionnaire_store, _response_store singletons
+    - dependencies.py: _llm_client, _cost_fuse, _profile_generator, etc.
+    - tracker.py: _cost_tracker singleton + persisted state file
+    - main.py: FastAPI app.dependency_overrides shared across test files
+
+    Heavy imports (aicbc.main, aicbc.analysis.store, etc.) are resolved lazily
+    once and cached so the fixture body is cheap on subsequent calls.
+    """
+    try:
+        _lazy_reset_dependencies()
+    except Exception:
+        pass
+    try:
+        reset_stores()
+    except Exception:
+        pass
+    try:
+        _lazy_reset_analysis_store()
+    except Exception:
+        pass
+    try:
+        reset_cost_tracker()
+    except Exception:
+        pass
+    try:
+        _lazy_clear_app_overrides()
+    except Exception:
+        pass
+    try:
+        _lazy_reset_rate_limits()
+    except Exception:
+        pass
+    try:
+        if _COST_STATE_FILE.exists():
+            _COST_STATE_FILE.unlink()
+    except Exception:
+        pass
+    yield
+    # Post-test safety-net cleanup
+    try:
+        _lazy_reset_dependencies()
+    except Exception:
+        pass
+    try:
+        reset_stores()
+    except Exception:
+        pass
+    try:
+        _lazy_reset_analysis_store()
+    except Exception:
+        pass
+    try:
+        reset_cost_tracker()
+    except Exception:
+        pass
+    try:
+        _lazy_clear_app_overrides()
+    except Exception:
+        pass
+    try:
+        _lazy_reset_rate_limits()
+    except Exception:
+        pass
+    try:
+        if _COST_STATE_FILE.exists():
+            _COST_STATE_FILE.unlink()
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Settings
@@ -58,19 +207,22 @@ def mock_llm_client() -> MagicMock:
     """Return a mock LLMClient with layer response factory."""
     client = MagicMock()
 
-    def _default_layer1() -> dict[str, Any]:
+    _CITIES = ["一线城市", "新一线城市", "二线城市", "三线城市", "四线城市"]
+    _INCOMES = ["15-30万元", "8-15万元", "30-50万元", "15-30万元", "8-15万元"]
+
+    def _default_layer1(idx: int = 0) -> dict[str, Any]:
         return {
-            "age": "28岁",
+            "age": f"{28 + idx}岁",
             "gender": "女",
-            "city": "新一线",
-            "income": "15-30万元",
+            "city": _CITIES[idx % len(_CITIES)],
+            "income": _INCOMES[idx % len(_INCOMES)],
             "occupation": "互联网产品经理",
             "education": "本科",
             "marital_status": "已婚无孩",
             "living_type": "自有住房（89㎡三居室）",
         }
 
-    def _default_layer2() -> dict[str, Any]:
+    def _default_layer2(idx: int = 0) -> dict[str, Any]:
         return {
             "price_sensitivity": "对高频消费品价格敏感，对耐用品愿意为品质溢价",
             "purchase_channels": ["京东自营", "天猫旗舰店", "山姆会员店"],
@@ -79,24 +231,24 @@ def mock_llm_client() -> MagicMock:
             "information_source": ["小红书", "什么值得买", "知乎", "同事推荐"],
         }
 
-    def _default_layer3() -> dict[str, Any]:
+    def _default_layer3(idx: int = 0) -> dict[str, Any]:
         return {
             "core_values": ["效率", "品质生活", "家庭至上"],
             "core_anxieties": ["时间不够用", "家务分工矛盾"],
             "tension_combination": {
                 "labels": ["精致品质", "凑单退单高手"],
                 "narrative_explanation": (
-                    "她追求精致生活却总在凑单后退掉不需要的商品，这种矛盾源于她既想享受品质又害怕浪费金钱的深层焦虑。"
-                    "小时候家境普通让她对浪费极度敏感，成年后收入提升让她有能力追求品质。"
+                    f"她追求精致生活却总在凑单后退掉不需要的商品，这种矛盾源于她既想享受品质又害怕浪费金钱的深层焦虑。"
+                    f"小时候家境普通让她对浪费极度敏感，成年后收入提升让她有能力追求品质（样本{idx + 1}）。"
                 ),
             },
-            "secret_motivation": "用科技产品证明自己的生活品味，缓解同辈压力",
-            "defense_mechanism": "合理化——把冲动消费解释为投资生活品质",
+            "secret_motivation": f"用科技产品证明自己的生活品味，缓解同辈压力（样本{idx + 1}）",
+            "defense_mechanism": "合理化——把临时消费欲望解释为投资生活品质",
         }
 
-    def _default_layer4() -> dict[str, Any]:
+    def _default_layer4(idx: int = 0) -> dict[str, Any]:
         return {
-            "daily_routine": "早7点起床，地铁通勤40分钟，晚7点到家，周末打扫或带孩子上兴趣班",
+            "daily_routine": f"早7点起床，地铁通勤{40 + idx}分钟，晚7点到家，周末打扫或带孩子上兴趣班",
             "purchase_trigger": "被小红书提升幸福感的小家电种草，叠加同事推荐",
             "stress_response": "焦虑时刷购物APP加购，冷静后删除，形成加购-删除循环",
             "social_behavior": "朋友圈极少发消费内容，但在私域社群活跃分享购物攻略",
@@ -121,9 +273,16 @@ def mock_llm_client() -> MagicMock:
         if not hasattr(_side_effect, "call_count"):
             _side_effect.call_count = 0
         _side_effect.call_count += 1
-        idx = (_side_effect.call_count - 1) % 5
-        layers = [_default_layer1(), _default_layer2(), _default_layer3(), _default_layer4(), _default_aux()]
-        return _mock_llm_response(layers[idx])
+        idx = (_side_effect.call_count - 1) // 5
+        layer_idx = (_side_effect.call_count - 1) % 5
+        layers = [
+            _default_layer1(idx),
+            _default_layer2(idx),
+            _default_layer3(idx),
+            _default_layer4(idx),
+            _default_aux(),
+        ]
+        return _mock_llm_response(layers[layer_idx])
 
     client.generate.side_effect = _side_effect
     return client
@@ -156,7 +315,7 @@ def sample_persona() -> PersonaProfile:
         layer1_demographics=Layer1Demographics(
             age="28岁",
             gender="女",
-            city="新一线",
+            city="新一线城市",
             income="15-30万元",
             occupation="互联网产品经理",
             education="本科",
@@ -181,7 +340,7 @@ def sample_persona() -> PersonaProfile:
                 ),
             ),
             secret_motivation="用科技产品证明自己的生活品味，缓解同辈压力",
-            defense_mechanism="合理化——把冲动消费解释为投资生活品质",
+            defense_mechanism="合理化——把临时消费欲望解释为投资生活品质",
         ),
         layer4_scenarios=Layer4Scenarios(
             daily_routine="早7点起床，地铁通勤40分钟，晚7点到家，周末打扫或带孩子上兴趣班",

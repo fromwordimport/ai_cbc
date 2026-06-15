@@ -1,0 +1,92 @@
+{
+  "研究创建": [
+    {
+      "用例": "洗碗机市场调研（标准）",
+      "study_id": "dishwasher-001",
+      "product_category": "洗碗机",
+      "research_goal": "评估消费者对不同品牌、容量、安装方式和价格档位洗碗机的偏好，确定最优产品组合",
+      "target_segments": ["一线城市年轻家庭", "新一线品质追求者", "二线务实家庭"],
+      "expected_status": 201
+    },
+    {
+      "用例": "扫地机器人新品定价（最小配置）",
+      "study_id": "robot-vac-001",
+      "product_category": "扫地机器人",
+      "research_goal": "新产品线定价策略调研",
+      "target_segments": ["年轻白领", "宠物家庭"],
+      "expected_status": 201
+    },
+    {
+      "用例": "边界测试-空研究目标",
+      "study_id": "edge-empty-goal",
+      "product_category": "洗碗机",
+      "research_goal": "",
+      "target_segments": ["测试"],
+      "expected_status": 422
+    }
+  ],
+  "画像生成": [
+    {
+      "用例": "小批量生成（3个）",
+      "study_id": "dishwasher-001",
+      "count": 3,
+      "skip_validation": false,
+      "expected_generated": 3
+    },
+    {
+      "用例": "大批量生成（50个）",
+      "study_id": "dishwasher-001",
+      "count": 50,
+      "skip_validation": false,
+      "expected_generated": ">= 45"
+    },
+    {
+      "用例": "跳过验证生成",
+      "study_id": "dishwasher-001",
+      "count": 5,
+      "skip_validation": true,
+      "expected_generated": 5
+    }
+  ],
+  "对话实验室": [
+    {
+      "question": "你为什么会考虑买洗碗机？",
+      "expected_emotion": "理性/真诚",
+      "expected_keywords": ["时间", "方便", "家庭"]
+    },
+    {
+      "question": "你觉得洗碗机最让你担心的是什么？",
+      "expected_emotion": "担忧/犹豫",
+      "expected_keywords": ["安装", "空间", "价格", "老人"]
+    },
+    {
+      "question": "如果预算只有3000元，你会怎么选？",
+      "expected_emotion": "务实/精打细算",
+      "expected_keywords": ["性价比", "品牌", "功能"]
+    }
+  ],
+  "市场模拟": [
+    {
+      "场景名称": "基准场景",
+      "scenarios": [
+        { "name": "高端品牌A", "price": 6999, "capacity": "16套", "installation": "嵌入式", "features": "智能互联", "brand": "品牌A", "energy": "一级" },
+        { "name": "中端品牌B", "price": 4999, "capacity": "13套", "installation": "独立式", "features": "基础功能", "brand": "品牌B", "energy": "二级" },
+        { "name": "经济品牌C", "price": 2999, "capacity": "8套", "installation": "台式", "features": "基础功能", "brand": "品牌C", "energy": "三级" }
+      ],
+      "rule": "logit",
+      "include_none": true,
+      "expected_top_share": "品牌B"
+    },
+    {
+      "场景名称": "新品上市模拟",
+      "scenarios": [
+        { "name": "新品X（16套/智能）", "price": 5999, "capacity": "16套", "installation": "嵌入式", "features": "AI智能洗", "brand": "新锐品牌", "energy": "一级" },
+        { "name": "现有竞品A", "price": 6999, "capacity": "16套", "installation": "嵌入式", "features": "智能互联", "brand": "品牌A", "energy": "一级" },
+        { "name": "现有竞品B", "price": 4999, "capacity": "13套", "installation": "独立式", "features": "基础功能", "brand": "品牌B", "energy": "二级" }
+      ],
+      "rule": "first_choice",
+      "include_none": false,
+      "expected_top_share": "新品X"
+    }
+  ]
+}

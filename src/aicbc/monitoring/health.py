@@ -6,9 +6,11 @@ import asyncio
 from typing import Any
 
 from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from aicbc.config.settings import get_settings
+from aicbc.core.store import get_questionnaire_store, get_store
 
 router = APIRouter()
 
@@ -186,15 +188,84 @@ async def readiness_check() -> ReadinessStatus:
     "/metrics",
     summary="Prometheus metrics endpoint",
     tags=["Health"],
-    response_class=Any,  # type: ignore[arg-type]
+    response_class=PlainTextResponse,
 )
 async def metrics() -> Any:
     """Expose Prometheus metrics for scraping."""
-    from fastapi.responses import PlainTextResponse
-
     from aicbc.monitoring.metrics import get_metrics
 
     return PlainTextResponse(
         content=get_metrics(),
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
+
+
+@router.get(
+    "/cost-status",
+    summary="Cost tracker and fuse status",
+    tags=["Health"],
+)
+async def cost_status() -> dict[str, Any]:
+    """Return current cost consumption and fuse status.
+
+    Shows real-time cost tracking across study/daily/weekly/monthly
+    dimensions and the current fuse status.
+    """
+    from aicbc.cost.fuse import CostFuse
+
+    fuse = CostFuse()
+    status, details = fuse.tracker.check_fuse_status()
+    return {
+        "fuse_status": status.value,
+        "details": details,
+    }
+
+
+@router.get(
+    "/dashboard/summary",
+    summary="Aggregated dashboard statistics",
+    tags=["Health"],
+)
+async def dashboard_summary() -> dict[str, Any]:
+    """Aggregated dashboard statistics from all subsystems.
+
+    Single-request endpoint replacing multiple independent API calls
+    for the overview Dashboard page.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    persona_store = get_store()
+    study_store = get_questionnaire_store()
+
+    studies, total_studies = study_store.list_studies(page=1, page_size=100)
+    persona_count = persona_store.count()
+
+    study_status_counts: dict[str, int] = {}
+    for s in studies:
+        status = s.status.value if hasattr(s.status, "value") else str(s.status)
+        study_status_counts[status] = study_status_counts.get(status, 0) + 1
+
+    # Recent activity (last 7 days)
+    week_ago = datetime.now(UTC) - timedelta(days=7)
+    recent_studies = [
+        {
+            "study_id": s.study_id,
+            "product_category": s.product_category,
+            "status": s.status.value,
+            "created_at": s.created_at.isoformat(),
+        }
+        for s in studies
+        if s.created_at >= week_ago
+    ]
+
+    return {
+        "summary": {
+            "total_studies": total_studies,
+            "total_personas": persona_count,
+            "studies_by_status": study_status_counts,
+            "recent_studies_last_7d": len(recent_studies),
+        },
+        "recent_studies": sorted(
+            recent_studies, key=lambda s: s["created_at"], reverse=True
+        )[:10],
+    }

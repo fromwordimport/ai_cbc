@@ -9,6 +9,7 @@ from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
 from aicbc.core.simulation.behavior_simulator import BehaviorSimulator
 from aicbc.core.validators import LogicValidator, SchemaValidator
+from aicbc.cost.fuse import CostFuse
 from aicbc.generators.profile_generator import ProfileGenerator
 from aicbc.generators.seed_generator import SeedGenerator
 from aicbc.llm.client import LLMClient
@@ -25,13 +26,22 @@ _logic_validator: LogicValidator | None = None
 _authenticity_scorer: AuthenticityScorer | None = None
 _bias_auditor: BiasAuditor | None = None
 _behavior_simulator: BehaviorSimulator | None = None
+_cost_fuse: CostFuse | None = None
+
+
+def get_cost_fuse() -> CostFuse:
+    """Return a singleton CostFuse instance."""
+    global _cost_fuse
+    if _cost_fuse is None:
+        _cost_fuse = CostFuse()
+    return _cost_fuse
 
 
 def get_llm_client() -> LLMClient:
-    """Return a singleton LLMClient instance."""
+    """Return a singleton LLMClient instance with shared CostFuse."""
     global _llm_client
     if _llm_client is None:
-        _llm_client = LLMClient()
+        _llm_client = LLMClient(cost_fuse=get_cost_fuse())
     return _llm_client
 
 
@@ -94,3 +104,32 @@ def get_behavior_simulator() -> BehaviorSimulator:
 def get_settings_dep() -> Settings:
     """Return application settings (FastAPI dependency wrapper)."""
     return get_settings()
+
+
+def get_cost_tracker_summary() -> dict:
+    """Return current cost tracker summary for health/monitoring endpoints."""
+    fuse = get_cost_fuse()
+    status, details = fuse.tracker.check_fuse_status()
+    return {
+        "fuse_status": status.value,
+        "details": details,
+    }
+
+
+def reset_dependencies() -> None:
+    """Reset all global dependency singletons to clean state.
+
+    Useful for tests to prevent state leakage between test files.
+    """
+    global _llm_client, _seed_generator, _profile_generator
+    global _schema_validator, _logic_validator, _authenticity_scorer
+    global _bias_auditor, _behavior_simulator, _cost_fuse
+    _llm_client = None
+    _seed_generator = None
+    _profile_generator = None
+    _schema_validator = None
+    _logic_validator = None
+    _authenticity_scorer = None
+    _bias_auditor = None
+    _behavior_simulator = None
+    _cost_fuse = None

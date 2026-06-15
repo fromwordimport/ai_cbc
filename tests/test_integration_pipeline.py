@@ -45,7 +45,7 @@ def _layer1() -> dict[str, Any]:
     return {
         "age": "28岁",
         "gender": "女",
-        "city": "新一线",
+        "city": "新一线城市",
         "income": "15-30万元",
         "occupation": "互联网产品经理",
         "education": "本科",
@@ -76,7 +76,7 @@ def _layer3() -> dict[str, Any]:
             ),
         },
         "secret_motivation": "用科技产品证明自己的生活品味，缓解同辈压力",
-        "defense_mechanism": "合理化——把冲动消费解释为'投资生活品质'",
+        "defense_mechanism": "合理化——把临时消费欲望解释为'投资生活品质'",
     }
 
 
@@ -186,7 +186,7 @@ class TestFullPipeline:
         assert result["profile"].persona_id == "persona-int-001"
         assert result["schema_result"].passed
         assert result["logic_result"].passed
-        assert result["logic_result"].score == 6.0  # All 6 rules pass
+        assert result["logic_result"].score == 7.0  # All 7 rules pass
 
     def test_profile_structure_is_complete(self, pipeline: PersonaPipeline) -> None:
         """Generated profile must contain all four layers and auxiliary data."""

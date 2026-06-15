@@ -218,8 +218,8 @@ tension_rules = [
 ```
 RULE-001: 矛盾标签必须有叙事解释
   触发条件：tension_combination.labels.length > 0
-  通过标准：narrative_explanation.length >= 30字
-  失败反馈："请为矛盾组合提供心理解释，至少30字"
+  通过标准：narrative_explanation.length >= 50字
+  失败反馈："请为矛盾组合提供心理解释，至少50字"
 
 RULE-002: 收入与消费行为匹配度
   触发条件：income_personal = "3万以下" AND spending_level = "高"
@@ -359,6 +359,14 @@ scoring:
 - **规则引擎初评**：对`auto_check: true`的维度进行快速打分
 - **LLM辅助深评**：对语义类维度，调用专门的审校Agent评分
 - **人机混合**：低于`human_review_threshold`时，强制等待人工确认
+
+**评分校准说明**：
+由于规则引擎评分的维度（内在一致性、认知有限性、时间延续性、语言自然度）与 LLM 辅助评分的维度（情境敏感性、社会摩擦感、知识边界感）使用不同的评分机制，可能存在系统性偏差。校准策略如下：
+
+1. **每月校准**：抽取 30 个样本，由人工对全部 7 个维度独立评分，计算规则引擎维度与 LLM 维度的平均偏差值
+2. **偏差修正**：如果两类维度的平均分差 > 0.3 分，对偏高的一方施加修正系数（如 LLM 维度平均偏低 0.4 分则统一 +0.4）
+3. **阈值不调**：总分及格线 9/14 保持不变，校准只影响各维度的原始分，不改变阈值
+4. **记录校准日志**：每次校准的修正系数记录在 `calibration_log` 中，便于审计
 
 **审校Agent Prompt模板**（用于语义维度评分）：
 
@@ -588,6 +596,25 @@ human_in_the_loop:
   trigger: "threshold_or_bias"      # always | threshold_or_bias | never
   review_queue_ttl_hours: 24        # 审核队列超时时间
   notify_channels: ["slack", "email"]  # 通知渠道
+
+  # 人工审核 SLA（服务水平协议）
+  sla:
+    priority_response:
+      HIGH: 2    # 高危偏见/总分<7，2小时内必须响应
+      MEDIUM: 8  # 重试3次未通过，8小时内响应
+      LOW: 24    # 一般质量问题，24小时内响应
+    escalation:
+      enabled: true
+      escalate_after_multiplier: 2.0  # 超时×2 后自动升级（如 HIGH 4h未响应→通知上级）
+      escalate_to: ["小伦", "小P"]     # 升级通知对象
+    timeout_action:
+      HIGH: "auto_reject"    # 高危超时自动拒绝，画像进入 DEPRECATED
+      MEDIUM: "auto_hold"    # 中危超时保留在队列中，不自动通过
+      LOW: "auto_approve"    # 低危超时自动通过（仅限总分≥9的画像）
+    queue_health_check:
+      interval_hours: 4      # 每4小时检查队列积压
+      alert_threshold: 10    # 队列积压 > 10 条时告警
+      max_queue_depth: 50    # 队列深度硬上限，触发后暂停新画像生成
 ```
 
 ---
@@ -634,6 +661,23 @@ human_in_the_loop:
 | FEEDBACK | 修正后分数提升 | VALIDATING-FULL |
 | FEEDBACK | 修正后分数下降，有历史高分版本 | ROLLBACK → VALIDATING-FULL |
 | FEEDBACK | 修正后分数下降，无历史高分版本 | HUMAN_REVIEW |
+
+### 与画像资产状态机的衔接
+
+Harness 状态机关注"生成+校验"，画像资产管理（`12-画像资产化管理规范.md`）关注"存储+使用"。两者的状态转换规则如下：
+
+| Harness 终态 | 资产终态 | 转换规则 |
+|-------------|---------|---------|
+| COMPLETED（总分 ≥ 12） | 自动进入 PUBLISHED | 优秀画像无需人工确认，直接可用 |
+| COMPLETED（9 ≤ 总分 < 12） | 自动进入 REVIEWED，由研究员手动确认后转 PUBLISHED | 合格画像留有人工确认环节 |
+| HUMAN_REVIEW → ACCEPTED | REVIEWED → 研究员手动转 PUBLISHED | 人工审核通过的画像进入正常流程 |
+| HUMAN_REVIEW → REJECTED | DEPRECATED | 人工拒绝的画像标记为废弃 |
+| 任何终态（总分 < 9） | DRAFT（等待重新生成或人工修正） | 不及格画像不得进入 REVIEWED |
+
+**自动转换原则**：
+- 仅总分 ≥ 12 且偏见检测 PASSED 的画像可自动进入 PUBLISHED
+- 偏见检测 FAILED 的画像无论分数高低均强制人工审核
+- 所有自动转换记录在 `status_history` 中，`by` 字段为 `"harness_auto"`
 
 ---
 

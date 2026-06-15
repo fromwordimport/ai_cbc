@@ -1,6 +1,10 @@
 # AI_CBC MVP Deployment — Docker Compose
-# Version: 1.0
+# Version: 1.1
 # Maintainer: 小维 (DevOps/MLOps Engineer)
+# Changes in v1.1:
+#   - worker/beat: added condition: service_healthy depends_on + healthcheck
+#   - nginx: added condition: service_healthy for api dependency
+#   - api: API_WORKERS bumped from 1 to 4
 
 services:
   # ---------------------------------------------------------------------------
@@ -21,7 +25,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - API_HOST=0.0.0.0
       - API_PORT=8000
-      - API_WORKERS=1
+      - API_WORKERS=4
       - METRICS_PATH=/metrics
       - SLOW_REQUEST_THRESHOLD=5.0
       # LLM API keys should be injected via .env or secrets
@@ -68,8 +72,16 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
-      - redis
-      - mongo
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A aicbc.tasks inspect ping --destination celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     restart: unless-stopped
     deploy:
       resources:
@@ -92,7 +104,14 @@ services:
       - ENVIRONMENT=production
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A aicbc.tasks inspect ping --destination celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     restart: unless-stopped
     networks:
       - aicbc-network
@@ -159,7 +178,8 @@ services:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - aicbc-network

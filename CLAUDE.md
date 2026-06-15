@@ -1,106 +1,107 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
 ## Repository Nature
 
-This is a **documentation and specification repository** for the AI_CBC virtual consumer research platform. There is no source code, build system, or test suite here — all files are design documents, architecture specifications, and process definitions written in Markdown.
+AI_CBC is a virtual-consumer Choice-Based Conjoint (CBC) research platform. This repo contains **both design specifications and a working application**:
 
-## Python Environment
-
-When Python code is introduced to this repository, **all environment and package management must use [`uv`](https://hellowac.github.io/uv-zh-cn/getting-started/)**. Do not use `pip`, `conda`, `poetry`, or `venv` directly. Use `uv venv` for virtual environments and `uv pip install` / `uv add` for dependency management.
+- Markdown specifications and architecture documents under `consumer-simulation/`, `cbc-questionnaire-system/`, `cbc-analysis-system/`, and `docs/`.
+- Python/FastAPI backend under `src/`.
+- React + Vite frontend under `frontend/`.
+- Test suites under `tests/` and `frontend/src/__tests__/`.
+- Deployment artifacts under `docker/` and `k8s/`.
+- Runtime assets under `configs/` and utility scripts under `scripts/`.
 
 ## System Architecture
-
-AI_CBC is a three-subsystem platform that uses LLM-generated "virtual consumers" to conduct Choice-Based Conjoint (CBC) market research:
 
 ```
 Consumer Simulation → CBC Questionnaire → Data Analysis
      (生成)              (收集)              (分析)
 ```
 
-| Subsystem | Directory | Core Function |
-|-----------|-----------|---------------|
-| Consumer Simulation | `consumer-simulation/` | Generate virtual consumer personas and simulate their behavior |
-| CBC Questionnaire | `cbc-questionnaire-system/` | Design choice experiments and generate questionnaires |
-| Data Analysis | `cbc-analysis-system/` | Statistical modeling (HB/MNL), market simulation, reporting |
+A **Security & Compliance Layer** spans all three subsystems.
 
-A fourth **Security & Compliance Layer (安全与合规层)** spans all three subsystems, covering ethics auditing, bias detection, red-team testing, cost fuses, input sanitization, and log auditing. Specifications for this layer live in `docs/Agent安全架构纲要.md` and related security documents.
+## Directory Guidance
 
-The subsystems exchange data through standardized formats defined in `docs/数据字典.md`.
+For detailed conventions and commands, see the CLAUDE.md in each directory:
 
-## Document Navigation
+| Directory | Focus |
+|-----------|-------|
+| [`consumer-simulation/CLAUDE.md`](consumer-simulation/CLAUDE.md) | Virtual-consumer generation specs, four-layer persona model, prompt templates |
+| [`cbc-questionnaire-system/CLAUDE.md`](cbc-questionnaire-system/CLAUDE.md) | CBC experimental design specs, attribute/level conventions |
+| [`cbc-analysis-system/CLAUDE.md`](cbc-analysis-system/CLAUDE.md) | Statistical modeling specs, HB/MNL, convergence rules |
+| [`docs/CLAUDE.md`](docs/CLAUDE.md) | Cross-cutting docs index, editing conventions, role owners |
+| [`src/CLAUDE.md`](src/CLAUDE.md) | Python backend architecture, dev commands, testing, linting |
+| [`frontend/CLAUDE.md`](frontend/CLAUDE.md) | React/Vite frontend, dev/test commands, API client |
+| [`tests/CLAUDE.md`](tests/CLAUDE.md) | pytest conventions, fixtures, global-state cleanup, red-team tests |
+| [`configs/CLAUDE.md`](configs/CLAUDE.md) | Prompt templates and tag JSON assets |
+| [`docker/CLAUDE.md`](docker/CLAUDE.md) | Container build and local observability stack |
+| [`k8s/CLAUDE.md`](k8s/CLAUDE.md) | Kubernetes deployment manifests |
+| [`scripts/CLAUDE.md`](scripts/CLAUDE.md) | Dev server with mocks, batch simulation, endpoint verification |
 
-**Start here for any work:** `AI_CBC_系统总览白皮书.md` — the system-wide white paper with architecture diagrams, phase definitions, and team roles.
+## Quick Start
 
-**For navigation by task:** `docs/文档索引与导航.md` — central index with role-based lookup tables, document dependency graph, and parameter quick-reference.
+```bash
+# Backend (use mocked dev server on Windows; see src/CLAUDE.md for details)
+uv venv
+uv pip install -e ".[dev,analysis]"
+uv run python scripts/dev_server_with_mocks.py
 
-**Key document clusters:**
+# Frontend
+cd frontend
+npm install
+npm run dev    # http://localhost:3000, proxies /api to localhost:8000
+```
 
-| Task | Entry Document |
-|------|---------------|
-| Understand the overall system | `AI_CBC_系统总览白皮书.md` |
-| Generate consumer personas | `consumer-simulation/05-Prompt模板库.md` (Template 1) |
-| Design a CBC experiment | `docs/洗碗机CBC实验设计方案.md` |
-| Integrate subsystems | `docs/全链路集成架构设计.md` |
-| Define data contracts | `docs/数据字典.md` |
-| Security/ethics review | `docs/Agent安全架构纲要.md` → `docs/伦理与偏见审计规范.md` |
-| Business acceptance criteria | `docs/项目成功标准书.md` |
+## Data Exchange Formats
 
-### Document Numbering Convention
+Standard interfaces (full schemas in [`docs/数据字典.md`](docs/数据字典.md)):
 
-All three subsystems use `NN-` prefix numbering (e.g., `01-`, `02-`) to indicate reading order. Within `consumer-simulation/`, `README.md` contains a full document dependency graph showing how the 17 numbered files relate to each other and to the root `消费者画像.md` tag-system source file.
+| Flow | Format | Producer → Consumer |
+|------|--------|---------------------|
+| Persona output | `PersonaProfile` JSON | consumer-simulation → questionnaire & analysis |
+| Raw responses | `CBCRawDataset` JSON/CSV | questionnaire → analysis |
+| Analysis result | `AnalysisResult` JSON | analysis → dashboard/report |
 
 ## Core Design Principles
 
-When editing or extending documents, preserve these architectural principles:
-
-1. **张力优先 (Tension First)**: Virtual consumers must have internally contradictory traits (e.g., high income + extreme frugality), not "average" personalities. Every contradiction requires a psychological narrative explanation.
-
-2. **Four-Layer Persona Model**: Consumer personas are structured as:
-   - Layer 1: Demographics (`layer1_demographics`)
-   - Layer 2: Behavioral patterns (`layer2_behavior`)
-   - Layer 3: Psychological motivations (`layer3_psychology`)
-   - Layer 4: Situational narratives (`layer4_scenarios`)
-   Upper layers must explain anomalies in lower layers.
-
-3. **Statistical Rigor**: HB models must report R-hat and ESS; R-hat > 1.1 means non-convergence. Effects coding is the default (parameters sum to 0). Price coefficients must be negative for WTP calculations.
-
-4. **Bias Zero-Tolerance**: Virtual consumer preferences must not systematically correlate with protected attributes (gender, race, etc.). All persona batches undergo automated bias auditing.
-
-## Standard Data Exchange Formats
-
-Three key interfaces between subsystems (full schemas in `docs/数据字典.md`):
-
-| Flow | Format | Producer → Consumer | Key Fields |
-|------|--------|---------------------|------------|
-| Persona output | `PersonaProfile` JSON | consumer-simulation → questionnaire & analysis | `persona_id`, four layers, `authenticity_score` |
-| Raw responses | `CBCRawDataset` JSON/CSV | questionnaire → analysis | `metadata`, `choice_records` with `chosen` flag |
-| Analysis result | `AnalysisResult` JSON | analysis → dashboard/report | `individual_utilities`, `importance`, `wtp`, `convergence` |
-
-### Effects Coding Naming Convention
-
-Categorical attributes use `{attribute_id}_{level_index}` where `level_index` ranges `0` to `n_levels-2`. The last level is recovered as the negative sum of others. Example: `capacity_0`, `capacity_1` → 3rd level = `-(capacity_0 + capacity_1)`.
-
-## Team Roles & Document Ownership
-
-Documents are owned by named roles (not individuals). Understanding these helps locate the right specification:
-
-| Role | Code | Domain | Key Documents |
-|------|------|--------|---------------|
-| 小联 | Conjoint Expert | Experimental design, model interpretation | `cbc-questionnaire-system/`, `docs/洗碗机CBC实验设计方案.md` |
-| 小数 | Data/Modeling Scientist | Statistical modeling, APIs | `cbc-analysis-system/`, `docs/建模管线与API设计.md` |
-| 小应 | LLM Application Engineer | Agent framework, prompts | `consumer-simulation/07-Harness架构设计方案.md`, `docs/Agent原型Prompt设计.md` |
-| 小示 | Behavior Engineer | Consumer psychology, persona design | `consumer-simulation/02-阶段一-画像生成.md`, `docs/目标人群角色卡设计.md` |
-| 小端 | Backend Engineer | Integration, data pipelines | `docs/全链路集成架构设计.md`, `docs/数据字典.md` |
-| 小伦 | Ethics/Bias Auditor | Fairness, compliance | `docs/伦理与偏见审计规范.md`, `docs/虚拟消费者公平性规范.md` |
-| 小测 | QA Engineer | Testing, validation | `consumer-simulation/14-测试规范.md`, `docs/测试验证方案.md` |
-| 小验 | Business Acceptance | KPIs, UAT | `docs/项目成功标准书.md`, `docs/业务验收标准与KPI框架.md` |
+1. **张力优先 (Tension First)**: Virtual consumers must have internally contradictory traits, not average personalities. Every contradiction requires a psychological narrative explanation.
+2. **Four-Layer Persona Model**: Demographics → Behavior → Psychology → Scenarios. Upper layers explain anomalies in lower layers.
+3. **Statistical Rigor**: HB models must report R-hat and ESS; R-hat > 1.1 means non-convergence. Effects coding is the default. Price coefficients must be negative for WTP calculations.
+4. **Bias Zero-Tolerance**: Virtual consumer preferences must not systematically correlate with protected attributes. All persona batches undergo automated bias auditing.
 
 ## Editing Conventions
 
-- All documents use Markdown with Chinese as the primary language
-- Frontmatter format: Chinese blockquote style (`> **版本**：v1.0`) — not YAML frontmatter. Typical fields: version, positioning, maintainer, related documents
-- Cross-references use relative paths with `[]()` links
-- The central index (`docs/文档索引与导航.md`) must be updated when adding new documents
-- Parameter tables are authoritative — changing a threshold (e.g., `rhat_max < 1.1`) requires同步 updates in all referencing documents
+- Specification documents use Markdown with Chinese as the primary language.
+- Frontmatter uses Chinese blockquote style (`> **版本**：v1.0`), not YAML.
+- Cross-references use relative paths with `[]()` links.
+- Update `docs/文档索引与导航.md` when adding new documents.
+- Parameter tables are authoritative — changing a threshold requires同步 updates in all referencing documents.
+
+## Environment & CI/CD
+
+- Python environment and package management must use `uv`.
+- Node.js 20+ for the frontend.
+- Copy `.env.example` to `.env` and set LLM keys.
+- CI/CD enforces conventional commits (`feat(scope): ...`), branch naming, ruff/mypy/bandit, pytest coverage ≥ 60%, and frontend build/test. See `.github/workflows/ci-cd.yml`.
+
+## Team Roles
+
+| Role | Domain | Key Areas |
+|------|--------|-----------|
+| 小P | PM | `docs/文档索引与导航.md`, schedule, risks |
+| 小联 | Conjoint Expert | `cbc-questionnaire-system/`, `docs/洗碗机CBC实验设计方案.md` |
+| 小数 | Data/Modeling Scientist | `cbc-analysis-system/`, `src/aicbc/analysis/`, `docs/建模管线与API设计.md` |
+| 小应 | LLM Application Engineer | `consumer-simulation/07-Harness架构设计方案.md`, `src/aicbc/agents/`, prompts |
+| 小示 | Behavior Engineer | `consumer-simulation/02-阶段一-画像生成.md`, `configs/tags/`, `docs/目标人群角色卡设计.md` |
+| 小端 | Backend Engineer | `docs/数据字典.md`, `src/aicbc/api/`, `src/aicbc/core/store*.py` |
+| 小伦 | Ethics/Bias Auditor | `docs/伦理与偏见审计规范.md`, `tests/redteam/` |
+| 小测 | QA Engineer | `consumer-simulation/14-测试规范.md`, `tests/` |
+| 小验 | Business Acceptance | `docs/项目成功标准书.md`, `docs/业务验收标准与KPI框架.md` |
+| 小维 | DevOps/MLOps | `.github/workflows/`, `docker/`, `k8s/`, `docker-compose.yml` |
+| 小控 | Cost Engineer | `src/aicbc/cost/`, cost env vars |
+| 小前 | Frontend Engineer | `frontend/` |
+| 小速 | Performance Engineer | Performance gates and optimizations |
+| 小培 | Training | Training materials and onboarding |
+| 小安 | Security Engineer | `docs/Agent安全架构纲要.md`, security reviews |

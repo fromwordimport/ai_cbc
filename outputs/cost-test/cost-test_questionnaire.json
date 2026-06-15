@@ -1,0 +1,473 @@
+{
+  "questionnaire_id": "q-cost-test-dopt",
+  "study_id": "cost-test",
+  "choice_sets": [
+    {
+      "choice_set_id": 1,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 2,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 3,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 4,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 5,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 6,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 7,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 8,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "西门子",
+            "energy": "超一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 9,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "方太",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 10,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "嵌入式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "台式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "超一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 11,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 5999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "全能",
+            "brand": "美的",
+            "energy": "二级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 2999,
+            "capacity": "13套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "方太",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 5999,
+            "capacity": "10套",
+            "installation": "水槽式",
+            "features": "基础",
+            "brand": "小米",
+            "energy": "一级"
+          }
+        }
+      ]
+    },
+    {
+      "choice_set_id": 12,
+      "alternatives": [
+        {
+          "alt_index": 0,
+          "attributes": {
+            "price": 2999,
+            "capacity": "6套",
+            "installation": "台式",
+            "features": "基础",
+            "brand": "美的",
+            "energy": "一级"
+          }
+        },
+        {
+          "alt_index": 1,
+          "attributes": {
+            "price": 5999,
+            "capacity": "13套",
+            "installation": "水槽式",
+            "features": "全能",
+            "brand": "小米",
+            "energy": "超一级"
+          }
+        },
+        {
+          "alt_index": 2,
+          "attributes": {
+            "price": 2999,
+            "capacity": "10套",
+            "installation": "嵌入式",
+            "features": "智能",
+            "brand": "西门子",
+            "energy": "二级"
+          }
+        }
+      ]
+    }
+  ],
+  "design_parameters": {
+    "n_choice_sets": 12,
+    "n_alternatives": 3,
+    "algorithm": "d_optimal",
+    "include_none": true,
+    "seed": 99
+  },
+  "d_efficiency": 0.7807648331868012,
+  "a_efficiency": 0.12096774193548389,
+  "iterations": 5,
+  "created_at": "2026-06-10T08:05:36.594188Z"
+}

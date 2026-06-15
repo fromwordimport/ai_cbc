@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-
 from aicbc.questionnaire.models import Attribute, AttributeType
 
 
@@ -36,6 +34,8 @@ def effects_encode_categorical(value: Any, attribute: Attribute) -> np.ndarray:
     if n_levels < 2:
         raise ValueError("effects coding requires at least 2 levels")
 
+    import numpy as np
+
     idx_map = _build_level_index_map(attribute)
     if value not in idx_map:
         raise ValueError(f"value '{value}' not found in attribute '{attribute.id}'")
@@ -50,6 +50,62 @@ def effects_encode_categorical(value: Any, attribute: Attribute) -> np.ndarray:
     return encoded
 
 
+def effects_encode_ordinal(value: Any, attribute: Attribute) -> np.ndarray:
+    """Encode an ordinal level using orthogonal polynomial contrasts.
+
+    For k ordered levels, returns k-1 orthogonal polynomial features.
+    The first feature is linear, second quadratic, third cubic, etc.
+    Contrasts are normalised so each column has unit length and sums to zero.
+
+    Example (4 levels: A < B < C < D):
+        A -> [c₀_linear, c₀_quadratic, c₀_cubic]
+        B -> [c₁_linear, c₁_quadratic, c₁_cubic]
+        ...
+    """
+    n_levels = len(attribute.levels)
+    if n_levels < 2:
+        raise ValueError("ordinal encoding requires at least 2 levels")
+
+    import numpy as np
+
+    idx_map = _build_level_index_map(attribute)
+    if value not in idx_map:
+        raise ValueError(f"value '{value}' not found in attribute '{attribute.id}'")
+
+    idx = idx_map[value]
+    # Evaluate orthogonal polynomials at equally spaced points 0..k-1
+    x = np.arange(n_levels, dtype=np.float64)
+    # Normalise to [-1, 1] for numerical stability
+    x_norm = 2 * (x - x.min()) / max(x.max() - x.min(), 1) - 1
+    poly_features = []
+    for degree in range(1, n_levels):
+        # Evaluate Legendre-like orthogonal polynomial of given degree
+        vals = _orthogonal_poly(x_norm, degree)
+        # Normalise to unit length
+        vals = vals / np.sqrt(np.sum(vals**2))
+        poly_features.append(vals)
+    contrast_matrix = np.column_stack(poly_features)
+    return contrast_matrix[idx].astype(np.float64)
+
+
+def _orthogonal_poly(x: np.ndarray, degree: int) -> np.ndarray:
+    """Evaluate degree-d orthogonal polynomial at points x using Gram-Schmidt.
+
+    Produces polynomials orthogonal on the given x values with unit
+    normalisation after calling code divides by sqrt(sum of squares).
+    """
+    import numpy as np
+
+    if degree == 1:
+        return x.astype(np.float64)
+    # Gram-Schmidt: start with x^degree, orthogonalise against lower degrees
+    raw = x ** degree
+    for d in range(1, degree):
+        prev = _orthogonal_poly(x, d)
+        raw = raw - np.dot(raw, prev) / np.dot(prev, prev) * prev
+    return raw.astype(np.float64)
+
+
 def effects_encode_price(value: float, attribute: Attribute) -> np.ndarray:
     """Encode a price value as a standardised continuous variable.
 
@@ -57,6 +113,8 @@ def effects_encode_price(value: float, attribute: Attribute) -> np.ndarray:
     so that price parameters are on a comparable scale to effects-coded
     categorical parameters.
     """
+    import numpy as np
+
     prices = [float(level.value) for level in attribute.levels]
     mean = sum(prices) / len(prices)
     std = np.std(prices, ddof=0)
@@ -80,14 +138,18 @@ def encode_profile(
     Returns:
         1-D numpy array of encoded values.
     """
+    import numpy as np
+
     parts: list[np.ndarray] = []
     for attr in attributes:
         if attr.id not in profile:
             raise ValueError(f"profile missing attribute '{attr.id}'")
         value = profile[attr.id]
 
-        if attr.type in (AttributeType.CATEGORICAL, AttributeType.ORDINAL):
+        if attr.type == AttributeType.CATEGORICAL:
             parts.append(effects_encode_categorical(value, attr))
+        elif attr.type == AttributeType.ORDINAL:
+            parts.append(effects_encode_ordinal(value, attr))
         elif attr.type == AttributeType.CONTINUOUS:
             parts.append(np.array([float(value)], dtype=np.float64))
         elif attr.type == AttributeType.PRICE:
@@ -110,6 +172,8 @@ def encode_design_matrix(
     Returns:
         2-D array of shape (n_profiles, n_params).
     """
+    import numpy as np
+
     rows = [encode_profile(p, attributes) for p in profiles]
     if not rows:
         return np.array([])
