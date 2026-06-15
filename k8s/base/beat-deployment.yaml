@@ -1,0 +1,86 @@
+# AI_CBC Celery Beat Scheduler Deployment
+# Periodically enqueues scheduled tasks (e.g. cost fuse checks, audit log rotation).
+# Only one replica is required; leader election is handled by Celery beat.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aicbc-beat
+  namespace: aicbc-prod
+  labels:
+    app.kubernetes.io/name: aicbc
+    app.kubernetes.io/component: beat
+    app.kubernetes.io/version: "0.1.0"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aicbc
+      app.kubernetes.io/component: beat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aicbc
+        app.kubernetes.io/component: beat
+    spec:
+      serviceAccountName: aicbc-beat
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: beat
+          image: ghcr.io/fromwordimport/aicbc:0.1.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - aicbc.analysis.tasks
+            - beat
+            - --loglevel=info
+            - --scheduler
+            - celery.beat.PersistentScheduler
+            - --schedulefile
+            - /tmp/celerybeat-schedule
+          envFrom:
+            - configMapRef:
+                name: aicbc-config
+          env:
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aicbc-secrets
+                  key: ANTHROPIC_API_KEY
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aicbc-secrets
+                  key: OPENAI_API_KEY
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aicbc-secrets
+                  key: SECRET_KEY
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

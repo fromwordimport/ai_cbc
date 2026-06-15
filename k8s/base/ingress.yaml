@@ -1,0 +1,33 @@
+# AI_CBC Ingress Configuration
+# Requires ingress-nginx or similar ingress controller
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aicbc-ingress
+  namespace: aicbc-prod
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.aicbc.example.com
+      secretName: aicbc-tls
+  rules:
+    - host: api.aicbc.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aicbc-api
+                port:
+                  number: 80

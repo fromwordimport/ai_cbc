@@ -1,0 +1,217 @@
+# AI_CBC Network Policies
+# Restricts pod-to-pod traffic to the minimum required for operation.
+# Requires a CNI plugin that supports NetworkPolicy (e.g. Calico, Cilium).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: aicbc-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow ingress to API pods from the ingress controller namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-api
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aicbc
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+# Allow API pods to reach MongoDB, Redis, and external LLM APIs.
+# SECURITY NOTE: Egress to external LLM APIs is intentionally broad (0.0.0.0/0:443)
+# because Anthropic and OpenAI use CDN-backed endpoints with dynamic IPs.
+# For stricter control, deploy an egress proxy/gateway and restrict to its IP,
+# or use a DNS-based egress filter (requires CNI support such as Cilium).
+# See: SEC-004 in security review.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-egress
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aicbc
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongo
+      ports:
+        - protocol: TCP
+          port: 27017
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+---
+# Allow workers to reach MongoDB, Redis, and external LLM APIs.
+# Same egress rationale as allow-api-egress (SEC-004).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-worker-egress
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aicbc
+      app.kubernetes.io/component: worker
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongo
+      ports:
+        - protocol: TCP
+          port: 27017
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+---
+# Allow beat to reach Redis.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-beat-egress
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aicbc
+      app.kubernetes.io/component: beat
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# Allow MongoDB pods to accept connections from API and workers.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongo-ingress
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongo
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aicbc
+      ports:
+        - protocol: TCP
+          port: 27017
+---
+# Allow Redis pods to accept connections from API, worker, and beat.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-ingress
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aicbc
+      ports:
+        - protocol: TCP
+          port: 6379
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# Deny all ingress to worker and beat pods (they do not need external traffic).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-ingress-worker-beat
+  namespace: aicbc-prod
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [worker, beat]
+  policyTypes:
+    - Ingress
+---
+# Allow DNS resolution for all pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: aicbc-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53

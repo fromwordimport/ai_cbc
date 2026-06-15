@@ -1,0 +1,9 @@
+# AI_CBC Kubernetes Namespace - Production
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aicbc-prod
+  labels:
+    app.kubernetes.io/name: aicbc
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/environment: production

@@ -1,0 +1,9 @@
+# AI_CBC Kubernetes Namespace - Staging
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aicbc-staging
+  labels:
+    app.kubernetes.io/name: aicbc
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/environment: staging

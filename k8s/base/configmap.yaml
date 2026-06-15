@@ -1,0 +1,47 @@
+# AI_CBC Application Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aicbc-config
+  namespace: aicbc-prod
+data:
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  API_WORKERS: "4"
+  MONGODB_URL: "mongodb://mongo:27017/aicbc"
+  REDIS_URL: "redis://redis:6379/0"
+  METRICS_PATH: "/metrics"
+  SLOW_REQUEST_THRESHOLD: "5.0"
+  # LLM Configuration
+  ANTHROPIC_BASE_URL: "https://api.anthropic.com"
+  ANTHROPIC_MODEL_PERSONA: "claude-sonnet-4-6"
+  ANTHROPIC_MODEL_SIMULATION: "claude-sonnet-4-6"
+  ANTHROPIC_MODEL_AUDIT: "claude-haiku-4-5"
+  OPENAI_BASE_URL: "https://api.openai.com/v1"
+  OPENAI_MODEL: "gpt-4o"
+  # LLM Parameters
+  LLM_TEMPERATURE: "0.3"
+  LLM_MAX_TOKENS: "4096"
+  LLM_TIMEOUT_SECONDS: "120"
+  LLM_MAX_RETRIES: "3"
+  # Cost Fuse
+  COST_FUSE_SINGLE_STUDY_CNY: "500"
+  COST_FUSE_DAILY_CNY: "1000"
+  COST_FUSE_WEEKLY_CNY: "5000"
+  COST_FUSE_DEGRADE_MODEL: "claude-haiku-4-5"
+  # Study Defaults
+  DEFAULT_N_CHOICE_SETS: "12"
+  DEFAULT_N_ALTERNATIVES: "3"
+  DEFAULT_SAMPLE_SIZE: "150"
+  DEFAULT_D_EFFICIENCY_TARGET: "0.85"
+  # Authenticity
+  AUTHENTICITY_PASS_THRESHOLD: "9"
+  AUTHENTICITY_EXCELLENT_THRESHOLD: "12"
+  AUTHENTICITY_MAX_SCORE: "14"
+  # Bias Audit
+  BIAS_KS_P_THRESHOLD: "0.05"
+  BIAS_CRAMERS_V_THRESHOLD: "0.1"
+  BIAS_ENTROPY_THRESHOLD: "0.7"

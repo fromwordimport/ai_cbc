@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base manifests (environment-agnostic).
+# Use overlays for environment-specific namespace and configuration:
+#   kubectl apply -k k8s/overlays/staging
+#   kubectl apply -k k8s/overlays/prod
+
+resources:
+  - serviceaccount.yaml
+  - configmap.yaml
+  - secret.yaml
+  - redis.yaml
+  - statefulset.yaml
+  - deployment.yaml
+  - worker-deployment.yaml
+  - beat-deployment.yaml
+  - network-policy.yaml
+  - ingress.yaml
+
+# Note: namespace is defined per-overlay so each environment owns its own
+# Namespace object and Kustomize does not duplicate or rename base resources.
+
+images:
+  - name: ghcr.io/fromwordimport/aicbc
+    newTag: 0.1.0
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: aicbc
+      app.kubernetes.io/version: "0.1.0"

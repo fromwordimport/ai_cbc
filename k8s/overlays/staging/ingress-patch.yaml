@@ -1,0 +1,24 @@
+# AI_CBC Staging Ingress Patch
+# Replaces the base placeholder domain with the staging domain used by CI/CD.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aicbc-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+spec:
+  tls:
+    - hosts:
+        - staging.aicbc.example.com
+      secretName: aicbc-tls-staging
+  rules:
+    - host: staging.aicbc.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aicbc-api
+                port:
+                  number: 80
