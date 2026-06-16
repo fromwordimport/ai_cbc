@@ -100,6 +100,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if path in self.EXEMPT_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
             return await call_next(request)
 
+        # Allow CORS preflight requests to pass through
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if settings.debug:
             return await call_next(request)
 
