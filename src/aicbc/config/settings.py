@@ -161,10 +161,19 @@ class Settings(BaseSettings):
     def _celery_broker_url_fallback(cls, v: Any) -> Any:
         """Fallback CELERY_BROKER_URL to REDIS_URL when not explicitly set."""
         if isinstance(v, str) and v.strip():
-            return v
+            return cls._ensure_redis_ssl_params(v)
         import os
 
-        return os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        return cls._ensure_redis_ssl_params(redis_url)
+
+    @staticmethod
+    def _ensure_redis_ssl_params(url: str) -> str:
+        """Append ssl_cert_reqs for rediss:// URLs required by Celery."""
+        if url.startswith("rediss://") and "ssl_cert_reqs" not in url:
+            separator = "&" if "?" in url else "?"
+            return f"{url}{separator}ssl_cert_reqs=CERT_NONE"
+        return url
 
     def model_post_init(self, __context: Any) -> None:
         """Decrypt any encrypted secrets after the model is initialised."""
