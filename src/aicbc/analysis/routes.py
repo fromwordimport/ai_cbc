@@ -13,7 +13,6 @@ from datetime import UTC, datetime
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine
 from aicbc.analysis.models import (
     AnalyzeRequest,
     AnalysisJobStatus,

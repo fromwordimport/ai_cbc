@@ -42,6 +42,9 @@ COPY --chown=aicbc:aicbc configs/ ./configs/
 # Copy supervisord configuration
 COPY docker/supervisord-render.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Pre-compile bytecode to reduce cold-start import time on Render free tier
+RUN python -m compileall -q /app/src /app/configs
+
 # Remove write permissions for security
 RUN chmod -R 555 /app/src /app/configs
 
