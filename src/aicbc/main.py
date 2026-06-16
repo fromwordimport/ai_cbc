@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import structlog
 from beanie import init_beanie
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -69,6 +70,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.state.debug = settings.debug
+
+# CORS: allow frontend origin
+cors_origins = ["https://aicbc.fromworldimport.com"]
+if settings.debug:
+    cors_origins.append("http://localhost:3000")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
