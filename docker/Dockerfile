@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY pyproject.toml uv.lock ./
+# Note: uv.lock is gitignored, so install directly from pyproject.toml.
+COPY pyproject.toml ./
 RUN pip install --no-cache-dir uv && \
     uv pip install --system --no-cache -r pyproject.toml
 
