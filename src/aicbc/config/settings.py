@@ -156,6 +156,16 @@ class Settings(BaseSettings):
             return key
         return "dev-secret-key-change-in-production-32chars"
 
+    @field_validator("celery_broker_url", mode="before")
+    @classmethod
+    def _celery_broker_url_fallback(cls, v: Any) -> Any:
+        """Fallback CELERY_BROKER_URL to REDIS_URL when not explicitly set."""
+        if isinstance(v, str) and v.strip():
+            return v
+        import os
+
+        return os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
     def model_post_init(self, __context: Any) -> None:
         """Decrypt any encrypted secrets after the model is initialised."""
         self.api_key = decrypt_value(self.api_key, self.secret_key)
