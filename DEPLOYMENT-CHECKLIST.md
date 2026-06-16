@@ -20,8 +20,9 @@
 
 ## 完成状态
 
-- [x] Render `aicbc-web` static site 部署成功
-- [x] Cloudflare 子域名 `aicbc.fromworldimport.com` 绑定成功
+- [x] Render `aicbc-web` static site 构建并部署成功
+- [x] Cloudflare 子域名 `aicbc.fromworldimport.com` 绑定成功（DNS only）
+- [x] 前端页面可正常显示
 - [x] 前端生产环境指向线上后端
 
 ---
@@ -161,14 +162,16 @@ curl https://aicbc-api.fromworldimport.com/ready
 
 ### 4.5 前端子域名
 
-前端静态站点绑定 `aicbc.fromworldimport.com`，需要在 Cloudflare 添加第二条 CNAME：
+前端静态站点绑定 `aicbc.fromworldimport.com`。
+
+> **重要**：Render Static Site 与 Cloudflare 橙色云代理冲突，会导致 error 1000。前端子域名必须设置为 **DNS only（灰色云）**。
 
 1. Cloudflare Dashboard → DNS → Records
 2. 添加 CNAME 记录：
    - **Type**: CNAME
    - **Name**: `aicbc`
    - **Target**: `aicbc-web.onrender.com`
-   - **Proxy status**: 开启（橙色云图标）
+   - **Proxy status**: 关闭（灰色云 / DNS only）
    - **TTL**: Auto
 3. 等待 DNS 生效后，Render 会自动验证并签发 HTTPS
 
