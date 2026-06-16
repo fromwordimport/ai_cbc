@@ -1,11 +1,20 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { compression } from 'vite-plugin-compression2'
+import { visualizer } from 'rollup-plugin-visualizer'
 import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Pre-compress static assets for CDN/Reverse-proxy serving
+    compression({ algorithm: 'gzip', include: /\.(js|css|html|svg|json)$/ }),
+    compression({ algorithm: 'brotliCompress', include: /\.(js|css|html|svg|json)$/ }),
+    // Emit bundle analysis report on build
+    visualizer({ open: false, filename: 'dist/stats.html' }),
+  ],
   test: {
     globals: true,
     environment: 'jsdom',
