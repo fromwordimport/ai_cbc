@@ -101,30 +101,41 @@ Render 为 `aicbc-api` service 创建后，在 Dashboard 中填入以下 secret 
 aicbc-api.onrender.com
 ```
 
+本项目实际绑定的自定义域名为：
+```
+aicbc-api.fromworldimport.com
+```
+
 ### 4.2 添加 DNS 记录
 
 1. 登录 Cloudflare Dashboard
-2. 选择你的域名
+2. 选择你的域名 `fromworldimport.com`
 3. 进入 DNS → Records
 4. 添加 CNAME 记录：
    - **Type**: CNAME
-   - **Name**: `api`（将创建子域名 `api.yourdomain.com`）
+   - **Name**: `aicbc-api`
    - **Target**: `aicbc-api.onrender.com`
    - **Proxy status**: 开启（橙色云图标）
    - **TTL**: Auto
 
 ### 4.3 在 Render 绑定自定义域名
 
+**方式 A（推荐）**：`render.yaml` 中已配置 `domains: [aicbc-api.fromworldimport.com]`，push 后 Render 自动处理。
+
+**方式 B（手动）**：
 1. Render Dashboard → aicbc-api → Settings → Custom Domain
-2. 输入 `api.yourdomain.com`
+2. 输入 `aicbc-api.fromworldimport.com`
 3. 等待 Render 验证 DNS（通常几分钟）
 4. 开启 SSL（Render 自动签发 Let's Encrypt）
+
+> 如果 Render 验证失败，先临时关闭 Cloudflare Proxy（改为灰色云 DNS only），验证通过后再开启 Proxy。
 
 ### 4.4 测试
 
 ```bash
-curl https://api.yourdomain.com/health
-curl https://api.yourdomain.com/ready
+nslookup aicbc-api.fromworldimport.com
+curl https://aicbc-api.fromworldimport.com/health
+curl https://aicbc-api.fromworldimport.com/ready
 ```
 
 ---

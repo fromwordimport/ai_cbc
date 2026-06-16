@@ -29,6 +29,8 @@ services:
     healthCheckPath: /health
     # Free plan sleeps after 15 min idle; acceptable for personal use
     plan: free
+    domains:
+      - aicbc-api.fromworldimport.com
     envVars:
       - key: ENVIRONMENT
         value: production
