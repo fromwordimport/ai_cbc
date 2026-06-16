@@ -12,9 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 # Note: uv.lock is gitignored, so install directly from pyproject.toml.
+# Include [analysis] extras because Celery worker needs pandas/numpy/pymc.
 COPY pyproject.toml ./
+COPY src/ ./src/
 RUN pip install --no-cache-dir uv && \
-    uv pip install --system --no-cache -r pyproject.toml
+    uv pip install --system --no-cache -e ".[analysis]"
 
 # Stage 2: Runtime — minimal image
 FROM python:3.11-slim AS runtime
