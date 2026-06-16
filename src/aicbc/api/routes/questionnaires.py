@@ -238,8 +238,8 @@ async def delete_study(
 
     # Cascade delete in dependency order: analyses → responses → personas → study.
     await analysis_store.adelete_by_study(study_id)
-    await response_store.delete_by_study(study_id)
-    await persona_store.delete_by_study(study_id)
+    await response_store.adelete_by_study(study_id)
+    await persona_store.adelete_by_study(study_id)
     await store.adelete_study(study_id)
 
     logger.info("study_deleted_cascade", study_id=study_id)
