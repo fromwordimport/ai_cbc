@@ -179,7 +179,11 @@ class MongoPersonaStore:
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[PersonaProfile], int]:
-        """Async version of :meth:`list_all`."""
+        """Async version of :meth:`list_all`.
+
+        Pushes filtering and pagination down to MongoDB so large persona
+        collections do not block the event loop or exhaust memory.
+        """
         query: Any = {}
         if segment is not None:
             query["segment"] = segment
@@ -187,18 +191,16 @@ class MongoPersonaStore:
             query["city"] = city_tier
         if bias_status is not None:
             query["bias_audit_status"] = bias_status
-
-        docs = await PersonaDocument.find(query).to_list()
-        items = [self._persona_from_doc(d) for d in docs]
-
         if study_id is not None:
             prefix = f"persona-{study_id}-"
-            items = [p for p in items if p.persona_id.startswith(prefix)]
+            query["persona_id"] = {"$regex": f"^{prefix}"}
 
-        total = len(items)
+        mongo_query = PersonaDocument.find(query)
+        total = await mongo_query.count()
         start = (page - 1) * page_size
-        end = start + page_size
-        return items[start:end], total
+        docs = await mongo_query.skip(start).limit(page_size).to_list()
+        items = [self._persona_from_doc(d) for d in docs]
+        return items, total
 
     def delete_by_study(self, study_id: str) -> int:
         """Delete all personas belonging to a study."""
@@ -300,16 +302,16 @@ class MongoQuestionnaireStore:
         page_size: int = 20,
     ) -> tuple[list[CBCStudy], int]:
         """Query studies with optional filters (async, Motor-loop safe)."""
-        query = StudyDocument.find_all()
+        query: Any = {}
         if product_category is not None:
-            query = query.find(StudyDocument.product_category == product_category)
+            query["product_category"] = product_category
 
-        docs = await query.to_list()
-        items = [CBCStudy.model_validate(d.data) for d in docs]
-        total = len(items)
+        mongo_query = StudyDocument.find(query)
+        total = await mongo_query.count()
         start = (page - 1) * page_size
-        end = start + page_size
-        return items[start:end], total
+        docs = await mongo_query.skip(start).limit(page_size).to_list()
+        items = [CBCStudy.model_validate(d.data) for d in docs]
+        return items, total
 
     def save_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
         """Persist a questionnaire keyed by study_id."""
@@ -408,14 +410,12 @@ class MongoResponseStore:
         page_size: int = 100,
     ) -> tuple[list[PersonaResponse], int]:
         """Async version of :meth:`list_responses_by_study`."""
-        docs = await ResponseDocument.find(
-            ResponseDocument.study_id == study_id
-        ).to_list()
-        items = [PersonaResponse.model_validate(d.data) for d in docs]
-        total = len(items)
+        mongo_query = ResponseDocument.find(ResponseDocument.study_id == study_id)
+        total = await mongo_query.count()
         start = (page - 1) * page_size
-        end = start + page_size
-        return items[start:end], total
+        docs = await mongo_query.skip(start).limit(page_size).to_list()
+        items = [PersonaResponse.model_validate(d.data) for d in docs]
+        return items, total
 
     def save_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
         """Persist (or merge) a raw dataset for a study."""
