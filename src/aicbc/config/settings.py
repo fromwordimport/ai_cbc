@@ -130,7 +130,7 @@ class Settings(BaseSettings):
 
     # Celery
     celery_broker_url: str = Field(
-        default="redis://localhost:6379/0",
+        default="",
         alias="CELERY_BROKER_URL",
     )
 
