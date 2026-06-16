@@ -76,14 +76,6 @@ cors_origins = ["https://aicbc.fromworldimport.com"]
 if settings.debug:
     cors_origins.append("http://localhost:3000")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-    allow_headers=["*"],
-)
-
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """Simple API key authentication middleware.
@@ -123,6 +115,16 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(RBACMiddleware)
 app.add_middleware(AuditLogMiddleware)
+
+# CORS must be the outermost middleware so OPTIONS preflight responses are returned
+# before any auth/RBAC checks can reject them without CORS headers.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=["*"],
+)
 
 # Register routes
 app.include_router(health_router, tags=["Health"])

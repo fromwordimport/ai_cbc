@@ -88,6 +88,11 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if path in self.PUBLIC_PATHS or path.startswith("/docs") or path.startswith("/redoc"):
             return await call_next(request)
 
+        # Allow CORS preflight requests to pass through; CORS middleware will
+        # intercept them if registered as the outermost layer.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         role = self._resolve_role(request)
         request.state.role = role
 
