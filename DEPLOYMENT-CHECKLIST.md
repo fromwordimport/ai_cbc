@@ -89,8 +89,11 @@ Render 为 `aicbc-api` service 创建后，在 Dashboard 中填入以下 secret 
 |---------|--------|------|
 | aicbc-api | `MONGODB_URL` | MongoDB Atlas 连接串 |
 | aicbc-api | `REDIS_URL` | Upstash Redis URL |
-| aicbc-api | `ANTHROPIC_API_KEY` | Anthropic Console 或国内大模型平台 |
-| aicbc-api | `OPENAI_API_KEY` | OpenAI Platform 或国内大模型平台 |
+| aicbc-api | `ANTHROPIC_API_KEY` | Anthropic Console（可选） |
+| aicbc-api | `ANTHROPIC_BASE_URL` | Anthropic 兼容接口 base URL（可选） |
+| aicbc-api | `OPENAI_API_KEY` | OpenAI 或国内大模型平台 API Key |
+| aicbc-api | `OPENAI_BASE_URL` | OpenAI 兼容接口 base URL，如 `https://api.deepseek.com/v1` |
+| aicbc-api | `OPENAI_MODEL` | 实际模型 ID，如 `deepseek-chat` |
 | aicbc-api | `SECRET_KEY` | Render 自动生成，无需修改 |
 
 > **注意**：`SECRET_KEY` 由 Render 在 `aicbc-api` 中自动生成。由于 Render 免费计划不支持单独的 `worker` 服务，Celery Worker 和 Celery Beat 通过 `docker/supervisord-render.conf` 与 API 运行在同一个容器内，因此无需额外配置 worker/beat 服务。
