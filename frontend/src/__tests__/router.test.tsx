@@ -56,7 +56,7 @@ describe('router', () => {
 
 describe('router route configuration', () => {
   const rootRoute = router.routes.find((r: any) => r.path === '/')
-  const children = rootRoute?.children || []
+  const children = (rootRoute?.children || []) as any[]
 
   const routeMap = new Map(children.map((c: any) => [c.path || 'index', c]))
 
@@ -310,7 +310,7 @@ describe('router 404 handling', () => {
 
 describe('router lazy loading verification', () => {
   const rootRoute = router.routes.find((r: any) => r.path === '/')
-  const children = rootRoute?.children || []
+  const children = (rootRoute?.children || []) as any[]
 
   it('lazy imports are defined for all page components', () => {
     // Verify that the router config references lazy-loaded components
