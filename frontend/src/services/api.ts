@@ -44,10 +44,12 @@ import type {
   AdminSettings,
 } from '@/types/api'
 
-const API_KEY = 'dev-key-change-in-prod'
+const API_KEY = import.meta.env.VITE_API_KEY || 'dev-key-change-in-prod'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const ROOT_API_BASE_URL = import.meta.env.VITE_ROOT_API_BASE_URL || ''
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -56,7 +58,7 @@ const api = axios.create({
 
 // Root-level endpoints are not prefixed with /api/v1.
 const rootApi = axios.create({
-  baseURL: '',
+  baseURL: ROOT_API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },

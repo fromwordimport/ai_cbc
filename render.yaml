@@ -70,3 +70,21 @@ services:
       - key: SECRET_KEY
         generateValue: true
         length: 32
+
+  # React + Vite static frontend
+  - type: static
+    name: aicbc-web
+    runtime: static
+    repo: https://github.com/fromwordimport/ai_cbc.git
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    domains:
+      - aicbc.fromworldimport.com
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://aicbc-api.fromworldimport.com/api/v1
+      - key: VITE_ROOT_API_BASE_URL
+        value: https://aicbc-api.fromworldimport.com
+      - key: VITE_API_KEY
+        value: dev-key-change-in-prod
