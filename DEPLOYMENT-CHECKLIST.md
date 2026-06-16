@@ -13,12 +13,19 @@
 
 - [x] GitHub 仓库已创建：`https://github.com/fromwordimport/ai_cbc`
 - [x] 代码已 push 到 `master` 分支
-- [ ] 拥有一个 Cloudflare 管理的域名
-- [ ] 已阅读 `render.yaml` 部署配置
+- [x] 拥有一个 Cloudflare 管理的域名： `fromworldimport.com`
+- [x] 已阅读 `render.yaml` 部署配置
 
 ---
 
-## 二、注册外部服务账号
+## 完成状态
+
+- [x] Render `aicbc-api` web service 部署成功
+- [x] MongoDB Atlas 连接成功
+- [x] Upstash Redis 连接成功
+- [x] Celery Worker / Beat 运行正常
+- [x] Cloudflare 子域名 `aicbc-api.fromworldimport.com` 绑定成功
+- [x] HTTPS 健康检查通过：`curl https://aicbc-api.fromworldimport.com/health`
 
 ### 2.1 Render（容器托管）
 
