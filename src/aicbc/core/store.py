@@ -58,10 +58,18 @@ class MemoryQuestionnaireStore:
         with self._lock:
             self._studies[study.study_id] = study
 
+    async def asave_study(self, study: CBCStudy) -> None:
+        """Async-compatible save_study (delegates to sync implementation)."""
+        self.save_study(study)
+
     def get_study(self, study_id: str) -> CBCStudy | None:
         """Retrieve a study by ID."""
         with self._lock:
             return self._studies.get(study_id)
+
+    async def aget_study(self, study_id: str) -> CBCStudy | None:
+        """Async-compatible get_study (delegates to sync implementation)."""
+        return self.get_study(study_id)
 
     def delete_study(self, study_id: str) -> bool:
         """Delete a study and its questionnaire by ID."""
@@ -71,6 +79,10 @@ class MemoryQuestionnaireStore:
                 del self._studies[study_id]
                 self._questionnaires.pop(study_id, None)
             return deleted
+
+    async def adelete_study(self, study_id: str) -> bool:
+        """Async-compatible delete_study (delegates to sync implementation)."""
+        return self.delete_study(study_id)
 
     def list_studies(
         self,
@@ -110,10 +122,18 @@ class MemoryQuestionnaireStore:
         with self._lock:
             self._questionnaires[questionnaire.study_id] = questionnaire
 
+    async def asave_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
+        """Async-compatible save_questionnaire (delegates to sync implementation)."""
+        self.save_questionnaire(questionnaire)
+
     def get_questionnaire(self, study_id: str) -> CBCQuestionnaire | None:
         """Retrieve the questionnaire for a study."""
         with self._lock:
             return self._questionnaires.get(study_id)
+
+    async def aget_questionnaire(self, study_id: str) -> CBCQuestionnaire | None:
+        """Async-compatible get_questionnaire (delegates to sync implementation)."""
+        return self.get_questionnaire(study_id)
 
     def clear(self) -> None:
         """Clear all stored studies and questionnaires."""
@@ -135,10 +155,18 @@ class MemoryResponseStore:
         with self._lock:
             self._responses[response.response_id] = response
 
+    async def asave_response(self, response: PersonaResponse) -> None:
+        """Async-compatible save_response (delegates to sync implementation)."""
+        self.save_response(response)
+
     def get_response(self, response_id: str) -> PersonaResponse | None:
         """Retrieve a response by ID."""
         with self._lock:
             return self._responses.get(response_id)
+
+    async def aget_response(self, response_id: str) -> PersonaResponse | None:
+        """Async-compatible get_response (delegates to sync implementation)."""
+        return self.get_response(response_id)
 
     def list_responses_by_study(
         self,
@@ -156,6 +184,15 @@ class MemoryResponseStore:
         end = start + page_size
         return items[start:end], total
 
+    async def alist_responses_by_study(
+        self,
+        study_id: str,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> tuple[list[PersonaResponse], int]:
+        """Async-compatible list_responses_by_study (delegates to sync implementation)."""
+        return self.list_responses_by_study(study_id, page=page, page_size=page_size)
+
     def save_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
         """Store (or merge) a raw dataset for a study."""
         with self._lock:
@@ -167,10 +204,18 @@ class MemoryResponseStore:
             else:
                 self._datasets[study_id] = dataset
 
+    async def asave_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
+        """Async-compatible save_dataset (delegates to sync implementation)."""
+        self.save_dataset(study_id, dataset)
+
     def get_dataset(self, study_id: str) -> CBCRawDataset | None:
         """Retrieve the raw dataset for a study."""
         with self._lock:
             return self._datasets.get(study_id)
+
+    async def aget_dataset(self, study_id: str) -> CBCRawDataset | None:
+        """Async-compatible get_dataset (delegates to sync implementation)."""
+        return self.get_dataset(study_id)
 
     def delete_response(self, response_id: str) -> bool:
         """Delete a single response by ID."""
@@ -180,6 +225,10 @@ class MemoryResponseStore:
                 return True
             return False
 
+    async def adelete_response(self, response_id: str) -> bool:
+        """Async-compatible delete_response (delegates to sync implementation)."""
+        return self.delete_response(response_id)
+
     def delete_dataset(self, study_id: str) -> bool:
         """Delete the raw dataset for a study."""
         with self._lock:
@@ -187,6 +236,10 @@ class MemoryResponseStore:
                 del self._datasets[study_id]
                 return True
             return False
+
+    async def adelete_dataset(self, study_id: str) -> bool:
+        """Async-compatible delete_dataset (delegates to sync implementation)."""
+        return self.delete_dataset(study_id)
 
     def delete_by_study(self, study_id: str) -> int:
         """Delete all responses and the dataset for a study."""
@@ -201,6 +254,10 @@ class MemoryResponseStore:
                 del self._datasets[study_id]
             return len(response_ids) + (1 if dataset_deleted else 0)
 
+    async def adelete_by_study(self, study_id: str) -> int:
+        """Async-compatible delete_by_study (delegates to sync implementation)."""
+        return self.delete_by_study(study_id)
+
     def delete_by_persona(self, persona_id: str) -> int:
         """Delete all responses belonging to a persona."""
         with self._lock:
@@ -212,6 +269,10 @@ class MemoryResponseStore:
             for rid in response_ids:
                 del self._responses[rid]
             return len(response_ids)
+
+    async def adelete_by_persona(self, persona_id: str) -> int:
+        """Async-compatible delete_by_persona (delegates to sync implementation)."""
+        return self.delete_by_persona(persona_id)
 
     def clear(self) -> None:
         """Clear all stored responses and datasets."""
@@ -249,6 +310,10 @@ class MemoryPersonaStore:
         fp = self._compute_fingerprint(persona)
         with self._lock:
             return fp in self._fingerprints
+
+    async def ais_duplicate(self, persona: PersonaProfile) -> bool:
+        """Async-compatible is_duplicate (delegates to sync implementation)."""
+        return self.is_duplicate(persona)
 
     def _add_to_index(self, persona: PersonaProfile) -> None:
         """Register a persona in all inverted indexes."""
@@ -299,10 +364,18 @@ class MemoryPersonaStore:
             self._add_to_index(persona)
             return True
 
+    async def asave(self, persona: PersonaProfile) -> bool:
+        """Async-compatible save (delegates to sync implementation)."""
+        return self.save(persona)
+
     def get(self, persona_id: str) -> PersonaProfile | None:
         """Retrieve a persona by ID."""
         with self._lock:
             return self._data.get(persona_id)
+
+    async def aget(self, persona_id: str) -> PersonaProfile | None:
+        """Async-compatible get (delegates to sync implementation)."""
+        return self.get(persona_id)
 
     def count(self) -> int:
         """Return the total number of stored personas."""
@@ -322,6 +395,10 @@ class MemoryPersonaStore:
                 del self._data[persona_id]
                 return True
             return False
+
+    async def adelete(self, persona_id: str) -> bool:
+        """Async-compatible delete (delegates to sync implementation)."""
+        return self.delete(persona_id)
 
     def list_all(
         self,
@@ -375,6 +452,26 @@ class MemoryPersonaStore:
         end = start + page_size
         return items[start:end], total
 
+    async def alist_all(
+        self,
+        *,
+        study_id: str | None = None,
+        segment: str | None = None,
+        city_tier: str | None = None,
+        bias_status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[PersonaProfile], int]:
+        """Async-compatible list_all (delegates to sync implementation)."""
+        return self.list_all(
+            study_id=study_id,
+            segment=segment,
+            city_tier=city_tier,
+            bias_status=bias_status,
+            page=page,
+            page_size=page_size,
+        )
+
     def delete_by_study(self, study_id: str) -> int:
         """Delete all personas belonging to a study and return count."""
         prefix = f"persona-{study_id}-"
@@ -389,6 +486,10 @@ class MemoryPersonaStore:
                 self._compute_fingerprint(p) for p in self._data.values()
             }
             return len(ids)
+
+    async def adelete_by_study(self, study_id: str) -> int:
+        """Async-compatible delete_by_study (delegates to sync implementation)."""
+        return self.delete_by_study(study_id)
 
     def clear(self) -> None:
         """Clear all stored personas and reset indexes."""

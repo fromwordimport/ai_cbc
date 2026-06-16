@@ -77,14 +77,14 @@ async def simulate_responses(
             detail=str(exc),
         ) from exc
 
-    questionnaire = await questionnaire_store.get_questionnaire(safe_study_id)
+    questionnaire = await questionnaire_store.aget_questionnaire(safe_study_id)
     if questionnaire is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No questionnaire found for study '{safe_study_id}'",
         )
 
-    study = await questionnaire_store.get_study(safe_study_id)
+    study = await questionnaire_store.aget_study(safe_study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -112,7 +112,7 @@ async def simulate_responses(
     all_records: list = []
 
     for idx, persona_id in enumerate(safe_persona_ids):
-        persona = await persona_store.get(persona_id)
+        persona = await persona_store.aget(persona_id)
         if persona is None:
             log.warning("persona_not_found", persona_id=persona_id)
             failed += 1
@@ -147,7 +147,7 @@ async def simulate_responses(
             record.respondent_index = idx
 
         all_records.extend(raw_slice.choice_records)
-        await response_store.save_response(persona_response)
+        await response_store.asave_response(persona_response)
 
         summaries.append(SimulatedResponseSummary(
             persona_id=persona_id,
@@ -167,7 +167,7 @@ async def simulate_responses(
             ),
             choice_records=all_records,
         )
-        await response_store.save_dataset(study_id, dataset)
+        await response_store.asave_dataset(study_id, dataset)
 
     log.info(
         "batch_simulation_complete",
@@ -194,7 +194,7 @@ async def list_responses(
     response_store: ResponseStore = Depends(get_response_store),
 ) -> list[PersonaResponseSummary]:
     """List all persona responses recorded for a study."""
-    items, _ = await response_store.list_responses_by_study(study_id)
+    items, _ = await response_store.alist_responses_by_study(study_id)
     return [
         PersonaResponseSummary(
             response_id=r.response_id,
@@ -217,7 +217,7 @@ async def export_dataset(
     response_store: ResponseStore = Depends(get_response_store),
 ) -> RawDatasetExportResponse:
     """Export the aggregated CBCRawDataset for downstream analysis."""
-    dataset = await response_store.get_dataset(study_id)
+    dataset = await response_store.aget_dataset(study_id)
     if dataset is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -93,7 +93,7 @@ async def converse(
             detail="Dangerous input pattern detected",
         )
 
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -150,7 +150,7 @@ async def run_interview(
                 detail=str(exc),
             ) from exc
 
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -198,7 +198,7 @@ async def simulate_purchase_decision(
     simulator: BehaviorSimulator = Depends(get_behavior_simulator),
 ) -> PurchaseDecisionResponse:
     """Simulate a consumer's purchase decision for a given product."""
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

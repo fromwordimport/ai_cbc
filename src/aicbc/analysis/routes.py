@@ -66,7 +66,7 @@ async def _verify_study_ownership(
 
     Prevents cross-study data access via manipulated URL paths.
     """
-    result = await store.get_result(analysis_id)
+    result = await store.aget_result(analysis_id)
     if result is not None and result.study_id != study_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,7 +77,7 @@ async def _verify_study_ownership(
 async def _get_study_attributes(study_id: str) -> list[Attribute]:
     """Retrieve study attributes from the questionnaire store."""
     store = get_questionnaire_store()
-    study = await store.get_study(study_id)
+    study = await store.aget_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -89,7 +89,7 @@ async def _get_study_attributes(study_id: str) -> list[Attribute]:
 async def _get_dataset(study_id: str) -> CBCRawDataset:
     """Retrieve the raw dataset for a study."""
     store = get_response_store()
-    dataset = await store.get_dataset(study_id)
+    dataset = await store.aget_dataset(study_id)
     if dataset is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -154,7 +154,7 @@ async def analyze_study(
         estimated_duration_seconds=300 if request.model_type == "hb" else 600 if request.model_type == "latent_class" else 30,
         progress_percent=0.0,
     )
-    await analysis_store.save_job(job)
+    await analysis_store.asave_job(job)
 
     # ── Enqueue Celery task ─────────────────────────────────────────────
     config_json = json.dumps({
@@ -196,10 +196,10 @@ async def get_analysis_result(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> AnalysisResultResponse:
     """Retrieve a completed analysis result."""
-    result = await analysis_store.get_result(analysis_id)
+    result = await analysis_store.aget_result(analysis_id)
     if result is None:
         # Check if job exists but hasn't completed yet → 409 Conflict
-        job = await analysis_store.get_job(analysis_id)
+        job = await analysis_store.aget_job(analysis_id)
         if job is not None and job.status in ("QUEUED", "RUNNING", "PENDING"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -225,7 +225,7 @@ async def get_analysis_status(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> AnalysisJobStatus:
     """Poll for analysis job status."""
-    job = await analysis_store.get_job(analysis_id)
+    job = await analysis_store.aget_job(analysis_id)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -247,17 +247,17 @@ async def get_analysis_status(
             task_result = celery_app.AsyncResult(celery_task_id)
             celery_state = task_result.state
             if celery_state == "STARTED":
-                await analysis_store.update_job_status(analysis_id, "RUNNING", progress=10.0)
+                await analysis_store.aupdate_job_status(analysis_id, "RUNNING", progress=10.0)
                 job.status = "RUNNING"
                 if job.started_at is None:
                     job.started_at = datetime.now(UTC)
             elif celery_state == "SUCCESS":
-                await analysis_store.update_job_status(analysis_id, "COMPLETED", progress=100.0)
+                await analysis_store.aupdate_job_status(analysis_id, "COMPLETED", progress=100.0)
                 job.status = "COMPLETED"
                 if job.completed_at is None:
                     job.completed_at = datetime.now(UTC)
             elif celery_state == "FAILURE":
-                await analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+                await analysis_store.aupdate_job_status(analysis_id, "FAILED", progress=0.0)
                 job.status = "FAILED"
         except Exception:
             pass  # Celery backend unavailable — fall through to store status
@@ -268,7 +268,7 @@ async def get_analysis_status(
         from datetime import UTC, datetime
         elapsed = (datetime.now(UTC) - job.started_at).total_seconds()
         if elapsed > _HARD_TIMEOUT:
-            await analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+            await analysis_store.aupdate_job_status(analysis_id, "FAILED", progress=0.0)
             job.status = "FAILED"
 
     return job
@@ -284,7 +284,7 @@ async def list_analyses(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> list[AnalysisJobStatus]:
     """List all analysis jobs associated with a study."""
-    return await analysis_store.list_jobs_by_study(study_id)
+    return await analysis_store.alist_jobs_by_study(study_id)
 
 
 @router.delete(
@@ -298,13 +298,13 @@ async def delete_analysis(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> None:
     """Delete an analysis job and all derived artefacts."""
-    job = await analysis_store.get_job(analysis_id)
+    job = await analysis_store.aget_job(analysis_id)
     if job is None or job.study_id != study_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Analysis '{analysis_id}' not found for study '{study_id}'",
         )
-    await analysis_store.delete_analysis(analysis_id)
+    await analysis_store.adelete_analysis(analysis_id)
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ async def get_convergence(
 ) -> ConvergenceDiagnostics:
     """Get MCMC convergence diagnostics (R-hat, ESS)."""
     await _verify_study_ownership(study_id, analysis_id, analysis_store)
-    diag = await analysis_store.get_convergence(analysis_id)
+    diag = await analysis_store.aget_convergence(analysis_id)
     if diag is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -345,7 +345,7 @@ async def get_importance(
 ) -> ImportanceResponse:
     """Get attribute importance rankings and statistics."""
     await _verify_study_ownership(study_id, analysis_id, analysis_store)
-    importance = await analysis_store.get_importance(analysis_id)
+    importance = await analysis_store.aget_importance(analysis_id)
     if importance is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -366,7 +366,7 @@ async def get_wtp(
 ) -> WTPResponse:
     """Get WTP estimates for all attributes."""
     await _verify_study_ownership(study_id, analysis_id, analysis_store)
-    wtp = await analysis_store.get_wtp(analysis_id)
+    wtp = await analysis_store.aget_wtp(analysis_id)
     if wtp is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -393,7 +393,7 @@ async def simulate_market(
 ) -> MarketSimResponse:
     """Simulate market shares for given product scenarios."""
     # Retrieve analysis result for utilities
-    result = await analysis_store.get_result(analysis_id)
+    result = await analysis_store.aget_result(analysis_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -452,7 +452,7 @@ async def simulate_market(
 
     # Store result
     sim_id = uuid.uuid4().hex[:8]
-    await analysis_store.save_market_sim(analysis_id, sim_id, response)
+    await analysis_store.asave_market_sim(analysis_id, sim_id, response)
 
     return response
 
@@ -484,7 +484,7 @@ async def compare_segments(
     and permutation test (non-parametric).
     """
     # Retrieve analysis result for utilities
-    result = await analysis_store.get_result(analysis_id)
+    result = await analysis_store.aget_result(analysis_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -577,7 +577,7 @@ async def compare_segments(
         interpretation=comparison["interpretation"],
     )
 
-    await analysis_store.save_segment_comparison(
+    await analysis_store.asave_segment_comparison(
         analysis_id, segment_a, segment_b, response
     )
     return response
@@ -613,7 +613,7 @@ async def download_report(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> Response:
     """Return a human-readable CBC analysis report."""
-    result = await analysis_store.get_result(analysis_id)
+    result = await analysis_store.aget_result(analysis_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -621,9 +621,9 @@ async def download_report(
         )
     await _verify_study_ownership(study_id, analysis_id, analysis_store)
 
-    importance = await analysis_store.get_importance(analysis_id)
-    wtp = await analysis_store.get_wtp(analysis_id)
-    market_sim = await analysis_store.get_latest_market_sim(analysis_id)
+    importance = await analysis_store.aget_importance(analysis_id)
+    wtp = await analysis_store.aget_wtp(analysis_id)
+    market_sim = await analysis_store.aget_latest_market_sim(analysis_id)
 
     content = build_report(
         analysis_result=result,
@@ -651,7 +651,7 @@ async def get_visualization(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> dict:
     """Return an ECharts-compatible JSON option for the requested chart."""
-    result = await analysis_store.get_result(analysis_id)
+    result = await analysis_store.aget_result(analysis_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -660,11 +660,11 @@ async def get_visualization(
     await _verify_study_ownership(study_id, analysis_id, analysis_store)
 
     if chart == "importance_bar":
-        importance = await analysis_store.get_importance(analysis_id)
+        importance = await analysis_store.aget_importance(analysis_id)
         return build_importance_chart_option(importance) if importance else {}
 
     if chart == "importance_pie":
-        importance = await analysis_store.get_importance(analysis_id)
+        importance = await analysis_store.aget_importance(analysis_id)
         return build_importance_pie_option(importance) if importance else {}
 
     if chart == "utility_distribution":
@@ -675,11 +675,11 @@ async def get_visualization(
         return build_market_share_option(market_sim)
 
     if chart == "wtp":
-        wtp = await analysis_store.get_wtp(analysis_id)
+        wtp = await analysis_store.aget_wtp(analysis_id)
         return build_wtp_chart_option(wtp) if wtp else {}
 
     # dashboard
-    importance = await analysis_store.get_importance(analysis_id)
+    importance = await analysis_store.aget_importance(analysis_id)
     market_sim = await _get_market_sim(analysis_store, analysis_id, sim_id)
     return build_dashboard_option(importance, market_sim)
 
@@ -691,8 +691,8 @@ async def _get_market_sim(
 ) -> MarketSimResponse | None:
     """Retrieve a market simulation, falling back to the latest saved one."""
     if sim_id:
-        return await analysis_store.get_market_sim(analysis_id, sim_id)
-    return await analysis_store.get_latest_market_sim(analysis_id)
+        return await analysis_store.aget_market_sim(analysis_id, sim_id)
+    return await analysis_store.aget_latest_market_sim(analysis_id)
 
 
 @router.post(
@@ -725,7 +725,7 @@ async def run_latent_class(
         estimated_duration_seconds=600,
         progress_percent=0.0,
     )
-    await analysis_store.save_job(job)
+    await analysis_store.asave_job(job)
 
     config_json = json.dumps({
         "n_classes": request.n_classes,
@@ -754,7 +754,7 @@ async def get_latent_class_result(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> LatentClassResponse:
     """Retrieve the full latent class model result."""
-    result = await analysis_store.get_latent_class_result(analysis_id)
+    result = await analysis_store.aget_latent_class_result(analysis_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

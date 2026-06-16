@@ -174,7 +174,7 @@ async def generate_personas_batch(
                     total_cost += profile.generation_metadata.cost_cny
                     continue
 
-            if not await store.save(profile):
+            if not await store.asave(profile):
                 # Duplicate content detected — skip silently but track cost
                 log.info("persona_duplicate_skipped", persona_id=profile.persona_id)
                 total_cost += profile.generation_metadata.cost_cny
@@ -239,7 +239,7 @@ async def get_persona(
     store: PersonaStore = Depends(get_store),
 ) -> PersonaDetail:
     """Retrieve a complete persona profile by its unique ID."""
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -264,7 +264,7 @@ async def list_personas(
     store: PersonaStore = Depends(get_store),
 ) -> PersonaListResponse:
     """List stored personas with optional filtering and pagination."""
-    items, total = await store.list_all(
+    items, total = await store.alist_all(
         study_id=study_id,
         segment=segment,
         city_tier=city_tier,
@@ -303,7 +303,7 @@ async def validate_persona(
     This is useful for re-validating personas after manual edits or
     when validation rules have been updated.
     """
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -333,7 +333,7 @@ async def get_persona_layer(
     store: PersonaStore = Depends(get_store),
 ) -> LayerResponse:
     """Retrieve a specific layer (1-4) of a persona profile."""
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -381,7 +381,7 @@ async def export_persona(
 
     Supports data subject access / portability requests under GDPR/PIPL.
     """
-    profile = await store.get(persona_id)
+    profile = await store.aget(persona_id)
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -420,10 +420,10 @@ async def delete_persona(
     response_store: ResponseStore = Depends(get_response_store),
 ) -> None:
     """Delete a persona and all associated responses from the store."""
-    deleted = await store.delete(persona_id)
+    deleted = await store.adelete(persona_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Persona '{persona_id}' not found",
         )
-    await response_store.delete_by_persona(persona_id)
+    await response_store.adelete_by_persona(persona_id)
