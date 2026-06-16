@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from aicbc.api.dependencies import (
     get_authenticity_scorer,
     get_bias_auditor,
-    get_llm_client,
     get_logic_validator,
     get_profile_generator,
     get_schema_validator,
@@ -29,6 +28,11 @@ from aicbc.api.schemas import (
     ValidateResponse,
 )
 from aicbc.config.settings import get_settings
+from aicbc.core.cache import (
+    get_personas_list_cache,
+    invalidate_dashboard_summary,
+    invalidate_personas_list,
+)
 from aicbc.core.privacy import redact_dict
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
@@ -209,6 +213,10 @@ async def generate_personas_batch(
         elapsed_seconds=elapsed,
     )
 
+    if personas:
+        invalidate_personas_list()
+        invalidate_dashboard_summary()
+
     return BatchGenerateResponse(
         study_id=request.study_id,
         requested=request.count,
@@ -264,6 +272,12 @@ async def list_personas(
     store: PersonaStore = Depends(get_store),
 ) -> PersonaListResponse:
     """List stored personas with optional filtering and pagination."""
+    cache = get_personas_list_cache()
+    cache_key = ("list", study_id, segment, city_tier, bias_status, page, page_size)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
     items, total = await store.alist_all(
         study_id=study_id,
         segment=segment,
@@ -273,12 +287,14 @@ async def list_personas(
         page_size=page_size,
     )
 
-    return PersonaListResponse(
+    response = PersonaListResponse(
         total=total,
         page=page,
         page_size=page_size,
         personas=[PersonaSummary.from_profile(p) for p in items],
     )
+    cache.set(cache_key, response)
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -427,3 +443,5 @@ async def delete_persona(
             detail=f"Persona '{persona_id}' not found",
         )
     await response_store.adelete_by_persona(persona_id)
+    invalidate_personas_list()
+    invalidate_dashboard_summary()

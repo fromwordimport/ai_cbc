@@ -7,6 +7,7 @@ import structlog
 from beanie import init_beanie
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -115,6 +116,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(RBACMiddleware)
 app.add_middleware(AuditLogMiddleware)
+
+# Compress JSON responses above 1 KB. Placed before CORS so CORS remains outermost.
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 # CORS must be the outermost middleware so OPTIONS preflight responses are returned
 # before any auth/RBAC checks can reject them without CORS headers.

@@ -10,6 +10,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from aicbc.config.settings import get_settings
+from aicbc.core.cache import get_dashboard_summary_cache
 from aicbc.core.store import get_questionnaire_store, get_store
 
 router = APIRouter()
@@ -230,8 +231,14 @@ async def dashboard_summary() -> dict[str, Any]:
     """Aggregated dashboard statistics from all subsystems.
 
     Single-request endpoint replacing multiple independent API calls
-    for the overview Dashboard page.
+    for the overview Dashboard page. Cached for 10s to reduce MongoDB
+    pressure on the frequently-refreshed dashboard.
     """
+    cache = get_dashboard_summary_cache()
+    cached = cache.get("summary")
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
     from datetime import UTC, datetime, timedelta
 
     persona_store = get_store()
@@ -258,7 +265,7 @@ async def dashboard_summary() -> dict[str, Any]:
         if s.created_at >= week_ago
     ]
 
-    return {
+    result = {
         "summary": {
             "total_studies": total_studies,
             "total_personas": persona_count,
@@ -269,3 +276,5 @@ async def dashboard_summary() -> dict[str, Any]:
             recent_studies, key=lambda s: s["created_at"], reverse=True
         )[:10],
     }
+    cache.set("summary", result)
+    return result

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-import structlog
 from datetime import UTC, datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Any
 
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
+
+from aicbc.analysis.store import AnalysisStore, get_analysis_store
 from aicbc.api.schemas import (
     CreateStudyRequest,
     GenerateQuestionnaireResponse,
@@ -17,6 +21,12 @@ from aicbc.api.schemas import (
     StudySummary,
     StudyUpdateRequest,
     UpdateStudyDesignRequest,
+)
+from aicbc.core.cache import (
+    get_studies_list_cache,
+    invalidate_dashboard_summary,
+    invalidate_personas_list,
+    invalidate_studies_list,
 )
 from aicbc.core.privacy import redact_dict
 from aicbc.core.security.input_sanitizer import sanitize_id
@@ -38,9 +48,6 @@ from aicbc.questionnaire.models import (
     StudyStatus,
 )
 from aicbc.questionnaire.validators import QuestionnaireValidator
-from pydantic import ValidationError
-
-from aicbc.analysis.store import AnalysisStore, get_analysis_store
 
 router = APIRouter()
 logger = structlog.get_logger("aicbc.api.questionnaires")
@@ -133,6 +140,8 @@ async def create_study(
         target_segments=request.target_segments,
     )
     await store.asave_study(study)
+    invalidate_studies_list()
+    invalidate_dashboard_summary()
     logger.info("study_created", study_id=study.study_id, n_attributes=len(study.attributes))
     return StudyDetailResponse.from_study(study)
 
@@ -150,17 +159,25 @@ async def list_studies(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyListResponse:
     """List all CBC studies with optional filtering."""
+    cache = get_studies_list_cache()
+    cache_key = ("list", product_category, page, page_size)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
     items, total = await store.alist_studies(
         product_category=product_category,
         page=page,
         page_size=page_size,
     )
-    return StudyListResponse(
+    response = StudyListResponse(
         total=total,
         page=page,
         page_size=page_size,
         studies=[StudySummary.from_study(s) for s in items],
     )
+    cache.set(cache_key, response)
+    return response
 
 
 @router.get(
@@ -211,6 +228,8 @@ async def update_study(
             setattr(study, field, value)
 
     await store.asave_study(study)
+    invalidate_studies_list()
+    invalidate_dashboard_summary()
     logger.info("study_updated", study_id=study_id)
     return StudyDetailResponse.from_study(study)
 
@@ -241,6 +260,10 @@ async def delete_study(
     await response_store.adelete_by_study(study_id)
     await persona_store.adelete_by_study(study_id)
     await store.adelete_study(study_id)
+
+    invalidate_studies_list()
+    invalidate_dashboard_summary()
+    invalidate_personas_list()
 
     logger.info("study_deleted_cascade", study_id=study_id)
 
@@ -339,6 +362,8 @@ async def generate_questionnaire(
     study.status = StudyStatus.READY
     await store.asave_study(study)
     await store.asave_questionnaire(questionnaire)
+    invalidate_studies_list()
+    invalidate_dashboard_summary()
 
     log.info(
         "questionnaire_generated",
@@ -448,7 +473,7 @@ async def update_study_design(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid attribute data: {exc.errors()}",
-        )
+        ) from exc
 
     if attributes is None:
         raise HTTPException(
@@ -523,6 +548,8 @@ async def update_study_design(
         study.status = StudyStatus.DESIGNING
 
     await store.asave_study(study)
+    invalidate_studies_list()
+    invalidate_dashboard_summary()
     logger.info(
         "study_design_updated",
         study_id=study_id,
