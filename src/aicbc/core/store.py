@@ -91,6 +91,20 @@ class MemoryQuestionnaireStore:
         end = start + page_size
         return items[start:end], total
 
+    async def alist_studies(
+        self,
+        *,
+        product_category: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[CBCStudy], int]:
+        """Async-compatible list studies (delegates to the sync implementation)."""
+        return self.list_studies(
+            product_category=product_category,
+            page=page,
+            page_size=page_size,
+        )
+
     def save_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
         """Store a questionnaire, keyed by study_id."""
         with self._lock:
@@ -294,6 +308,10 @@ class MemoryPersonaStore:
         """Return the total number of stored personas."""
         with self._lock:
             return len(self._data)
+
+    async def acount(self) -> int:
+        """Async-compatible count (delegates to the sync implementation)."""
+        return self.count()
 
     def delete(self, persona_id: str) -> bool:
         """Delete a persona by ID."""

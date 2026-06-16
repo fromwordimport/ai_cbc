@@ -186,6 +186,10 @@ class MongoPersonaStore:
         """Total number of stored personas."""
         return _run(PersonaDocument.count())
 
+    async def acount(self) -> int:
+        """Async total number of stored personas."""
+        return await PersonaDocument.count()
+
     def clear(self) -> None:
         """Delete all personas."""
         _run(PersonaDocument.delete_all())
@@ -245,6 +249,25 @@ class MongoQuestionnaireStore:
             query["product_category"] = product_category
 
         docs = _run(StudyDocument.find(query).to_list())
+        items = [CBCStudy.model_validate(d.data) for d in docs]
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        return items[start:end], total
+
+    async def alist_studies(
+        self,
+        *,
+        product_category: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[CBCStudy], int]:
+        """Query studies with optional filters (async, Motor-loop safe)."""
+        query = StudyDocument.find_all()
+        if product_category is not None:
+            query = query.find(StudyDocument.product_category == product_category)
+
+        docs = await query.to_list()
         items = [CBCStudy.model_validate(d.data) for d in docs]
         total = len(items)
         start = (page - 1) * page_size

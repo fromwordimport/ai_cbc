@@ -150,7 +150,7 @@ async def list_studies(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyListResponse:
     """List all CBC studies with optional filtering."""
-    items, total = store.list_studies(
+    items, total = await store.alist_studies(
         product_category=product_category,
         page=page,
         page_size=page_size,

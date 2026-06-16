@@ -237,8 +237,8 @@ async def dashboard_summary() -> dict[str, Any]:
     persona_store = get_store()
     study_store = get_questionnaire_store()
 
-    studies, total_studies = study_store.list_studies(page=1, page_size=100)
-    persona_count = persona_store.count()
+    studies, total_studies = await study_store.alist_studies(page=1, page_size=100)
+    persona_count = await persona_store.acount()
 
     study_status_counts: dict[str, int] = {}
     for s in studies:
