@@ -20,12 +20,23 @@
 
 ## 完成状态
 
-- [x] Render `aicbc-api` web service 部署成功
-- [x] MongoDB Atlas 连接成功
-- [x] Upstash Redis 连接成功
-- [x] Celery Worker / Beat 运行正常
-- [x] Cloudflare 子域名 `aicbc-api.fromworldimport.com` 绑定成功
-- [x] HTTPS 健康检查通过：`curl https://aicbc-api.fromworldimport.com/health`
+- [x] Render `aicbc-web` static site 部署成功
+- [x] Cloudflare 子域名 `aicbc.fromworldimport.com` 绑定成功
+- [x] 前端生产环境指向线上后端
+
+---
+
+## 九、生产环境访问地址
+
+| 服务 | 地址 |
+|------|------|
+| 前端 | https://aicbc.fromworldimport.com |
+| 后端 API | https://aicbc-api.fromworldimport.com |
+| 后端健康检查 | https://aicbc-api.fromworldimport.com/health |
+
+---
+
+*完成本清单后，AI_CBC 前后端均可通过 Cloudflare 子域名对外提供个人访问。*
 
 ### 2.1 Render（容器托管）
 
@@ -143,6 +154,25 @@ aicbc-api.fromworldimport.com
 nslookup aicbc-api.fromworldimport.com
 curl https://aicbc-api.fromworldimport.com/health
 curl https://aicbc-api.fromworldimport.com/ready
+```
+
+### 4.5 前端子域名
+
+前端静态站点绑定 `aicbc.fromworldimport.com`，需要在 Cloudflare 添加第二条 CNAME：
+
+1. Cloudflare Dashboard → DNS → Records
+2. 添加 CNAME 记录：
+   - **Type**: CNAME
+   - **Name**: `aicbc`
+   - **Target**: `aicbc-web.onrender.com`
+   - **Proxy status**: 开启（橙色云图标）
+   - **TTL**: Auto
+3. 等待 DNS 生效后，Render 会自动验证并签发 HTTPS
+
+测试：
+```bash
+nslookup aicbc.fromworldimport.com
+curl https://aicbc.fromworldimport.com
 ```
 
 ---
