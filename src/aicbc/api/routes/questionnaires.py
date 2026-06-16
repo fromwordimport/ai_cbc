@@ -114,7 +114,7 @@ async def create_study(
     safe_study_id = sanitize_id(request.study_id, field_name="study_id")
 
     # Conflict detection: reject duplicate study_id
-    if store.get_study(safe_study_id) is not None:
+    if await store.get_study(safe_study_id) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Study '{safe_study_id}' already exists",
@@ -132,7 +132,7 @@ async def create_study(
         design_parameters=design_params,
         target_segments=request.target_segments,
     )
-    store.save_study(study)
+    await store.save_study(study)
     logger.info("study_created", study_id=study.study_id, n_attributes=len(study.attributes))
     return StudyDetailResponse.from_study(study)
 
@@ -174,7 +174,7 @@ async def get_study(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyDetailResponse:
     """Retrieve a complete CBC study definition."""
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -195,7 +195,7 @@ async def update_study(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyDetailResponse:
     """Update an existing CBC study's configuration."""
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -210,7 +210,7 @@ async def update_study(
         elif hasattr(study, field):
             setattr(study, field, value)
 
-    store.save_study(study)
+    await store.save_study(study)
     logger.info("study_updated", study_id=study_id)
     return StudyDetailResponse.from_study(study)
 
@@ -229,7 +229,7 @@ async def delete_study(
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> None:
     """Delete a study and cascade-delete all derived artefacts."""
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -237,10 +237,10 @@ async def delete_study(
         )
 
     # Cascade delete in dependency order: analyses → responses → personas → study.
-    analysis_store.delete_by_study(study_id)
-    response_store.delete_by_study(study_id)
-    persona_store.delete_by_study(study_id)
-    store.delete_study(study_id)
+    await analysis_store.delete_by_study(study_id)
+    await response_store.delete_by_study(study_id)
+    await persona_store.delete_by_study(study_id)
+    await store.delete_study(study_id)
 
     logger.info("study_deleted_cascade", study_id=study_id)
 
@@ -269,19 +269,19 @@ async def export_study(
     raw dataset and analysis results in a portable JSON structure suitable for
     data-subject access / portability requests.
     """
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Study '{study_id}' not found",
         )
 
-    questionnaire = store.get_questionnaire(study_id)
+    questionnaire = await store.get_questionnaire(study_id)
 
-    personas, _ = persona_store.list_all(study_id=study_id, page=1, page_size=10_000)
-    responses, _ = response_store.list_responses_by_study(study_id, page=1, page_size=10_000)
-    dataset = response_store.get_dataset(study_id)
-    analyses = analysis_store.list_jobs_by_study(study_id)
+    personas, _ = await persona_store.list_all(study_id=study_id, page=1, page_size=10_000)
+    responses, _ = await response_store.list_responses_by_study(study_id, page=1, page_size=10_000)
+    dataset = await response_store.get_dataset(study_id)
+    analyses = await analysis_store.list_jobs_by_study(study_id)
 
     return StudyExportResponse(
         study_id=study_id,
@@ -318,7 +318,7 @@ async def generate_questionnaire(
     design_parameters.algorithm field. D-efficiency is reported for quality
     validation (target >= 0.85).
     """
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -337,8 +337,8 @@ async def generate_questionnaire(
 
     # Update study status
     study.status = StudyStatus.READY
-    store.save_study(study)
-    store.save_questionnaire(questionnaire)
+    await store.save_study(study)
+    await store.save_questionnaire(questionnaire)
 
     log.info(
         "questionnaire_generated",
@@ -371,7 +371,7 @@ async def get_questionnaire(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> QuestionnaireDetailResponse:
     """Retrieve the questionnaire generated for a study."""
-    questionnaire = store.get_questionnaire(study_id)
+    questionnaire = await store.get_questionnaire(study_id)
     if questionnaire is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -396,7 +396,7 @@ async def get_study_design(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyDesignResponse:
     """Retrieve the attribute design of a CBC study."""
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -429,7 +429,7 @@ async def update_study_design(
     store: QuestionnaireStore = Depends(get_questionnaire_store),
 ) -> StudyDesignResponse:
     """Update the attributes of a CBC study."""
-    study = store.get_study(study_id)
+    study = await store.get_study(study_id)
     if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -522,7 +522,7 @@ async def update_study_design(
     if study.status in (StudyStatus.INIT, StudyStatus.READY):
         study.status = StudyStatus.DESIGNING
 
-    store.save_study(study)
+    await store.save_study(study)
     logger.info(
         "study_design_updated",
         study_id=study_id,

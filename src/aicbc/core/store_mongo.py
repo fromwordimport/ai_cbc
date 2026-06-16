@@ -41,13 +41,12 @@ from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
 
 
 def _run(awaitable: Any) -> Any:
-    """Run an awaitable Beanie query, creating a fresh event loop if necessary.
+    """Run an awaitable Beanie query.
 
-    FastAPI executes sync route handlers in a thread-pool thread that has no
-    running loop, so ``asyncio.run`` works.  In test runners that already have
-    an active loop we fall back to running the awaitable in a dedicated thread
-    with its own loop.  Beanie query objects are awaitable but not coroutines,
-    so we wrap them in a coroutine before passing to ``asyncio.run``.
+    When called from an async context (e.g. an ``async def`` FastAPI route)
+    the coroutine is returned so the caller can ``await`` it on the same
+    event loop that owns the Motor client.  When called from a non-async
+    context ``asyncio.run`` executes the query synchronously.
     """
 
     async def _execute() -> Any:
@@ -58,11 +57,9 @@ def _run(awaitable: Any) -> Any:
     except RuntimeError:
         return asyncio.run(_execute())
 
-    import concurrent.futures
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(asyncio.run, _execute())
-        return future.result()
+    # Running inside an event loop: return the coroutine for the caller to
+    # await.  This keeps Motor operations on the loop that created the client.
+    return _execute()
 
 
 class MongoPersonaStore:
