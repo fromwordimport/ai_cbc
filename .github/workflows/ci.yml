@@ -46,7 +46,7 @@ jobs:
       - name: Check commit message format
         run: |
           COMMIT_MSG=$(git log --format=%s -n 1)
-          if [[ ! "$COMMIT_MSG" =~ ^(feat|fix|docs|test|refactor|perf|security|cost)\(.+\):\ .+ ]]; then
+          if [[ ! "$COMMIT_MSG" =~ ^(feat|fix|docs|test|refactor|perf|security|cost|chore|ci)\(.+\):\ .+ ]]; then
             echo "Commit message format violation: $COMMIT_MSG"
             echo "Expected format: type(scope): description"
             exit 1
