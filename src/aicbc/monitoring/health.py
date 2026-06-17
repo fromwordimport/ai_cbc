@@ -46,10 +46,11 @@ async def _check_mongodb() -> DependencyCheck:
     """Check MongoDB connectivity."""
     start = asyncio.get_event_loop().time()
     try:
-        # TODO: Implement actual MongoDB ping when motor client is available
-        # from aicbc.core.store import get_mongo_client
-        # client = get_mongo_client()
-        # await client.admin.command('ping')
+        from aicbc.main import _mongo_client
+
+        if _mongo_client is None:
+            raise RuntimeError("MongoDB client not initialized")
+        await _mongo_client.admin.command("ping")
         latency = (asyncio.get_event_loop().time() - start) * 1000
         return DependencyCheck(
             name="mongodb",
@@ -70,10 +71,12 @@ async def _check_redis() -> DependencyCheck:
     """Check Redis connectivity."""
     start = asyncio.get_event_loop().time()
     try:
-        # TODO: Implement actual Redis ping when redis client is available
-        # import redis.asyncio as aioredis
-        # r = aioredis.from_url(get_settings().database.redis_url)
-        # await r.ping()
+        import redis.asyncio as aioredis
+
+        settings = get_settings()
+        r = aioredis.from_url(settings.database.redis_url, decode_responses=True)
+        await r.ping()
+        await r.close()
         latency = (asyncio.get_event_loop().time() - start) * 1000
         return DependencyCheck(
             name="redis",
