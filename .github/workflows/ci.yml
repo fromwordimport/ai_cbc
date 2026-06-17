@@ -199,7 +199,7 @@ jobs:
           docker build -f docker/Dockerfile -t aicbc-scan:${{ github.sha }} .
 
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@v0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'aicbc-scan:${{ github.sha }}'
           format: 'sarif'
