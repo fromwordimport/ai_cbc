@@ -33,10 +33,7 @@ def _generate_full_factorial(attributes: list[Attribute]) -> list[dict[str, Any]
     """Generate all possible attribute-level combinations."""
     level_lists = [[level.value for level in attr.levels] for attr in attributes]
     attr_ids = [attr.id for attr in attributes]
-    return [
-        dict(zip(attr_ids, combo, strict=True))
-        for combo in product(*level_lists)
-    ]
+    return [dict(zip(attr_ids, combo, strict=True)) for combo in product(*level_lists)]
 
 
 def _select_balanced_subset(
@@ -119,7 +116,7 @@ def _distribute_to_choice_sets(
     # Cycle profiles if we don't have enough for all choice sets
     total_needed = num_sets * alts_per_set
     while len(shuffled) < total_needed:
-        shuffled.extend(shuffled[:total_needed - len(shuffled)])
+        shuffled.extend(shuffled[: total_needed - len(shuffled)])
 
     choice_sets: list[ChoiceSet] = []
     for i in range(num_sets):
@@ -130,20 +127,14 @@ def _distribute_to_choice_sets(
         # Build alternatives
         alternatives = []
         for j, profile in enumerate(alts):
-            alternatives.append(
-                Alternative(alt_index=j, attributes=profile)
-            )
+            alternatives.append(Alternative(alt_index=j, attributes=profile))
 
-        choice_sets.append(
-            ChoiceSet(choice_set_id=i + 1, alternatives=alternatives)
-        )
+        choice_sets.append(ChoiceSet(choice_set_id=i + 1, alternatives=alternatives))
 
     return choice_sets
 
 
-def _check_balance(
-    choice_sets: list[ChoiceSet], attributes: list[Attribute]
-) -> float:
+def _check_balance(choice_sets: list[ChoiceSet], attributes: list[Attribute]) -> float:
     """Compute a balance score based on level frequency evenness.
 
     Returns a score in [0, 1] where 1 = perfectly balanced.
@@ -166,9 +157,7 @@ def _check_balance(
         deviations = [abs(c - ideal) for c in counts.values()]
         # Normalise: max possible deviation is total_alts - ideal
         max_dev = total_alts - ideal
-        attr_score = (
-            1.0 - (sum(deviations) / (n_levels * max_dev)) if max_dev > 0 else 1.0
-        )
+        attr_score = 1.0 - (sum(deviations) / (n_levels * max_dev)) if max_dev > 0 else 1.0
         scores.append(attr_score)
 
     return float(np.mean(scores))
@@ -176,7 +165,6 @@ def _check_balance(
 
 # Alias for backward compatibility with tests
 _check_orthogonality = _check_balance
-
 
 
 def generate_balanced_questionnaire(
@@ -199,14 +187,10 @@ def generate_balanced_questionnaire(
     all_profiles = _generate_full_factorial(attributes)
 
     # 2. Select balanced subset
-    subset = _select_balanced_subset(
-        all_profiles, attributes, target_size, seed=seed
-    )
+    subset = _select_balanced_subset(all_profiles, attributes, target_size, seed=seed)
 
     # 3. Distribute to choice sets
-    choice_sets = _distribute_to_choice_sets(
-        subset, num_sets, alts_per_set, attributes, seed=seed
-    )
+    choice_sets = _distribute_to_choice_sets(subset, num_sets, alts_per_set, attributes, seed=seed)
 
     # 4. Compute efficiency metrics
     profiles = []
@@ -231,6 +215,7 @@ def generate_balanced_questionnaire(
         a_efficiency=a_eff,
         iterations=1,
     )
+
 
 # Backward-compatibility alias — use generate_balanced_questionnaire instead.
 def generate_orthogonal_questionnaire(

@@ -107,7 +107,10 @@ class RBACMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(
                 status_code=403,
-                content={"error": "Forbidden", "detail": f"Role '{role}' cannot access this resource"},
+                content={
+                    "error": "Forbidden",
+                    "detail": f"Role '{role}' cannot access this resource",
+                },
             )
 
         return await call_next(request)

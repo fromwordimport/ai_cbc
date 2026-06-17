@@ -10,12 +10,8 @@ class TensionPair(BaseModel):
 
     tag_a: str = Field(..., description="First tag in the tension pair")
     tag_b: str = Field(..., description="Second tag in the tension pair")
-    tension_value: float = Field(
-        ..., description="Tension strength between 0 and 1"
-    )
-    narrative: str = Field(
-        default="", description="Psychological narrative explaining the tension"
-    )
+    tension_value: float = Field(..., description="Tension strength between 0 and 1")
+    narrative: str = Field(default="", description="Psychological narrative explaining the tension")
 
     @field_validator("tension_value")
     @classmethod
@@ -31,18 +27,14 @@ class SeedConfig(BaseModel):
     plus tension metadata that validates the configuration has narrative depth.
     """
 
-    life_stage: str = Field(
-        ..., description="Life stage of the consumer (e.g., '初入职场单身')"
-    )
+    life_stage: str = Field(..., description="Life stage of the consumer (e.g., '初入职场单身')")
     anxieties: list[str] = Field(
         default_factory=list,
         min_length=1,
         max_length=3,
         description="Core anxiety labels matched to the life stage",
     )
-    income_bracket: str = Field(
-        ..., description="Personal or household annual income bracket"
-    )
+    income_bracket: str = Field(..., description="Personal or household annual income bracket")
     city_tier: str = Field(
         ..., description="City tier (一线城市, 新一线城市, 二线城市, 三四线城市, 县城/乡镇)"
     )

@@ -17,9 +17,15 @@ class SchemaValidator:
 
     VALID_GENDERS = ["男", "女", "其他"]
     VALID_CITIES = [
-        "一线城市", "新一线城市", "二线城市",
-        "三线城市", "四线城市", "五线城市",
-        "县城/乡镇", "农村", "海外",
+        "一线城市",
+        "新一线城市",
+        "二线城市",
+        "三线城市",
+        "四线城市",
+        "五线城市",
+        "县城/乡镇",
+        "农村",
+        "海外",
     ]
 
     def validate(self, persona: PersonaProfile) -> ValidationResult:
@@ -44,10 +50,21 @@ class SchemaValidator:
 
         # Layer 1
         layer1 = persona.layer1_demographics
-        for field_name in ["age", "gender", "city", "income", "occupation", "education", "marital_status", "living_type"]:
+        for field_name in [
+            "age",
+            "gender",
+            "city",
+            "income",
+            "occupation",
+            "education",
+            "marital_status",
+            "living_type",
+        ]:
             value = getattr(layer1, field_name, None)
             if value is None or (isinstance(value, str) and not value.strip()):
-                result.add_error(f"layer1_demographics.{field_name} is required and must not be empty")
+                result.add_error(
+                    f"layer1_demographics.{field_name} is required and must not be empty"
+                )
 
         # Layer 2
         layer2 = persona.layer2_behavior
@@ -61,14 +78,21 @@ class SchemaValidator:
         for field_name in ["secret_motivation", "defense_mechanism"]:
             value = getattr(layer3, field_name, None)
             if value is None or (isinstance(value, str) and not value.strip()):
-                result.add_error(f"layer3_psychology.{field_name} is required and must not be empty")
+                result.add_error(
+                    f"layer3_psychology.{field_name} is required and must not be empty"
+                )
 
         if layer3.tension_combination is None:
             result.add_error("layer3_psychology.tension_combination is required")
 
         # Layer 4
         layer4 = persona.layer4_scenarios
-        for field_name in ["daily_routine", "purchase_trigger", "stress_response", "social_behavior"]:
+        for field_name in [
+            "daily_routine",
+            "purchase_trigger",
+            "stress_response",
+            "social_behavior",
+        ]:
             value = getattr(layer4, field_name, None)
             if value is None or (isinstance(value, str) and not value.strip()):
                 result.add_error(f"layer4_scenarios.{field_name} is required and must not be empty")
@@ -85,8 +109,7 @@ class SchemaValidator:
 
         if layer1.city not in self.VALID_CITIES:
             result.add_error(
-                f"layer1_demographics.city must be one of {self.VALID_CITIES}, "
-                f"got '{layer1.city}'"
+                f"layer1_demographics.city must be one of {self.VALID_CITIES}, got '{layer1.city}'"
             )
 
     def _check_array_lengths(self, persona: PersonaProfile, result: ValidationResult) -> None:
@@ -106,9 +129,7 @@ class SchemaValidator:
         """Validate numeric fields are within allowed ranges."""
         score = persona.authenticity_score
         if score is not None and not (0 <= score <= 14):
-            result.add_error(
-                f"authenticity_score must be between 0 and 14, got {score}"
-            )
+            result.add_error(f"authenticity_score must be between 0 and 14, got {score}")
 
     def _check_string_lengths(self, persona: PersonaProfile, result: ValidationResult) -> None:
         """Validate string fields meet minimum length requirements."""

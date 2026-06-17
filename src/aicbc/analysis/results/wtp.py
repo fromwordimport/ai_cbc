@@ -7,6 +7,8 @@ Handles edge cases like positive price coefficients and extreme values.
 
 from __future__ import annotations
 
+import pandas as pd
+
 from aicbc.questionnaire.models import Attribute, AttributeType
 
 
@@ -115,7 +117,8 @@ class WTPCalculator:
                     else:
                         # Last level: beta_{k-1} = -sum(beta_0..beta_{k-2})
                         ref_cols = [
-                            f"{attr.id}_{j}" for j in range(n_levels - 1)
+                            f"{attr.id}_{j}"
+                            for j in range(n_levels - 1)
                             if f"{attr.id}_{j}" in self.util.columns
                         ]
                         if col_0 in self.util.columns and ref_cols:
@@ -127,32 +130,36 @@ class WTPCalculator:
                     # WTP = level_diff / (-beta_price) * price_std
                     wtp = self._compute_wtp_from_diff(level_diff)
                     if len(wtp) > 0:
-                        comparisons.append({
-                            "from_level": from_level,
-                            "to_level": to_level,
-                            "wtp_mean": float(wtp.mean()),
-                            "wtp_median": float(wtp.median()),
-                            "wtp_std": float(wtp.std()),
-                            "ci_95_lower": float(wtp.quantile(0.025)),
-                            "ci_95_upper": float(wtp.quantile(0.975)),
-                            "n_valid": len(wtp),
-                        })
+                        comparisons.append(
+                            {
+                                "from_level": from_level,
+                                "to_level": to_level,
+                                "wtp_mean": float(wtp.mean()),
+                                "wtp_median": float(wtp.median()),
+                                "wtp_std": float(wtp.std()),
+                                "ci_95_lower": float(wtp.quantile(0.025)),
+                                "ci_95_upper": float(wtp.quantile(0.975)),
+                                "n_valid": len(wtp),
+                            }
+                        )
 
                 results[attr.id] = {"comparisons": comparisons}
             else:
                 # Continuous attribute
                 wtp = self.compute_wtp(attr.id, "continuous")
                 results[attr.id] = {
-                    "comparisons": [{
-                        "from_level": "baseline",
-                        "to_level": "+1 unit",
-                        "wtp_mean": float(wtp.mean()),
-                        "wtp_median": float(wtp.median()),
-                        "wtp_std": float(wtp.std()),
-                        "ci_95_lower": float(wtp.quantile(0.025)),
-                        "ci_95_upper": float(wtp.quantile(0.975)),
-                        "n_valid": len(wtp),
-                    }]
+                    "comparisons": [
+                        {
+                            "from_level": "baseline",
+                            "to_level": "+1 unit",
+                            "wtp_mean": float(wtp.mean()),
+                            "wtp_median": float(wtp.median()),
+                            "wtp_std": float(wtp.std()),
+                            "ci_95_lower": float(wtp.quantile(0.025)),
+                            "ci_95_upper": float(wtp.quantile(0.975)),
+                            "n_valid": len(wtp),
+                        }
+                    ]
                 }
 
         return results

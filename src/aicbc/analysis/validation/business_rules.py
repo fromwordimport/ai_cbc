@@ -19,7 +19,6 @@ from typing import Any
 
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # 1.  Domain constants (dishwasher category)
 # ---------------------------------------------------------------------------
@@ -28,19 +27,19 @@ import pandas as pd
 # Key = attribute_id, value = list of level values in INCREASING preference order.
 # A level utility that *decreases* along this list triggers a warning.
 MONOTONIC_EXPECTATIONS: dict[str, list[str | float]] = {
-    "capacity": ["6套", "10套", "13套"],      # larger capacity → higher utility
-    "energy":   ["二级", "一级", "超一级"],   # better efficiency → higher utility
-    "features": ["基础", "智能", "全能"],      # more features → higher utility
+    "capacity": ["6套", "10套", "13套"],  # larger capacity → higher utility
+    "energy": ["二级", "一级", "超一级"],  # better efficiency → higher utility
+    "features": ["基础", "智能", "全能"],  # more features → higher utility
 }
 
 # WTP plausibility bounds per attribute upgrade (CNY).
 # Based on dishwasher category business intuition (docs/洗碗机CBC实验设计方案.md §5.1).
 WTP_BOUNDS: dict[str, tuple[float, float]] = {
-    "capacity": (0.0, 3000.0),      # 6套→13套 最大合理溢价
+    "capacity": (0.0, 3000.0),  # 6套→13套 最大合理溢价
     "installation": (0.0, 1500.0),  # 台式→嵌入式/水槽式
-    "features": (0.0, 2000.0),      # 基础→全能
-    "brand": (0.0, 2500.0),         # 品牌升级溢价
-    "energy": (0.0, 800.0),         # 能效升级
+    "features": (0.0, 2000.0),  # 基础→全能
+    "brand": (0.0, 2500.0),  # 品牌升级溢价
+    "energy": (0.0, 800.0),  # 能效升级
 }
 
 # Minimum acceptable negative rate for price coefficients.
@@ -53,6 +52,7 @@ PRICE_MEAN_MAX = 0.0
 # ---------------------------------------------------------------------------
 # 2.  Validation result dataclass
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ValidationResult:
@@ -77,6 +77,7 @@ class ValidationResult:
 # ---------------------------------------------------------------------------
 # 3.  Price coefficient validator
 # ---------------------------------------------------------------------------
+
 
 def validate_price_coefficient(
     price_coefficients: pd.Series,
@@ -126,8 +127,7 @@ def validate_price_coefficient(
             passed=False,
             severity="CRITICAL",
             message=(
-                f"Mean price coefficient {mean_price:.4f} is not negative "
-                f"(threshold < {mean_max})."
+                f"Mean price coefficient {mean_price:.4f} is not negative (threshold < {mean_max})."
             ),
             details=details,
         )
@@ -136,10 +136,7 @@ def validate_price_coefficient(
         rule_name="price_coefficient_negative",
         passed=True,
         severity="INFO",
-        message=(
-            f"Price coefficients OK: {negative_rate:.1%} negative, "
-            f"mean={mean_price:.4f}."
-        ),
+        message=(f"Price coefficients OK: {negative_rate:.1%} negative, mean={mean_price:.4f}."),
         details=details,
     )
 
@@ -147,6 +144,7 @@ def validate_price_coefficient(
 # ---------------------------------------------------------------------------
 # 4.  WTP plausibility validator
 # ---------------------------------------------------------------------------
+
 
 def validate_wtp_plausibility(
     wtp_results: dict[str, dict],
@@ -227,6 +225,7 @@ def validate_wtp_plausibility(
 # 5.  Attribute level monotonicity validator
 # ---------------------------------------------------------------------------
 
+
 def validate_level_monotonicity(
     individual_utilities: pd.DataFrame,
     attributes: list[dict[str, Any]],
@@ -275,9 +274,7 @@ def validate_level_monotonicity(
 
         # Check that required effect-coded parameter columns are present
         required_params = [f"{attr_id}_{i}" for i in range(n_levels - 1)]
-        missing_params = [
-            p for p in required_params if p not in individual_utilities.columns
-        ]
+        missing_params = [p for p in required_params if p not in individual_utilities.columns]
         if missing_params:
             results.append(
                 ValidationResult(
@@ -340,8 +337,7 @@ def validate_level_monotonicity(
                         "attribute": attr_id,
                         "expected_order": [str(v) for v in expected_order],
                         "mean_utilities": {
-                            str(k): round(float(v), 4)
-                            for k, v in mean_utils.items()
+                            str(k): round(float(v), 4) for k, v in mean_utils.items()
                         },
                         "violations": [
                             {
@@ -362,15 +358,13 @@ def validate_level_monotonicity(
                     passed=True,
                     severity="INFO",
                     message=(
-                        f"Attribute '{attr_id}' level utilities follow expected "
-                        f"monotonic order."
+                        f"Attribute '{attr_id}' level utilities follow expected monotonic order."
                     ),
                     details={
                         "attribute": attr_id,
                         "expected_order": [str(v) for v in expected_order],
                         "mean_utilities": {
-                            str(k): round(float(v), 4)
-                            for k, v in mean_utils.items()
+                            str(k): round(float(v), 4) for k, v in mean_utils.items()
                         },
                     },
                 )
@@ -382,6 +376,7 @@ def validate_level_monotonicity(
 # ---------------------------------------------------------------------------
 # 6.  Segment comparison sanity validator
 # ---------------------------------------------------------------------------
+
 
 def validate_segment_comparison(
     comparison_result: dict[str, Any],
@@ -436,8 +431,7 @@ def validate_segment_comparison(
                 passed=False,
                 severity="HIGH",
                 message=(
-                    f"Inconsistent significance flag: p={p_value:.4f} < 0.05 "
-                    f"but significant=False."
+                    f"Inconsistent significance flag: p={p_value:.4f} < 0.05 but significant=False."
                 ),
                 details={"p_value": p_value, "significant": significant},
             )
@@ -449,8 +443,7 @@ def validate_segment_comparison(
                 passed=False,
                 severity="HIGH",
                 message=(
-                    f"Inconsistent significance flag: p={p_value:.4f} >= 0.05 "
-                    f"but significant=True."
+                    f"Inconsistent significance flag: p={p_value:.4f} >= 0.05 but significant=True."
                 ),
                 details={"p_value": p_value, "significant": significant},
             )
@@ -472,6 +465,7 @@ def validate_segment_comparison(
 # ---------------------------------------------------------------------------
 # 7.  Market simulation sanity validator
 # ---------------------------------------------------------------------------
+
 
 def validate_market_simulation(
     market_sim_response: dict[str, Any],
@@ -507,10 +501,7 @@ def validate_market_simulation(
                 rule_name="market_simulation_share_sum",
                 passed=False,
                 severity="HIGH",
-                message=(
-                    f"Predicted shares sum to {total_share:.4f}, "
-                    f"expected 1.0 (±0.01)."
-                ),
+                message=(f"Predicted shares sum to {total_share:.4f}, expected 1.0 (±0.01)."),
                 details={
                     "total_share": round(total_share, 4),
                     "n_scenarios": len(scenarios),
@@ -533,19 +524,14 @@ def validate_market_simulation(
         )
 
     # No negative shares
-    negative_shares = [
-        s for s in scenarios if s.get("predicted_share", 0.0) < 0
-    ]
+    negative_shares = [s for s in scenarios if s.get("predicted_share", 0.0) < 0]
     if negative_shares:
         results.append(
             ValidationResult(
                 rule_name="market_simulation_no_negative",
                 passed=False,
                 severity="CRITICAL",
-                message=(
-                    f"{len(negative_shares)} scenario(s) have negative "
-                    f"predicted shares."
-                ),
+                message=(f"{len(negative_shares)} scenario(s) have negative predicted shares."),
                 details={
                     "negative_scenarios": [
                         {"name": s.get("name"), "share": s.get("predicted_share")}
@@ -584,10 +570,7 @@ def validate_market_simulation(
                 rule_name="market_simulation_ci_order",
                 passed=False,
                 severity="HIGH",
-                message=(
-                    f"{len(ci_issues)} scenario(s) have invalid CI "
-                    f"(lower >= upper)."
-                ),
+                message=(f"{len(ci_issues)} scenario(s) have invalid CI (lower >= upper)."),
                 details={"issues": ci_issues},
             )
         )
@@ -607,6 +590,7 @@ def validate_market_simulation(
 # ---------------------------------------------------------------------------
 # 8.  Orchestrator: run all validations
 # ---------------------------------------------------------------------------
+
 
 def run_all_validations(
     individual_utilities: pd.DataFrame,
@@ -645,15 +629,11 @@ def run_all_validations(
 
     # 4. Segment comparison
     if segment_comparison is not None:
-        all_results["segment_comparison"] = validate_segment_comparison(
-            segment_comparison
-        )
+        all_results["segment_comparison"] = validate_segment_comparison(segment_comparison)
 
     # 5. Market simulation
     if market_simulation is not None:
-        all_results["market_simulation"] = validate_market_simulation(
-            market_simulation
-        )
+        all_results["market_simulation"] = validate_market_simulation(market_simulation)
 
     return all_results
 
@@ -671,19 +651,10 @@ def summarize_results(
         for r in cat_results:
             flat.append((category, r))
 
-    passed = not any(
-        not r.passed and r.severity in ("CRITICAL", "HIGH")
-        for _, r in flat
-    )
-    critical_failures = sum(
-        1 for _, r in flat if not r.passed and r.severity == "CRITICAL"
-    )
-    high_failures = sum(
-        1 for _, r in flat if not r.passed and r.severity == "HIGH"
-    )
-    warning_failures = sum(
-        1 for _, r in flat if not r.passed and r.severity == "WARNING"
-    )
+    passed = not any(not r.passed and r.severity in ("CRITICAL", "HIGH") for _, r in flat)
+    critical_failures = sum(1 for _, r in flat if not r.passed and r.severity == "CRITICAL")
+    high_failures = sum(1 for _, r in flat if not r.passed and r.severity == "HIGH")
+    warning_failures = sum(1 for _, r in flat if not r.passed and r.severity == "WARNING")
 
     return {
         "overall_passed": passed,

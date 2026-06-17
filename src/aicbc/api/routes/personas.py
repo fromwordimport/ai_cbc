@@ -104,9 +104,7 @@ async def generate_personas_batch(
     # P0-001: Pass study_id to ProfileGenerator for per-study cost tracking.
     # Use the DI-injected profile_gen's llm_client so that test overrides apply.
     if safe_study_id:
-        profile_gen = ProfileGenerator(
-            llm_client=profile_gen._llm, study_id=safe_study_id
-        )
+        profile_gen = ProfileGenerator(llm_client=profile_gen._llm, study_id=safe_study_id)
 
     def _safe_error_message(exc: Exception) -> str:
         """Return safe error detail for client exposure."""

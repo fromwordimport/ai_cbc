@@ -67,11 +67,27 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-antd': ['antd', '@ant-design/icons'],
-          'vendor-echarts': ['echarts', 'echarts-for-react'],
-          'vendor-axios': ['axios'],
+        manualChunks(id: string) {
+          if (
+            ['/node_modules/react/', '/node_modules/react-dom/', '/node_modules/react-router-dom/'].some(
+              (p) => id.includes(p)
+            )
+          ) {
+            return 'vendor-react'
+          }
+          if (
+            ['/node_modules/antd/', '/node_modules/@ant-design/icons/'].some((p) => id.includes(p))
+          ) {
+            return 'vendor-antd'
+          }
+          if (
+            ['/node_modules/echarts/', '/node_modules/echarts-for-react/'].some((p) => id.includes(p))
+          ) {
+            return 'vendor-echarts'
+          }
+          if (id.includes('/node_modules/axios/')) {
+            return 'vendor-axios'
+          }
         },
       },
     },

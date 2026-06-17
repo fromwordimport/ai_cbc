@@ -176,9 +176,7 @@ class MemoryResponseStore:
     ) -> tuple[list[PersonaResponse], int]:
         """Query responses for a study."""
         with self._lock:
-            items = [
-                r for r in self._responses.values() if r.study_id == study_id
-            ]
+            items = [r for r in self._responses.values() if r.study_id == study_id]
         total = len(items)
         start = (page - 1) * page_size
         end = start + page_size
@@ -244,9 +242,7 @@ class MemoryResponseStore:
     def delete_by_study(self, study_id: str) -> int:
         """Delete all responses and the dataset for a study."""
         with self._lock:
-            response_ids = [
-                rid for rid, r in self._responses.items() if r.study_id == study_id
-            ]
+            response_ids = [rid for rid, r in self._responses.items() if r.study_id == study_id]
             for rid in response_ids:
                 del self._responses[rid]
             dataset_deleted = study_id in self._datasets
@@ -261,11 +257,7 @@ class MemoryResponseStore:
     def delete_by_persona(self, persona_id: str) -> int:
         """Delete all responses belonging to a persona."""
         with self._lock:
-            response_ids = [
-                rid
-                for rid, r in self._responses.items()
-                if r.persona_id == persona_id
-            ]
+            response_ids = [rid for rid, r in self._responses.items() if r.persona_id == persona_id]
             for rid in response_ids:
                 del self._responses[rid]
             return len(response_ids)
@@ -319,12 +311,8 @@ class MemoryPersonaStore:
         """Register a persona in all inverted indexes."""
         pid = persona.persona_id
         self._segment_index.setdefault(persona.segment, set()).add(pid)
-        self._city_tier_index.setdefault(
-            persona.layer1_demographics.city, set()
-        ).add(pid)
-        self._bias_status_index.setdefault(
-            persona.bias_audit_status, set()
-        ).add(pid)
+        self._city_tier_index.setdefault(persona.layer1_demographics.city, set()).add(pid)
+        self._bias_status_index.setdefault(persona.bias_audit_status, set()).add(pid)
 
     def _remove_from_index(self, persona: PersonaProfile) -> None:
         """Unregister a persona from all inverted indexes."""
@@ -419,18 +407,10 @@ class MemoryPersonaStore:
                 candidate_ids = seg_ids
             if city_tier is not None:
                 ct_ids = self._city_tier_index.get(city_tier, set())
-                candidate_ids = (
-                    ct_ids
-                    if candidate_ids is None
-                    else candidate_ids & ct_ids
-                )
+                candidate_ids = ct_ids if candidate_ids is None else candidate_ids & ct_ids
             if bias_status is not None:
                 bs_ids = self._bias_status_index.get(bias_status, set())
-                candidate_ids = (
-                    bs_ids
-                    if candidate_ids is None
-                    else candidate_ids & bs_ids
-                )
+                candidate_ids = bs_ids if candidate_ids is None else candidate_ids & bs_ids
 
             if candidate_ids is not None:
                 items = [self._data[pid] for pid in candidate_ids if pid in self._data]
@@ -482,9 +462,7 @@ class MemoryPersonaStore:
                 self._remove_from_index(persona)
                 del self._data[pid]
             # Recompute fingerprints for remaining personas.
-            self._fingerprints = {
-                self._compute_fingerprint(p) for p in self._data.values()
-            }
+            self._fingerprints = {self._compute_fingerprint(p) for p in self._data.values()}
             return len(ids)
 
     async def adelete_by_study(self, study_id: str) -> int:

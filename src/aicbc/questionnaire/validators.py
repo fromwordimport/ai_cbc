@@ -29,9 +29,7 @@ class QuestionnaireValidator:
 
         # Check 3: D-efficiency threshold (design doc: >= 0.85 target, >= 0.80 minimum)
         if questionnaire.d_efficiency is not None and questionnaire.d_efficiency < 0.80:
-            errors.append(
-                f"D-efficiency过低: {questionnaire.d_efficiency:.3f} (最低要求0.80)"
-            )
+            errors.append(f"D-efficiency过低: {questionnaire.d_efficiency:.3f} (最低要求0.80)")
         else:
             score += 1.0
 
@@ -64,8 +62,7 @@ class QuestionnaireValidator:
             # Represent a choice set as a tuple of (alt_index, attributes),
             # so that [A@0, B@1] and [B@0, A@1] are NOT considered duplicates.
             alt_key = tuple(
-                (alt.alt_index, frozenset(alt.attributes.items()))
-                for alt in cs.alternatives
+                (alt.alt_index, frozenset(alt.attributes.items())) for alt in cs.alternatives
             )
             if alt_key in seen:
                 return True
@@ -90,7 +87,6 @@ class QuestionnaireValidator:
                             f"{c.attribute_id}={c.level_value}" for c in pair.conditions
                         )
                         violations.append(
-                            f"选择集 {cs.choice_set_id} 选项 {alt.alt_index}: "
-                            f"违反禁止组合 [{desc}]"
+                            f"选择集 {cs.choice_set_id} 选项 {alt.alt_index}: 违反禁止组合 [{desc}]"
                         )
         return violations

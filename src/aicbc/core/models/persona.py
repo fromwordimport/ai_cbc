@@ -18,7 +18,9 @@ class Layer1Demographics(BaseModel):
     marital_status: str = Field(..., description="婚姻状况")
     living_type: str = Field(..., description="居住形态")
     life_stage: str = Field(default="", description="人生阶段，如'初入职场单身'、'养育幼儿'")
-    brand_relationship_stage: str = Field(default="", description="品牌关系阶段，如'初次了解'、'忠诚拥护'")
+    brand_relationship_stage: str = Field(
+        default="", description="品牌关系阶段，如'初次了解'、'忠诚拥护'"
+    )
 
     model_config = {"json_schema_extra": {"layer": 1, "layer_name": "demographics"}}
 
@@ -181,9 +183,7 @@ class PersonaProfile(BaseModel):
         for sample in v:
             length = len(sample.strip())
             if not (20 <= length <= 60):
-                raise ValueError(
-                    f"Each language sample must be 20-60 characters, got {length}"
-                )
+                raise ValueError(f"Each language sample must be 20-60 characters, got {length}")
         return v
 
     def to_dict(self) -> dict[str, Any]:

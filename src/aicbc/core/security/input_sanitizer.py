@@ -212,9 +212,7 @@ def sanitize_text(value: str, field_name: str = "text", max_length: int | None =
 
     limit = max_length or _MAX_TEXT_LENGTH
     if len(value) > limit:
-        raise SanitizationError(
-            f"{field_name} exceeds maximum length of {limit} characters"
-        )
+        raise SanitizationError(f"{field_name} exceeds maximum length of {limit} characters")
 
     value_lower = value.lower()
     for pattern in _DANGEROUS_PATTERNS:

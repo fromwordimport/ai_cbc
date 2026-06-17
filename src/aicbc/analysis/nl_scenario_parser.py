@@ -135,9 +135,7 @@ def parse_nl_scenario(
                     parsed[attr.id] = value
                     break
             if attr.id not in parsed:
-                value = _extract_number_near(
-                    normalized, _normalize(attr.name), fallback=False
-                )
+                value = _extract_number_near(normalized, _normalize(attr.name), fallback=False)
                 if value is not None:
                     parsed[attr.id] = value
             if attr.id not in parsed:

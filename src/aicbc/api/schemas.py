@@ -275,7 +275,9 @@ class ConverseResponse(BaseModel):
 class InterviewRequest(BaseModel):
     """Request for a multi-question interview."""
 
-    questions: list[Annotated[str, Field(max_length=2000)]] = Field(..., min_length=1, max_length=20, description="访谈问题列表")
+    questions: list[Annotated[str, Field(max_length=2000)]] = Field(
+        ..., min_length=1, max_length=20, description="访谈问题列表"
+    )
     context: dict[str, Any] = Field(default_factory=dict, description="情境上下文")
 
 

@@ -272,9 +272,7 @@ async def dashboard_summary() -> dict[str, Any]:
             "studies_by_status": study_status_counts,
             "recent_studies_last_7d": len(recent_studies),
         },
-        "recent_studies": sorted(
-            recent_studies, key=lambda s: s["created_at"], reverse=True
-        )[:10],
+        "recent_studies": sorted(recent_studies, key=lambda s: s["created_at"], reverse=True)[:10],
     }
     cache.set("summary", result)
     return result

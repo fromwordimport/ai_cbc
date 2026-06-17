@@ -16,11 +16,11 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
-import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 import structlog
 
@@ -149,7 +149,9 @@ class ToolCallResult:
 class ToolCallError(Exception):
     """Base exception for tool call failures."""
 
-    def __init__(self, message: str, error_code: str = "TOOL_ERROR", detail: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str, error_code: str = "TOOL_ERROR", detail: dict[str, Any] | None = None
+    ):
         super().__init__(message)
         self.error_code = error_code
         self.detail = detail or {}
@@ -327,9 +329,7 @@ class ToolRegistry:
         while retry_count <= rt.spec.max_retries:
             try:
                 if rt.is_async:
-                    result_data = asyncio.run(
-                        _run_with_timeout(rt.fn, validated_args, timeout)
-                    )
+                    result_data = asyncio.run(_run_with_timeout(rt.fn, validated_args, timeout))
                 else:
                     result_data = _run_sync_with_timeout(rt.fn, validated_args, timeout)
 
@@ -572,11 +572,11 @@ async def _run_with_timeout(
     if asyncio.iscoroutinefunction(fn):
         try:
             return await asyncio.wait_for(fn(**kwargs), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise ToolTimeoutError(
                 f"Tool call timed out after {timeout}s",
                 timeout_seconds=timeout,
-            )
+            ) from None
 
     # Run sync function in thread pool
     loop = asyncio.get_running_loop()
@@ -585,11 +585,11 @@ async def _run_with_timeout(
             loop.run_in_executor(None, functools.partial(fn, **kwargs)),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise ToolTimeoutError(
             f"Tool call timed out after {timeout}s",
             timeout_seconds=timeout,
-        )
+        ) from None
 
 
 def _run_sync_with_timeout(
@@ -601,10 +601,10 @@ def _run_sync_with_timeout(
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(_run_with_timeout(fn, kwargs, timeout))
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise ToolTimeoutError(
             f"Tool call timed out after {timeout}s",
             timeout_seconds=timeout,
-        )
+        ) from None
     finally:
         loop.close()

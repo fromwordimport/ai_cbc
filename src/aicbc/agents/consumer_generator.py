@@ -271,6 +271,7 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             Tuple of (profiles, states, summary).  ``profiles`` and ``states``
             are aligned one-to-one and contain only successful generations.
         """
+
         async def _batch_core() -> list:
             semaphore = asyncio.Semaphore(max_concurrency)
 
@@ -329,7 +330,10 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             profiles.append(profile)
             states.append(state)
             total_corrections += state.correction_count
-            if profile.authenticity_score is not None and profile.authenticity_score >= self._threshold:
+            if (
+                profile.authenticity_score is not None
+                and profile.authenticity_score >= self._threshold
+            ):
                 passed_count += 1
 
         generated_count = len(profiles)
@@ -342,9 +346,8 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             "passed_authenticity": passed_count,
             "failed_authenticity": generated_count - passed_count,
             "total_corrections": total_corrections,
-            "avg_authenticity_score": sum(
-                p.authenticity_score or 0 for p in profiles
-            ) / max(generated_count, 1),
+            "avg_authenticity_score": sum(p.authenticity_score or 0 for p in profiles)
+            / max(generated_count, 1),
             "concurrency": max_concurrency,
             "failures": failures,
         }

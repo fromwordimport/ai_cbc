@@ -142,16 +142,12 @@ class MemoryAnalysisStore:
         """Async-compatible get_result (delegates to sync implementation)."""
         return self.get_result(analysis_id)
 
-    def save_convergence(
-        self, analysis_id: str, diag: ConvergenceDiagnostics
-    ) -> None:
+    def save_convergence(self, analysis_id: str, diag: ConvergenceDiagnostics) -> None:
         """Store convergence diagnostics."""
         with self._lock:
             self._convergence[analysis_id] = diag
 
-    async def asave_convergence(
-        self, analysis_id: str, diag: ConvergenceDiagnostics
-    ) -> None:
+    async def asave_convergence(self, analysis_id: str, diag: ConvergenceDiagnostics) -> None:
         """Async-compatible save_convergence (delegates to sync implementation)."""
         self.save_convergence(analysis_id, diag)
 
@@ -164,16 +160,12 @@ class MemoryAnalysisStore:
         """Async-compatible get_convergence (delegates to sync implementation)."""
         return self.get_convergence(analysis_id)
 
-    def save_importance(
-        self, analysis_id: str, importance: ImportanceResponse
-    ) -> None:
+    def save_importance(self, analysis_id: str, importance: ImportanceResponse) -> None:
         """Store attribute importance results."""
         with self._lock:
             self._importance[analysis_id] = importance
 
-    async def asave_importance(
-        self, analysis_id: str, importance: ImportanceResponse
-    ) -> None:
+    async def asave_importance(self, analysis_id: str, importance: ImportanceResponse) -> None:
         """Async-compatible save_importance (delegates to sync implementation)."""
         self.save_importance(analysis_id, importance)
 
@@ -204,9 +196,7 @@ class MemoryAnalysisStore:
         """Async-compatible get_wtp (delegates to sync implementation)."""
         return self.get_wtp(analysis_id)
 
-    def save_market_sim(
-        self, analysis_id: str, sim_id: str, result: MarketSimResponse
-    ) -> None:
+    def save_market_sim(self, analysis_id: str, sim_id: str, result: MarketSimResponse) -> None:
         """Store market simulation result keyed by analysis_id + sim_id."""
         with self._lock:
             self._market_sim[f"{analysis_id}:{sim_id}"] = result
@@ -217,16 +207,12 @@ class MemoryAnalysisStore:
         """Async-compatible save_market_sim (delegates to sync implementation)."""
         self.save_market_sim(analysis_id, sim_id, result)
 
-    def get_market_sim(
-        self, analysis_id: str, sim_id: str
-    ) -> MarketSimResponse | None:
+    def get_market_sim(self, analysis_id: str, sim_id: str) -> MarketSimResponse | None:
         """Retrieve market simulation result."""
         with self._lock:
             return self._market_sim.get(f"{analysis_id}:{sim_id}")
 
-    async def aget_market_sim(
-        self, analysis_id: str, sim_id: str
-    ) -> MarketSimResponse | None:
+    async def aget_market_sim(self, analysis_id: str, sim_id: str) -> MarketSimResponse | None:
         """Async-compatible get_market_sim (delegates to sync implementation)."""
         return self.get_market_sim(analysis_id, sim_id)
 
@@ -282,25 +268,20 @@ class MemoryAnalysisStore:
         with self._lock:
             key = None
             for k in self._market_sim:
-                if k.startswith(f"{analysis_id}:"):
-                    if key is None or k > key:
-                        key = k
+                if k.startswith(f"{analysis_id}:") and (key is None or k > key):
+                    key = k
             return self._market_sim.get(key) if key else None
 
     async def aget_latest_market_sim(self, analysis_id: str) -> MarketSimResponse | None:
         """Async-compatible get_latest_market_sim (delegates to sync implementation)."""
         return self.get_latest_market_sim(analysis_id)
 
-    def save_latent_class_result(
-        self, analysis_id: str, result: dict[str, Any]
-    ) -> None:
+    def save_latent_class_result(self, analysis_id: str, result: dict[str, Any]) -> None:
         """Store a latent class model result."""
         with self._lock:
             self._latent_class[analysis_id] = result
 
-    async def asave_latent_class_result(
-        self, analysis_id: str, result: dict[str, Any]
-    ) -> None:
+    async def asave_latent_class_result(self, analysis_id: str, result: dict[str, Any]) -> None:
         """Async-compatible save_latent_class_result (delegates to sync implementation)."""
         self.save_latent_class_result(analysis_id, result)
 
@@ -316,9 +297,7 @@ class MemoryAnalysisStore:
     def delete_by_study(self, study_id: str) -> int:
         """Delete all analyses belonging to a study."""
         with self._lock:
-            analysis_ids = [
-                aid for aid, job in self._jobs.items() if job.study_id == study_id
-            ]
+            analysis_ids = [aid for aid, job in self._jobs.items() if job.study_id == study_id]
             for aid in analysis_ids:
                 self._delete_analysis_unlocked(aid)
             return len(analysis_ids)
@@ -330,9 +309,7 @@ class MemoryAnalysisStore:
     def list_jobs_by_study(self, study_id: str) -> list[AnalysisJobStatus]:
         """Return all analysis jobs belonging to a study."""
         with self._lock:
-            return [
-                job for job in self._jobs.values() if job.study_id == study_id
-            ]
+            return [job for job in self._jobs.values() if job.study_id == study_id]
 
     async def alist_jobs_by_study(self, study_id: str) -> list[AnalysisJobStatus]:
         """Async-compatible list_jobs_by_study (delegates to sync implementation)."""

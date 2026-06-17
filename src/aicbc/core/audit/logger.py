@@ -111,11 +111,13 @@ class AuditLogger:
             "resource_id": resource_id,
             "result": result,
             "ip_address": ip_address,
-            "data": redact_dict({
-                **data,
-                "user_agent": user_agent,
-                "role": role,
-            }),
+            "data": redact_dict(
+                {
+                    **data,
+                    "user_agent": user_agent,
+                    "role": role,
+                }
+            ),
         }
 
     def get_memory_logs(self) -> list[dict[str, Any]]:

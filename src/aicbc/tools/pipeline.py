@@ -10,10 +10,6 @@ from typing import Any
 
 import structlog
 
-from aicbc.analysis.models import AnalysisResultResponse
-from aicbc.core.models.persona import PersonaProfile
-from aicbc.questionnaire.models import Attribute, CBCQuestionnaire
-from aicbc.questionnaire.response_models import CBCRawDataset
 from aicbc.tools.protocol import (
     ToolParameter,
     ToolSpec,
@@ -189,24 +185,28 @@ def responses_to_raw_dataset(
 
             for alt in alternatives:
                 alt_idx = alt.get("alt_index", 0)
-                alt_records.append({
-                    "alt_index": alt_idx,
-                    "chosen": alt_idx == chosen_idx if chosen_idx is not None else False,
-                    "attributes": alt.get("attributes", {}),
-                })
+                alt_records.append(
+                    {
+                        "alt_index": alt_idx,
+                        "chosen": alt_idx == chosen_idx if chosen_idx is not None else False,
+                        "attributes": alt.get("attributes", {}),
+                    }
+                )
 
             # Determine none_chosen
             none_chosen = chosen_idx is None
 
-            choice_records.append({
-                "respondent_id": persona_id,
-                "respondent_index": resp_idx,
-                "segment": segment,
-                "choice_set_id": cs_id,
-                "choice_set_index": cs_id - 1,
-                "alternatives": alt_records,
-                "none_chosen": none_chosen,
-            })
+            choice_records.append(
+                {
+                    "respondent_id": persona_id,
+                    "respondent_index": resp_idx,
+                    "segment": segment,
+                    "choice_set_id": cs_id,
+                    "choice_set_index": cs_id - 1,
+                    "alternatives": alt_records,
+                    "none_chosen": none_chosen,
+                }
+            )
 
     dataset = {
         "metadata": {
@@ -301,7 +301,6 @@ def analysis_result_to_report_context(
 
     # Extract core data
     importance = analysis_result.get("importance", {})
-    population_params = analysis_result.get("population_params", {})
     convergence = analysis_result.get("convergence", {})
     wtp = analysis_result.get("wtp", {})
     model_type = analysis_result.get("model_type", "unknown")
@@ -321,14 +320,12 @@ def analysis_result_to_report_context(
     if sorted_importance:
         top_attr, top_val = sorted_importance[0]
         findings.append(
-            f"最重要的属性是'{attr_name_map.get(top_attr, top_attr)}'"
-            f"（重要性={top_val:.1%}）"
+            f"最重要的属性是'{attr_name_map.get(top_attr, top_attr)}'（重要性={top_val:.1%}）"
         )
     if len(sorted_importance) > 1:
         second_attr, second_val = sorted_importance[1]
         findings.append(
-            f"其次为'{attr_name_map.get(second_attr, second_attr)}'"
-            f"（重要性={second_val:.1%}）"
+            f"其次为'{attr_name_map.get(second_attr, second_attr)}'（重要性={second_val:.1%}）"
         )
 
     # Convergence assessment
@@ -348,8 +345,7 @@ def analysis_result_to_report_context(
             comparisons = attr_wtp.get("comparisons", []) if isinstance(attr_wtp, dict) else []
             if comparisons:
                 wtp_findings.append(
-                    f"{attr_name_map.get(attr_id, attr_id)}: "
-                    f"包含{len(comparisons)}个水平对比"
+                    f"{attr_name_map.get(attr_id, attr_id)}: 包含{len(comparisons)}个水平对比"
                 )
 
     # Charts data
@@ -373,8 +369,7 @@ def analysis_result_to_report_context(
     if sorted_importance:
         top_attr_id = sorted_importance[0][0]
         recommendations.append(
-            f"优先优化'{attr_name_map.get(top_attr_id, top_attr_id)}'属性，"
-            f"其对消费者决策影响最大"
+            f"优先优化'{attr_name_map.get(top_attr_id, top_attr_id)}'属性，其对消费者决策影响最大"
         )
 
     result = {
@@ -458,8 +453,12 @@ def validate_data_flow(
     # PersonaProfile → CBCRawDataset validation
     if source_type == "PersonaProfile" and target_type == "CBCRawDataset":
         required_persona_fields = [
-            "persona_id", "segment", "layer1_demographics",
-            "layer2_behavior", "layer3_psychology", "layer4_scenarios",
+            "persona_id",
+            "segment",
+            "layer1_demographics",
+            "layer2_behavior",
+            "layer3_psychology",
+            "layer4_scenarios",
         ]
         for field in required_persona_fields:
             if field not in data:

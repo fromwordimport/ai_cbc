@@ -6,6 +6,7 @@ for comparing preference differences between consumer segments.
 
 from __future__ import annotations
 
+import pandas as pd
 from scipy import stats
 
 
@@ -31,13 +32,10 @@ def hotellings_t2(
     if n_a < p or n_b < p:
         return {
             "method": "Hotelling's T²",
-            "statistic": float('nan'),
-            "p_value": float('nan'),
+            "statistic": float("nan"),
+            "p_value": float("nan"),
             "significant": False,
-            "error": (
-                f"Insufficient samples: n_a={n_a}, n_b={n_b}, "
-                f"need at least p={p} per group"
-            ),
+            "error": (f"Insufficient samples: n_a={n_a}, n_b={n_b}, need at least p={p} per group"),
         }
 
     mean_a = group_a.mean(axis=0).values
@@ -73,8 +71,8 @@ def hotellings_t2(
         # Singular covariance matrix
         return {
             "method": "Hotelling's T²",
-            "statistic": float('nan'),
-            "p_value": float('nan'),
+            "statistic": float("nan"),
+            "p_value": float("nan"),
             "significant": False,
             "error": "Singular covariance matrix",
         }
@@ -228,9 +226,12 @@ def compare_segments(
 
     # ── Multiple comparison correction (Bonferroni-Holm) ──────────────
     from statsmodels.stats.multitest import multipletests
+
     raw_pvalues = [r["p_value"] for r in per_attribute]
     _reject, corrected_p, _alpha_sidak, _alpha_bonf = multipletests(
-        raw_pvalues, alpha=0.05, method="holm",
+        raw_pvalues,
+        alpha=0.05,
+        method="holm",
     )
     for i, result in enumerate(per_attribute):
         result["corrected_p_value"] = float(corrected_p[i])
@@ -238,15 +239,15 @@ def compare_segments(
 
     # Generate interpretation (uses corrected significance)
     sig_attrs = [
-        r for r in per_attribute
+        r
+        for r in per_attribute
         if r.get("corrected_significant", r["significant"])
         and r["effect_size"] in ("medium", "large")
     ]
     if sig_attrs:
         attr_names = ", ".join([r["attribute"] for r in sig_attrs[:3]])
         interpretation = (
-            f"两群体在{attr_names}等属性上存在显著差异"
-            f"（p<0.05, 效应量≥中等），建议差异化策略。"
+            f"两群体在{attr_names}等属性上存在显著差异（p<0.05, 效应量≥中等），建议差异化策略。"
         )
     else:
         interpretation = "两群体偏好无显著差异，可考虑统一策略。"

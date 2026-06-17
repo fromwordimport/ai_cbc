@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import numpy as np
+
+
 def d_efficiency(info_matrix: np.ndarray, n_choice_sets: int | None = None) -> float:
     """Compute D-efficiency from an information matrix.
 

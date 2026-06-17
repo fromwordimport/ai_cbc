@@ -14,6 +14,9 @@ TODO(NLScenarioParser): Implement natural-language-to-structured-scenario parser
 
 from __future__ import annotations
 
+import numpy as np
+import pandas as pd
+
 from aicbc.analysis.preprocessing import get_feature_columns
 from aicbc.questionnaire.design.effects_coding import encode_profile
 from aicbc.questionnaire.models import Attribute
@@ -85,13 +88,15 @@ class MarketSimulator:
 
         import pandas as pd
 
-        return pd.DataFrame({
-            "name": scenario_names,
-            "predicted_share": shares.mean(axis=0),
-            "share_std": shares.std(axis=0, ddof=1),
-            "share_ci_95_lower": np.percentile(shares, 2.5, axis=0),
-            "share_ci_95_upper": np.percentile(shares, 97.5, axis=0),
-        })
+        return pd.DataFrame(
+            {
+                "name": scenario_names,
+                "predicted_share": shares.mean(axis=0),
+                "share_std": shares.std(axis=0, ddof=1),
+                "share_ci_95_lower": np.percentile(shares, 2.5, axis=0),
+                "share_ci_95_upper": np.percentile(shares, 97.5, axis=0),
+            }
+        )
 
     def _compute_utilities(
         self,
@@ -132,9 +137,7 @@ class MarketSimulator:
             try:
                 encoded = encode_profile(profile, self.attributes)
             except (ValueError, KeyError) as exc:
-                raise ValueError(
-                    f"Scenario[{i}] '{scenario.get('name', '?')}': {exc}"
-                ) from exc
+                raise ValueError(f"Scenario[{i}] '{scenario.get('name', '?')}': {exc}") from exc
             rows.append(encoded)
         return np.array(rows)
 
@@ -187,11 +190,15 @@ class MarketSimulator:
                 scenarios.extend(competitors)
 
             shares = self.simulate_share(scenarios, include_none=False)
-            base_share = shares[shares["name"] == base_scenario["name"]]["predicted_share"].values[0]
-            results.append({
-                attribute: value,
-                "predicted_share": base_share,
-            })
+            base_share = shares[shares["name"] == base_scenario["name"]]["predicted_share"].values[
+                0
+            ]
+            results.append(
+                {
+                    attribute: value,
+                    "predicted_share": base_share,
+                }
+            )
 
         import pandas as pd
 

@@ -64,10 +64,7 @@ def detect_pii(text: str) -> list[PIIMatch]:
     candidates.sort(key=lambda m: (m.start, -(m.end - m.start)))
     filtered: list[PIIMatch] = []
     for match in candidates:
-        if not any(
-            other.start <= match.start and other.end >= match.end
-            for other in filtered
-        ):
+        if not any(other.start <= match.start and other.end >= match.end for other in filtered):
             filtered.append(match)
     return sorted(filtered, key=lambda m: m.start)
 

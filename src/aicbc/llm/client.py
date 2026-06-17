@@ -19,8 +19,8 @@ from anthropic import APIError as AnthropicAPIError
 from openai import APIError as OpenAIAPIError
 from openai import OpenAI
 
+from aicbc.config.pricing import estimate_cost_usd
 from aicbc.config.settings import get_settings
-from aicbc.config.pricing import estimate_cost_usd, PRICE_TABLE
 from aicbc.cost.fuse import CostFuse, CostFuseError
 
 logger = structlog.get_logger("aicbc.llm")
@@ -38,12 +38,21 @@ class Provider(StrEnum):
 
 # Leakage indicators that suggest system prompt content escaped into output
 _LEAKAGE_INDICATORS = (
-    "你是", "系统指令", "You are a helpful",
-    "System instruction", "Constraints:", "约束条件",
-    "虚拟消费者生成专家", "角色定义", "张力组合",
+    "你是",
+    "系统指令",
+    "You are a helpful",
+    "System instruction",
+    "Constraints:",
+    "约束条件",
+    "虚拟消费者生成专家",
+    "角色定义",
+    "张力组合",
 )
 
-def _estimate_cost(provider: Provider, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+
+def _estimate_cost(
+    provider: Provider, model: str, prompt_tokens: int, completion_tokens: int
+) -> float:
     """Estimate API call cost in USD — reads from unified pricing registry."""
     try:
         return estimate_cost_usd(model, prompt_tokens, completion_tokens)
@@ -236,7 +245,9 @@ class LLMClient:
         if json_mode:
             extra = "\nYou must respond with valid JSON only."
             if system_msg:
-                kwargs["system"].append({"type": "text", "text": extra, "cache_control": {"type": "ephemeral"}})
+                kwargs["system"].append(
+                    {"type": "text", "text": extra, "cache_control": {"type": "ephemeral"}}
+                )
             else:
                 kwargs["system"] = [
                     {"type": "text", "text": extra, "cache_control": {"type": "ephemeral"}}
@@ -273,7 +284,9 @@ class LLMClient:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
-            estimated_cost_usd=_estimate_cost(Provider.ANTHROPIC, model, prompt_tokens, completion_tokens),
+            estimated_cost_usd=_estimate_cost(
+                Provider.ANTHROPIC, model, prompt_tokens, completion_tokens
+            ),
             latency_seconds=latency,
             raw_response=response,
         )
@@ -316,7 +329,9 @@ class LLMClient:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
-            estimated_cost_usd=_estimate_cost(Provider.OPENAI, model, prompt_tokens, completion_tokens),
+            estimated_cost_usd=_estimate_cost(
+                Provider.OPENAI, model, prompt_tokens, completion_tokens
+            ),
             latency_seconds=latency,
             raw_response=response,
         )

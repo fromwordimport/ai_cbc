@@ -19,11 +19,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
 import structlog
 
 from aicbc.core.models.persona import PersonaProfile
-from aicbc.questionnaire.models import Attribute, AttributeType, CBCQuestionnaire
+from aicbc.questionnaire.models import CBCQuestionnaire
 from aicbc.questionnaire.response_models import PersonaResponse
 
 logger = structlog.get_logger("aicbc.agents.evaluation")
@@ -138,18 +137,14 @@ class EvaluationChain:
         chosen_alts = self._extract_chosen_attributes(questionnaire, response)
 
         # 1. Price sensitivity check
-        price_pattern, price_contra = self._check_price_consistency(
-            persona, chosen_alts
-        )
+        price_pattern, price_contra = self._check_price_consistency(persona, chosen_alts)
         if price_pattern:
             choice_patterns.append(price_pattern)
         if price_contra:
             contradictions.append(price_contra)
 
         # 2. Brand loyalty check
-        brand_pattern, brand_contra = self._check_brand_consistency(
-            persona, chosen_alts
-        )
+        brand_pattern, brand_contra = self._check_brand_consistency(persona, chosen_alts)
         if brand_pattern:
             choice_patterns.append(brand_pattern)
         if brand_contra:
@@ -191,8 +186,7 @@ class EvaluationChain:
             contradictions=contradictions,
             contradiction_score=contradiction_score,
             consistency_score=consistency_score,
-            needs_correction=needs_correction
-            and len(persona_corrections) < self.MAX_CORRECTIONS,
+            needs_correction=needs_correction and len(persona_corrections) < self.MAX_CORRECTIONS,
             correction_history=persona_corrections,
         )
 
@@ -208,7 +202,7 @@ class EvaluationChain:
             Dict with aggregate statistics and per-persona reports.
         """
         reports: list[EvaluationReport] = []
-        for persona, response in zip(personas, responses):
+        for persona, response in zip(personas, responses, strict=False):
             report = self.evaluate(persona, questionnaire, response)
             reports.append(report)
 
@@ -217,12 +211,8 @@ class EvaluationChain:
         total_contradictions = sum(r.n_contradictions for r in reports)
         high_severity = sum(r.n_high_severity for r in reports)
 
-        avg_consistency = (
-            sum(r.consistency_score for r in reports) / total if total else 0
-        )
-        avg_contradiction = (
-            sum(r.contradiction_score for r in reports) / total if total else 0
-        )
+        avg_consistency = sum(r.consistency_score for r in reports) / total if total else 0
+        avg_contradiction = sum(r.contradiction_score for r in reports) / total if total else 0
 
         return {
             "total_evaluated": total,
@@ -285,7 +275,10 @@ class EvaluationChain:
                 feedback = self._build_trigger_reason(report)
                 try:
                     resim_results = simulator.resimulate_sets(
-                        persona, questionnaire, affected_indices, feedback,
+                        persona,
+                        questionnaire,
+                        affected_indices,
+                        feedback,
                     )
                     n_replaced = len(resim_results)
                     # Recompute consistency with updated choices
@@ -336,7 +329,7 @@ class EvaluationChain:
         """Extract attributes of chosen alternatives for each choice set."""
         chosen: list[dict[str, Any]] = []
 
-        for cs, choice in zip(questionnaire.choice_sets, response.responses):
+        for cs, choice in zip(questionnaire.choice_sets, response.responses, strict=False):
             chosen_idx = choice.chosen_alt_index
             if chosen_idx is None:
                 continue
@@ -417,7 +410,7 @@ class EvaluationChain:
                 rule_id="EVA-PRICE-002",
                 category="price_behavior",
                 severity="medium",
-                description=f"价格不敏感却过度选择低价选项",
+                description="价格不敏感却过度选择低价选项",
                 expected_behavior="对价格不敏感，可能偏好高端",
                 actual_behavior=f"{ratio:.0%}选择低价选项",
             )
@@ -441,6 +434,7 @@ class EvaluationChain:
 
         # Count brand concentration
         from collections import Counter
+
         brand_counts = Counter(brands)
         most_common = brand_counts.most_common(1)[0]
         concentration = most_common[1] / len(brands)
@@ -507,15 +501,17 @@ class EvaluationChain:
 
             # Check if chosen alternatives vary on this attribute
             values = [alt.get(attr_id) for alt in chosen_alts if attr_id in alt]
-            if len(set(str(v) for v in values)) > 1:
-                contradictions.append(ContradictionFinding(
-                    rule_id="EVA-FEAT-001",
-                    category="feature_preference",
-                    severity="low",
-                    description=f"声称忽略'{ignored}'，但选择在该属性上仍有差异",
-                    expected_behavior=f"对'{ignored}'不敏感，选择应随机分布",
-                    actual_behavior=f"选择了{len(set(values))}种不同的{ignored}配置",
-                ))
+            if len({str(v) for v in values}) > 1:
+                contradictions.append(
+                    ContradictionFinding(
+                        rule_id="EVA-FEAT-001",
+                        category="feature_preference",
+                        severity="low",
+                        description=f"声称忽略'{ignored}'，但选择在该属性上仍有差异",
+                        expected_behavior=f"对'{ignored}'不敏感，选择应随机分布",
+                        actual_behavior=f"选择了{len(set(values))}种不同的{ignored}配置",
+                    )
+                )
 
         return contradictions
 
@@ -588,11 +584,7 @@ class EvaluationChain:
         """Build a human-readable trigger reason."""
         reasons = []
         if report.contradiction_score > EvaluationChain.CONTRADICTION_THRESHOLD:
-            reasons.append(
-                f"矛盾得分{report.contradiction_score:.2f}超过阈值"
-            )
+            reasons.append(f"矛盾得分{report.contradiction_score:.2f}超过阈值")
         if report.consistency_score < EvaluationChain.CONSISTENCY_THRESHOLD:
-            reasons.append(
-                f"一致性得分{report.consistency_score:.2f}低于阈值"
-            )
+            reasons.append(f"一致性得分{report.consistency_score:.2f}低于阈值")
         return "; ".join(reasons) if reasons else "手动触发"

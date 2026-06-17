@@ -48,7 +48,7 @@ def decrypt_value(value: str, secret_key: str) -> str:
     if not secret_key or len(secret_key) < 32:
         raise ValueError("secret_key must be at least 32 characters for AES-256-GCM")
 
-    combined = base64.urlsafe_b64decode(value[len(_ENCRYPTION_PREFIX):].encode("utf-8"))
+    combined = base64.urlsafe_b64decode(value[len(_ENCRYPTION_PREFIX) :].encode("utf-8"))
     if len(combined) < _NONCE_SIZE + _TAG_SIZE:
         raise ValueError("invalid encrypted value: too short")
 

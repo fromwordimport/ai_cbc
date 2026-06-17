@@ -20,9 +20,9 @@ logger = structlog.get_logger("aicbc.cost")
 class DegradationLevel(StrEnum):
     """Model degradation level based on cost consumption."""
 
-    STANDARD = "STANDARD"   # Normal routing
-    DEGRADED = "DEGRADED"   # Switch to lighter model
-    EMERGENCY = "EMERGENCY" # Block non-essential calls
+    STANDARD = "STANDARD"  # Normal routing
+    DEGRADED = "DEGRADED"  # Switch to lighter model
+    EMERGENCY = "EMERGENCY"  # Block non-essential calls
 
 
 class CostFuseError(Exception):

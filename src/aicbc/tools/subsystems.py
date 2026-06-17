@@ -22,7 +22,7 @@ from aicbc.core.models.persona import PersonaProfile
 from aicbc.core.simulation.cbc_choice_simulator import CBCChoiceSimulator
 from aicbc.questionnaire.generator import QuestionnaireGenerator
 from aicbc.questionnaire.models import Attribute, CBCStudy, DesignParameters
-from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
+from aicbc.questionnaire.response_models import CBCRawDataset
 from aicbc.tools.protocol import (
     ToolParameter,
     ToolSpec,
@@ -89,9 +89,19 @@ register_tool(
         parameters=[
             ToolParameter(name="study_id", type="string", description="研究标识", required=True),
             ToolParameter(name="index", type="integer", description="画像序号", required=True),
-            ToolParameter(name="life_stage", type="string", description="人生阶段", required=False, default=None),
-            ToolParameter(name="anxieties", type="array", description="焦虑标签", required=False, default=None),
-            ToolParameter(name="seed", type="integer", description="随机种子", required=False, default=None),
+            ToolParameter(
+                name="life_stage",
+                type="string",
+                description="人生阶段",
+                required=False,
+                default=None,
+            ),
+            ToolParameter(
+                name="anxieties", type="array", description="焦虑标签", required=False, default=None
+            ),
+            ToolParameter(
+                name="seed", type="integer", description="随机种子", required=False, default=None
+            ),
         ],
         timeout_seconds=60.0,
         max_retries=1,
@@ -155,8 +165,16 @@ register_tool(
         parameters=[
             ToolParameter(name="study_id", type="string", description="研究标识", required=True),
             ToolParameter(name="count", type="integer", description="生成数量", required=True),
-            ToolParameter(name="life_stages", type="array", description="人生阶段列表", required=False, default=None),
-            ToolParameter(name="seed", type="integer", description="随机种子", required=False, default=None),
+            ToolParameter(
+                name="life_stages",
+                type="array",
+                description="人生阶段列表",
+                required=False,
+                default=None,
+            ),
+            ToolParameter(
+                name="seed", type="integer", description="随机种子", required=False, default=None
+            ),
         ],
         timeout_seconds=300.0,
         max_retries=0,
@@ -234,14 +252,50 @@ register_tool(
         description="创建CBC研究定义（含默认洗碗机6属性）",
         parameters=[
             ToolParameter(name="study_id", type="string", description="研究标识", required=True),
-            ToolParameter(name="product_category", type="string", description="产品类别", required=True),
-            ToolParameter(name="research_goal", type="string", description="研究目标", required=True),
-            ToolParameter(name="target_segments", type="array", description="目标群体", required=False, default=None),
-            ToolParameter(name="n_choice_sets", type="integer", description="选择集数量", required=False, default=12),
-            ToolParameter(name="n_alternatives", type="integer", description="每集选项数", required=False, default=3),
-            ToolParameter(name="algorithm", type="string", description="设计算法", required=False, default="d_optimal"),
-            ToolParameter(name="include_none", type="boolean", description="含none选项", required=False, default=True),
-            ToolParameter(name="seed", type="integer", description="随机种子", required=False, default=None),
+            ToolParameter(
+                name="product_category", type="string", description="产品类别", required=True
+            ),
+            ToolParameter(
+                name="research_goal", type="string", description="研究目标", required=True
+            ),
+            ToolParameter(
+                name="target_segments",
+                type="array",
+                description="目标群体",
+                required=False,
+                default=None,
+            ),
+            ToolParameter(
+                name="n_choice_sets",
+                type="integer",
+                description="选择集数量",
+                required=False,
+                default=12,
+            ),
+            ToolParameter(
+                name="n_alternatives",
+                type="integer",
+                description="每集选项数",
+                required=False,
+                default=3,
+            ),
+            ToolParameter(
+                name="algorithm",
+                type="string",
+                description="设计算法",
+                required=False,
+                default="d_optimal",
+            ),
+            ToolParameter(
+                name="include_none",
+                type="boolean",
+                description="含none选项",
+                required=False,
+                default=True,
+            ),
+            ToolParameter(
+                name="seed", type="integer", description="随机种子", required=False, default=None
+            ),
         ],
         timeout_seconds=10.0,
         max_retries=0,
@@ -290,8 +344,12 @@ register_tool(
         name="generate_questionnaire",
         description="生成CBC问卷（选择集）",
         parameters=[
-            ToolParameter(name="study", type="object", description="CBCStudy序列化字典", required=True),
-            ToolParameter(name="seed", type="integer", description="随机种子", required=False, default=None),
+            ToolParameter(
+                name="study", type="object", description="CBCStudy序列化字典", required=True
+            ),
+            ToolParameter(
+                name="seed", type="integer", description="随机种子", required=False, default=None
+            ),
         ],
         timeout_seconds=120.0,
         max_retries=1,
@@ -347,7 +405,6 @@ def simulate_cbc_choices(
         # Fallback: extract from choice set alternatives
         first_cs = q_obj.choice_sets[0] if q_obj.choice_sets else None
         if first_cs:
-            attr_ids = list(first_cs.alternatives[0].attributes.keys())
             # This is a simplified fallback; full reconstruction requires study
             raise ValueError(
                 "Questionnaire dict missing 'attributes' field; "
@@ -381,11 +438,32 @@ register_tool(
         name="simulate_cbc_choices",
         description="模拟单个画像的CBC选择行为",
         parameters=[
-            ToolParameter(name="persona", type="object", description="PersonaProfile字典", required=True),
-            ToolParameter(name="questionnaire", type="object", description="CBCQuestionnaire字典", required=True),
-            ToolParameter(name="deterministic", type="boolean", description="确定性选择", required=False, default=False),
-            ToolParameter(name="include_none", type="boolean", description="含none选项", required=False, default=False),
-            ToolParameter(name="seed", type="integer", description="随机种子", required=False, default=None),
+            ToolParameter(
+                name="persona", type="object", description="PersonaProfile字典", required=True
+            ),
+            ToolParameter(
+                name="questionnaire",
+                type="object",
+                description="CBCQuestionnaire字典",
+                required=True,
+            ),
+            ToolParameter(
+                name="deterministic",
+                type="boolean",
+                description="确定性选择",
+                required=False,
+                default=False,
+            ),
+            ToolParameter(
+                name="include_none",
+                type="boolean",
+                description="含none选项",
+                required=False,
+                default=False,
+            ),
+            ToolParameter(
+                name="seed", type="integer", description="随机种子", required=False, default=None
+            ),
         ],
         timeout_seconds=10.0,
         max_retries=0,
@@ -476,12 +554,36 @@ register_tool(
         name="run_conjoint_analysis",
         description="运行联合分析（自动选择HB/MNL模型）",
         parameters=[
-            ToolParameter(name="dataset", type="object", description="CBCRawDataset字典", required=True),
-            ToolParameter(name="attributes", type="array", description="属性定义列表", required=True),
-            ToolParameter(name="model_type", type="string", description="模型类型", required=False, default="auto"),
-            ToolParameter(name="n_draws", type="integer", description="MCMC采样数", required=False, default=1000),
-            ToolParameter(name="n_tune", type="integer", description="调优迭代数", required=False, default=1000),
-            ToolParameter(name="n_chains", type="integer", description="链数", required=False, default=4),
+            ToolParameter(
+                name="dataset", type="object", description="CBCRawDataset字典", required=True
+            ),
+            ToolParameter(
+                name="attributes", type="array", description="属性定义列表", required=True
+            ),
+            ToolParameter(
+                name="model_type",
+                type="string",
+                description="模型类型",
+                required=False,
+                default="auto",
+            ),
+            ToolParameter(
+                name="n_draws",
+                type="integer",
+                description="MCMC采样数",
+                required=False,
+                default=1000,
+            ),
+            ToolParameter(
+                name="n_tune",
+                type="integer",
+                description="调优迭代数",
+                required=False,
+                default=1000,
+            ),
+            ToolParameter(
+                name="n_chains", type="integer", description="链数", required=False, default=4
+            ),
         ],
         timeout_seconds=600.0,
         max_retries=1,
@@ -595,10 +697,30 @@ register_tool(
         parameters=[
             ToolParameter(name="study", type="object", description="CBCStudy字典", required=True),
             ToolParameter(name="personas", type="array", description="画像列表", required=True),
-            ToolParameter(name="questionnaire", type="object", description="预生成问卷", required=False, default=None),
-            ToolParameter(name="deterministic", type="boolean", description="确定性选择", required=False, default=False),
-            ToolParameter(name="seed", type="integer", description="随机种子", required=False, default=None),
-            ToolParameter(name="analysis_config", type="object", description="分析配置", required=False, default=None),
+            ToolParameter(
+                name="questionnaire",
+                type="object",
+                description="预生成问卷",
+                required=False,
+                default=None,
+            ),
+            ToolParameter(
+                name="deterministic",
+                type="boolean",
+                description="确定性选择",
+                required=False,
+                default=False,
+            ),
+            ToolParameter(
+                name="seed", type="integer", description="随机种子", required=False, default=None
+            ),
+            ToolParameter(
+                name="analysis_config",
+                type="object",
+                description="分析配置",
+                required=False,
+                default=None,
+            ),
         ],
         timeout_seconds=900.0,
         max_retries=0,

@@ -10,10 +10,9 @@ accumulation survives process restarts.
 from __future__ import annotations
 
 import json
-import os
 import threading
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -33,11 +32,11 @@ _STATE_FILE = Path("./data/cost_state.json")
 class FuseStatus(StrEnum):
     """Current fuse status derived from cost consumption."""
 
-    NORMAL = "NORMAL"       # < 80%  of any budget
-    WARNING = "WARNING"     # >= 80% of any budget
-    DEGRADE = "DEGRADE"     # >= 95% of any budget
-    FUSE = "FUSE"           # >= 100% of any budget
-    EMERGENCY = "EMERGENCY" # >= 120% of any budget
+    NORMAL = "NORMAL"  # < 80%  of any budget
+    WARNING = "WARNING"  # >= 80% of any budget
+    DEGRADE = "DEGRADE"  # >= 95% of any budget
+    FUSE = "FUSE"  # >= 100% of any budget
+    EMERGENCY = "EMERGENCY"  # >= 120% of any budget
 
 
 @dataclass
@@ -258,7 +257,7 @@ class CostTracker:
         if not _STATE_FILE.exists():
             return
         try:
-            with open(_STATE_FILE, "r", encoding="utf-8") as f:
+            with open(_STATE_FILE, encoding="utf-8") as f:
                 state = json.load(f)
 
             for k, v in state.get("per_study", {}).items():
@@ -286,7 +285,9 @@ class CostTracker:
                     total_tokens=v.get("total_tokens", 0),
                 )
             self._global_total_cny = state.get("global_total_cny", 0.0)
-            self._last_reset_date = state.get("last_reset_date", datetime.now(UTC).strftime("%Y-%m-%d"))
+            self._last_reset_date = state.get(
+                "last_reset_date", datetime.now(UTC).strftime("%Y-%m-%d")
+            )
             logger.info("cost_state_loaded", file=str(_STATE_FILE))
         except Exception as exc:
             logger.warning("cost_state_load_failed", error=str(exc))
@@ -385,7 +386,9 @@ class CostTracker:
         month_key = now.strftime("%Y-%m")
 
         with self._lock:
-            study_cost = self._per_study.get(study_id or "", CostSummary()).total_cny if study_id else 0.0
+            study_cost = (
+                self._per_study.get(study_id or "", CostSummary()).total_cny if study_id else 0.0
+            )
             daily_cost = self._daily.get(day_key, CostSummary()).total_cny
             weekly_cost = self._weekly.get(week_key, CostSummary()).total_cny
             monthly_cost = self._monthly.get(month_key, CostSummary()).total_cny
@@ -431,7 +434,9 @@ class CostTracker:
         }
         return status, details
 
-    def should_allow_call(self, study_id: str | None = None) -> tuple[bool, FuseStatus, dict[str, Any]]:
+    def should_allow_call(
+        self, study_id: str | None = None
+    ) -> tuple[bool, FuseStatus, dict[str, Any]]:
         """Convenience wrapper: return (allowed, status, details).
 
         Calls are **blocked** only at FUSE or EMERGENCY level.

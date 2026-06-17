@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 from aicbc.questionnaire.models import Attribute, AttributeType
 
 
@@ -99,7 +101,7 @@ def _orthogonal_poly(x: np.ndarray, degree: int) -> np.ndarray:
     if degree == 1:
         return x.astype(np.float64)
     # Gram-Schmidt: start with x^degree, orthogonalise against lower degrees
-    raw = x ** degree
+    raw = x**degree
     for d in range(1, degree):
         prev = _orthogonal_poly(x, d)
         raw = raw - np.dot(raw, prev) / np.dot(prev, prev) * prev
@@ -123,9 +125,7 @@ def effects_encode_price(value: float, attribute: Attribute) -> np.ndarray:
     return np.array([(float(value) - mean) / std], dtype=np.float64)
 
 
-def encode_profile(
-    profile: dict[str, Any], attributes: list[Attribute]
-) -> np.ndarray:
+def encode_profile(profile: dict[str, Any], attributes: list[Attribute]) -> np.ndarray:
     """Encode a single product profile into a design-matrix row.
 
     Concatenates effects-coded categorical/ordinal attributes and
@@ -160,9 +160,7 @@ def encode_profile(
     return np.concatenate(parts) if parts else np.array([], dtype=np.float64)
 
 
-def encode_design_matrix(
-    profiles: list[dict[str, Any]], attributes: list[Attribute]
-) -> np.ndarray:
+def encode_design_matrix(profiles: list[dict[str, Any]], attributes: list[Attribute]) -> np.ndarray:
     """Encode a list of profiles into a design matrix X.
 
     Args:

@@ -32,10 +32,7 @@ def load_tag_schema(schema_name: str, tags_dir: Path | None = None) -> dict[str,
         FileNotFoundError: If the JSON file does not exist.
     """
     if schema_name not in TAG_SCHEMA_NAMES:
-        raise ValueError(
-            f"Unknown schema '{schema_name}'. "
-            f"Must be one of: {TAG_SCHEMA_NAMES}"
-        )
+        raise ValueError(f"Unknown schema '{schema_name}'. Must be one of: {TAG_SCHEMA_NAMES}")
 
     directory = tags_dir or DEFAULT_TAGS_DIR
     file_path = directory / f"{schema_name}.json"
@@ -55,10 +52,7 @@ def load_all_tag_schemas(tags_dir: Path | None = None) -> dict[str, dict[str, An
     Returns:
         Dictionary mapping schema_name -> parsed schema dict.
     """
-    return {
-        name: load_tag_schema(name, tags_dir=tags_dir)
-        for name in TAG_SCHEMA_NAMES
-    }
+    return {name: load_tag_schema(name, tags_dir=tags_dir) for name in TAG_SCHEMA_NAMES}
 
 
 def get_dimension_options(
@@ -83,9 +77,7 @@ def get_dimension_options(
     for dim in schema.get("dimensions", []):
         if dim.get("id") == dimension_id:
             return dim.get("options", [])
-    raise ValueError(
-        f"Dimension '{dimension_id}' not found in schema '{schema_name}'"
-    )
+    raise ValueError(f"Dimension '{dimension_id}' not found in schema '{schema_name}'")
 
 
 def list_dimensions(

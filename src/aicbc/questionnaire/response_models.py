@@ -31,9 +31,7 @@ class ChoiceRecord(BaseModel):
     choice_set_id: int = Field(..., ge=1, description="Choice set ID (1-based)")
     choice_set_index: int = Field(..., ge=0, description="0-based choice set index")
     alternatives: list[AlternativeRecord] = Field(..., description="Alternative records")
-    none_chosen: bool = Field(
-        default=False, description="Whether 'none of these' was selected"
-    )
+    none_chosen: bool = Field(default=False, description="Whether 'none of these' was selected")
 
 
 class DatasetMetadata(BaseModel):
@@ -77,12 +75,8 @@ class SingleChoiceDetail(BaseModel):
     chosen_alt_index: int | None = Field(
         default=None, description="Selected alternative index, or None if 'none'"
     )
-    reasoning: str = Field(
-        default="", description="Brief reasoning for the choice"
-    )
-    confidence: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Confidence in the choice"
-    )
+    reasoning: str = Field(default="", description="Brief reasoning for the choice")
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Confidence in the choice")
 
 
 class PersonaResponse(BaseModel):

@@ -15,7 +15,7 @@ from functools import lru_cache, wraps
 from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
-    from prometheus_client import Counter, Gauge, Histogram, Info
+    from prometheus_client import Counter, Histogram
 
 # ---------------------------------------------------------------------------
 # Lazy Metrics Initialization
@@ -80,7 +80,7 @@ def _get_metrics() -> dict[str, Any]:
         "llm_tokens_total": Counter(
             "aicbc_llm_tokens_total",
             "Total LLM token usage",
-            ["model", "type"],  # type: prompt | completion
+            ["model", "type"],  # label kind: prompt | completion
         ),
         "llm_latency_seconds": Histogram(
             "aicbc_llm_latency_seconds",

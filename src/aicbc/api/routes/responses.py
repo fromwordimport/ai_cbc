@@ -68,9 +68,7 @@ async def simulate_responses(
         ) from exc
 
     try:
-        safe_persona_ids = sanitize_string_list(
-            request.persona_ids, field_name="persona_ids"
-        )
+        safe_persona_ids = sanitize_string_list(request.persona_ids, field_name="persona_ids")
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -149,12 +147,14 @@ async def simulate_responses(
         all_records.extend(raw_slice.choice_records)
         await response_store.asave_response(persona_response)
 
-        summaries.append(SimulatedResponseSummary(
-            persona_id=persona_id,
-            response_id=persona_response.response_id,
-            completion_status=persona_response.completion_status,
-            n_choice_sets_answered=len(persona_response.responses),
-        ))
+        summaries.append(
+            SimulatedResponseSummary(
+                persona_id=persona_id,
+                response_id=persona_response.response_id,
+                completion_status=persona_response.completion_status,
+                n_choice_sets_answered=len(persona_response.responses),
+            )
+        )
 
     # Merge into a single dataset
     if all_records:
@@ -230,7 +230,5 @@ async def export_dataset(
         n_choice_sets=dataset.metadata.n_choice_sets,
         n_alternatives=dataset.metadata.n_alternatives,
         n_total_records=len(dataset.choice_records),
-        choice_records=[
-            record.model_dump(mode="json") for record in dataset.choice_records
-        ],
+        choice_records=[record.model_dump(mode="json") for record in dataset.choice_records],
     )

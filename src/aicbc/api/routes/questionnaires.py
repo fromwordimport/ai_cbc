@@ -68,13 +68,15 @@ def parse_custom_attributes(raw: list[dict] | None) -> list[Attribute] | None:
             )
             for lv in levels_raw
         ]
-        attrs.append(Attribute(
-            id=item["id"],
-            name=item.get("name", item["id"]),
-            type=item.get("type") or "categorical",
-            levels=levels,
-            description=item.get("description"),
-        ))
+        attrs.append(
+            Attribute(
+                id=item["id"],
+                name=item.get("name", item["id"]),
+                type=item.get("type") or "categorical",
+                levels=levels,
+                description=item.get("description"),
+            )
+        )
     return attrs
 
 
@@ -349,7 +351,9 @@ async def generate_questionnaire(
         )
 
     log = logger.bind(study_id=study_id)
-    log.info("questionnaire_generation_requested", algorithm=study.design_parameters.algorithm.value)
+    log.info(
+        "questionnaire_generation_requested", algorithm=study.design_parameters.algorithm.value
+    )
 
     generator = QuestionnaireGenerator()
     questionnaire = generator.generate_questionnaire(study, seed=seed)
@@ -499,9 +503,7 @@ async def update_study_design(
     # Additional validation: level values non-empty
     for attr in attributes:
         for lv in attr.levels:
-            if lv.value is None or (
-                isinstance(lv.value, str) and lv.value.strip() == ""
-            ):
+            if lv.value is None or (isinstance(lv.value, str) and lv.value.strip() == ""):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"level value cannot be empty for attribute '{attr.id}'",

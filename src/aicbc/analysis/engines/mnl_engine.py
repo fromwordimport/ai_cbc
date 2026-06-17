@@ -89,30 +89,36 @@ class MNLEngine:
         # Handle both Series and ndarray
         param_vals = params.values if hasattr(params, "values") else params
         bse_vals = bse.values if hasattr(bse, "values") else bse
-        tvals = self.results.tvalues.values if hasattr(self.results.tvalues, "values") else self.results.tvalues
-        pvals = self.results.pvalues.values if hasattr(self.results.pvalues, "values") else self.results.pvalues
+        tvals = (
+            self.results.tvalues.values
+            if hasattr(self.results.tvalues, "values")
+            else self.results.tvalues
+        )
+        pvals = (
+            self.results.pvalues.values
+            if hasattr(self.results.pvalues, "values")
+            else self.results.pvalues
+        )
 
-        population_mu = {
-            col: float(param_vals[i]) for i, col in enumerate(feature_cols)
-        }
-        population_sigma = {
-            col: float(bse_vals[i]) for i, col in enumerate(feature_cols)
-        }
+        population_mu = {col: float(param_vals[i]) for i, col in enumerate(feature_cols)}
+        population_sigma = {col: float(bse_vals[i]) for i, col in enumerate(feature_cols)}
 
         # Build coefficient table
         conf_int = self.results.conf_int()
         ci_lower = conf_int[:, 0] if hasattr(conf_int, "shape") else conf_int.iloc[:, 0].values
         ci_upper = conf_int[:, 1] if hasattr(conf_int, "shape") else conf_int.iloc[:, 1].values
-        coef_table = pd.DataFrame({
-            "parameter": feature_cols,
-            "coef": param_vals,
-            "std_err": bse_vals,
-            "z": tvals,
-            "p_value": pvals,
-            "ci_lower": ci_lower,
-            "ci_upper": ci_upper,
-            "significant": pvals < 0.05,
-        })
+        coef_table = pd.DataFrame(
+            {
+                "parameter": feature_cols,
+                "coef": param_vals,
+                "std_err": bse_vals,
+                "z": tvals,
+                "p_value": pvals,
+                "ci_lower": ci_lower,
+                "ci_upper": ci_upper,
+                "significant": pvals < 0.05,
+            }
+        )
 
         # MNL has no individual heterogeneity: all respondents get population mu
         resp_ids = data[resp_id_col].unique()

@@ -51,9 +51,13 @@ def _dishwasher_default_attributes() -> list[Attribute]:
             type=AttributeType.CATEGORICAL,
             levels=[
                 AttributeLevel(value="capacity_1", label="8套", description="2-3人家庭，紧凑型"),
-                AttributeLevel(value="capacity_2", label="14套", description="主流4-6人家庭，可洗锅"),
+                AttributeLevel(
+                    value="capacity_2", label="14套", description="主流4-6人家庭，可洗锅"
+                ),
                 AttributeLevel(value="capacity_3", label="18套", description="多代同堂或餐具很多"),
-                AttributeLevel(value="capacity_4", label="24套", description="接近商用级，经常聚餐"),
+                AttributeLevel(
+                    value="capacity_4", label="24套", description="接近商用级，经常聚餐"
+                ),
             ],
         ),
         Attribute(
@@ -71,9 +75,15 @@ def _dishwasher_default_attributes() -> list[Attribute]:
             name="喷淋臂类型",
             type=AttributeType.CATEGORICAL,
             levels=[
-                AttributeLevel(value="spray_arm_1", label="上下双层", description="基础配置，仅中层+底层"),
-                AttributeLevel(value="spray_arm_2", label="三层", description="增加顶部喷淋，覆盖面更全"),
-                AttributeLevel(value="spray_arm_3", label="多向旋喷", description="360°旋转喷淋，死角无残留"),
+                AttributeLevel(
+                    value="spray_arm_1", label="上下双层", description="基础配置，仅中层+底层"
+                ),
+                AttributeLevel(
+                    value="spray_arm_2", label="三层", description="增加顶部喷淋，覆盖面更全"
+                ),
+                AttributeLevel(
+                    value="spray_arm_3", label="多向旋喷", description="360°旋转喷淋，死角无残留"
+                ),
             ],
         ),
         Attribute(
@@ -81,10 +91,20 @@ def _dishwasher_default_attributes() -> list[Attribute]:
             name="安装方式",
             type=AttributeType.CATEGORICAL,
             levels=[
-                AttributeLevel(value="installation_1", label="嵌入式", description="需定制橱柜，美观统一"),
-                AttributeLevel(value="installation_2", label="独立式", description="摆放灵活，免改装"),
-                AttributeLevel(value="installation_3", label="台式", description="小体积，免安装，适合出租或小厨房"),
-                AttributeLevel(value="installation_4", label="水槽式", description="不占橱柜空间，替换原水槽"),
+                AttributeLevel(
+                    value="installation_1", label="嵌入式", description="需定制橱柜，美观统一"
+                ),
+                AttributeLevel(
+                    value="installation_2", label="独立式", description="摆放灵活，免改装"
+                ),
+                AttributeLevel(
+                    value="installation_3",
+                    label="台式",
+                    description="小体积，免安装，适合出租或小厨房",
+                ),
+                AttributeLevel(
+                    value="installation_4", label="水槽式", description="不占橱柜空间，替换原水槽"
+                ),
             ],
         ),
         Attribute(
@@ -94,7 +114,9 @@ def _dishwasher_default_attributes() -> list[Attribute]:
             levels=[
                 AttributeLevel(value="drying_1", label="余热", description="依靠高温余温蒸发水分"),
                 AttributeLevel(value="drying_2", label="热交换", description="通过冷水壁冷凝"),
-                AttributeLevel(value="drying_3", label="热风", description="主动热风循环，餐具干爽"),
+                AttributeLevel(
+                    value="drying_3", label="热风", description="主动热风循环，餐具干爽"
+                ),
                 AttributeLevel(value="drying_4", label="晶蕾", description="吸湿放热，省电且全干"),
             ],
         ),
@@ -152,7 +174,10 @@ class QuestionnaireGenerator:
         # Must use `is not None` — seed=0 is a valid value but falsy.
         effective_seed = seed if seed is not None else study.design_parameters.seed
 
-        if study.design_parameters.algorithm in (DesignAlgorithm.BALANCED, DesignAlgorithm.ORTHOGONAL):
+        if study.design_parameters.algorithm in (
+            DesignAlgorithm.BALANCED,
+            DesignAlgorithm.ORTHOGONAL,
+        ):
             questionnaire = generate_balanced_questionnaire(
                 study_id=study.study_id,
                 attributes=study.attributes,

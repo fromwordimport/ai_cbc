@@ -15,25 +15,18 @@ Data flow:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import structlog
 
-from aicbc.agents.tool_protocol import ToolRegistry, ToolResult, ToolSpec, tool
+from aicbc.agents.tool_protocol import ToolRegistry, ToolSpec
 from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine, HBResult
-from aicbc.analysis.engines.mnl_engine import MNLEngine, MNLResult
+from aicbc.analysis.engines.mnl_engine import MNLEngine
 from aicbc.analysis.models import (
     AnalysisResultResponse,
     ConvergenceDiagnostics,
-    ImportanceResponse,
-    ImportanceStats,
-    PriceCoefficientSummary,
-    WTPAttribute,
-    WTPComparison,
-    WTPResponse,
 )
 from aicbc.analysis.preprocessing import get_feature_columns, to_long_format, validate_dataset
 from aicbc.analysis.results.importance import aggregate_importance, compute_importance
@@ -305,12 +298,14 @@ def simulate_market_shares(
 
     shares = []
     for _, row in shares_df.iterrows():
-        shares.append({
-            "name": row["name"],
-            "predicted_share": float(row["predicted_share"]),
-            "share_ci_95_lower": float(row.get("share_ci_95_lower", row["predicted_share"])),
-            "share_ci_95_upper": float(row.get("share_ci_95_upper", row["predicted_share"])),
-        })
+        shares.append(
+            {
+                "name": row["name"],
+                "predicted_share": float(row["predicted_share"]),
+                "share_ci_95_lower": float(row.get("share_ci_95_lower", row["predicted_share"])),
+                "share_ci_95_upper": float(row.get("share_ci_95_upper", row["predicted_share"])),
+            }
+        )
 
     return {
         "shares": shares,
@@ -553,6 +548,7 @@ def register_analysis_tools(registry: ToolRegistry | None = None) -> ToolRegistr
 def _from_param(name: str, description: str, required: bool = True) -> Any:
     """Helper to create a ToolParameter (used in ToolSpec construction above)."""
     from aicbc.agents.tool_protocol import ToolParameter
+
     return ToolParameter(name=name, param_type="any", description=description, required=required)
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pandas as pd
+
 from aicbc.questionnaire.design.effects_coding import encode_profile
 from aicbc.questionnaire.models import Attribute, AttributeType
 from aicbc.questionnaire.response_models import CBCRawDataset
@@ -125,9 +127,7 @@ def validate_dataset(
         choice_counts = df.groupby(["resp_id", "task_id"])["chosen"].sum()
         bad_tasks = choice_counts[choice_counts != 1]
         if len(bad_tasks) > 0:
-            report["errors"].append(
-                f"{len(bad_tasks)} tasks do not have exactly one choice"
-            )
+            report["errors"].append(f"{len(bad_tasks)} tasks do not have exactly one choice")
             report["valid"] = False
 
     # ── Rule 3: sample size (WARNING) ────────────────────────────────────
@@ -146,15 +146,12 @@ def validate_dataset(
     # effects-coded values or being explicitly tagged.
     if df.shape[0] > 0:
         n_none_tasks = 0
-        for (resp_id, task_id), group in df.groupby(["resp_id", "task_id"]):
+        for (_, _), group in df.groupby(["resp_id", "task_id"]):
             # A "none" choice: alternative has all-zero feature values
             feature_cols = get_feature_columns(attributes)
             for _, row in group.iterrows():
                 if row["chosen"] == 1:
-                    all_zero = all(
-                        abs(float(row.get(col, 0.0))) < 1e-9
-                        for col in feature_cols
-                    )
+                    all_zero = all(abs(float(row.get(col, 0.0))) < 1e-9 for col in feature_cols)
                     if all_zero:
                         n_none_tasks += 1
                     break

@@ -22,7 +22,7 @@ The pipeline:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -30,12 +30,10 @@ import pandas as pd
 import structlog
 
 from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine, HBResult
-from aicbc.analysis.engines.mnl_engine import MNLEngine, MNLResult
+from aicbc.analysis.engines.mnl_engine import MNLEngine
 from aicbc.analysis.models import (
     AnalysisResultResponse,
     ConvergenceDiagnostics,
-    ImportanceResponse,
-    ImportanceStats,
     PriceCoefficientSummary,
     WTPAttribute,
     WTPComparison,
@@ -43,8 +41,8 @@ from aicbc.analysis.models import (
 )
 from aicbc.analysis.preprocessing import get_feature_columns, to_long_format, validate_dataset
 from aicbc.analysis.results.importance import aggregate_importance, compute_importance
-from aicbc.core.security.input_sanitizer import sanitize_text
 from aicbc.analysis.results.wtp import WTPCalculator
+from aicbc.core.security.input_sanitizer import sanitize_text
 from aicbc.questionnaire.models import Attribute, AttributeType
 from aicbc.questionnaire.response_models import CBCRawDataset
 
@@ -79,21 +77,15 @@ class AnalysisAgentConfig:
     def __post_init__(self) -> None:
         """Validate configuration values are within safe ranges."""
         if self.rhat_threshold < 1.0 or self.rhat_threshold > 1.5:
-            raise ValueError(
-                f"rhat_threshold must be in [1.0, 1.5], got {self.rhat_threshold}"
-            )
+            raise ValueError(f"rhat_threshold must be in [1.0, 1.5], got {self.rhat_threshold}")
         if self.ess_min_threshold < 100:
-            raise ValueError(
-                f"ess_min_threshold must be >= 100, got {self.ess_min_threshold}"
-            )
+            raise ValueError(f"ess_min_threshold must be >= 100, got {self.ess_min_threshold}")
         if self.hb_draws < 100:
             raise ValueError(f"hb_draws must be >= 100, got {self.hb_draws}")
         if self.hb_tune < 100:
             raise ValueError(f"hb_tune must be >= 100, got {self.hb_tune}")
         if self.hb_chains < 2 or self.hb_chains > 8:
-            raise ValueError(
-                f"hb_chains must be in [2, 8], got {self.hb_chains}"
-            )
+            raise ValueError(f"hb_chains must be in [2, 8], got {self.hb_chains}")
 
 
 @dataclass
@@ -192,9 +184,7 @@ class AnalysisAgent:
 
         # 7. Compute importance
         self._log.info("step_compute_importance")
-        util_df = pd.DataFrame.from_dict(
-            hb_result.individual_utilities, orient="index"
-        )
+        util_df = pd.DataFrame.from_dict(hb_result.individual_utilities, orient="index")
         importance_df = compute_importance(util_df, attributes)
         importance_agg = aggregate_importance(importance_df)
 
@@ -312,8 +302,7 @@ class AnalysisAgent:
         mu_price = hb_result.population_mu[price_col]
         if mu_price > 0:
             warnings.append(
-                f"价格系数为正 ({mu_price:.4f})，违背经济学直觉。"
-                f"建议检查数据编码或增加样本量。"
+                f"价格系数为正 ({mu_price:.4f})，违背经济学直觉。建议检查数据编码或增加样本量。"
             )
 
         return warnings
@@ -384,8 +373,7 @@ class AnalysisAgent:
         """Build the structured AnalysisResultResponse."""
         # Importance dict
         importance_dict = {
-            attr_id: float(row["mean"])
-            for attr_id, row in importance_agg.iterrows()
+            attr_id: float(row["mean"]) for attr_id, row in importance_agg.iterrows()
         }
 
         # Convergence diagnostics
@@ -448,42 +436,39 @@ class AnalysisAgent:
             reverse=True,
         )
         top_attr = sorted_importance[0]
-        findings.append(
-            f"最重要的属性是'{top_attr[0]}'（重要性={top_attr[1]:.1%}）"
-        )
+        findings.append(f"最重要的属性是'{top_attr[0]}'（重要性={top_attr[1]:.1%}）")
 
         if len(sorted_importance) > 1:
             second_attr = sorted_importance[1]
-            findings.append(
-                f"其次为'{second_attr[0]}'（重要性={second_attr[1]:.1%}）"
-            )
+            findings.append(f"其次为'{second_attr[0]}'（重要性={second_attr[1]:.1%}）")
 
         # Price coefficient
-        mu = result.population_params.mu if hasattr(result.population_params, "mu") else result.population_params.get("mu", {})
+        mu = (
+            result.population_params.mu
+            if hasattr(result.population_params, "mu")
+            else result.population_params.get("mu", {})
+        )
         price_attrs = [a for a in attributes if a.type == AttributeType.PRICE]
         if price_attrs and price_attrs[0].id in mu:
             price_coef = mu[price_attrs[0].id]
             if price_coef < 0:
-                findings.append(
-                    f"价格系数为负 ({price_coef:.4f})，符合经济学直觉"
-                )
+                findings.append(f"价格系数为负 ({price_coef:.4f})，符合经济学直觉")
             else:
-                findings.append(
-                    f"价格系数为正 ({price_coef:.4f})，需进一步检查"
-                )
+                findings.append(f"价格系数为正 ({price_coef:.4f})，需进一步检查")
                 recommendations.append("检查价格属性编码和数据质量")
 
         # WTP summary
         if result.wtp:
-            wtp_values = result.wtp.wtp_values if hasattr(result.wtp, "wtp_values") else result.wtp.get("wtp_values", {})
+            wtp_values = (
+                result.wtp.wtp_values
+                if hasattr(result.wtp, "wtp_values")
+                else result.wtp.get("wtp_values", {})
+            )
             if wtp_values:
                 first_attr = list(wtp_values.keys())[0]
                 comps = wtp_values[first_attr].get("comparisons", [])
                 if comps:
-                    findings.append(
-                        f"{first_attr}的WTP分析已完成，"
-                        f"包含{len(comps)}个水平对比"
-                    )
+                    findings.append(f"{first_attr}的WTP分析已完成，包含{len(comps)}个水平对比")
 
         # Summary
         summary = (

@@ -64,16 +64,35 @@ class AuthenticityScorer:
 
     # Marketing / academic jargon that real consumers rarely use
     MARKETING_TERMS: set[str] = {
-        "性价比", "用户体验", "痛点", "场景化", "垂直领域",
-        "私域流量", "公域流量", "转化漏斗", "用户画像",
-        "底层逻辑", "顶层设计", "组合拳", "闭环", "抓手",
-        "赋能", "对齐", "颗粒度", "调性", "打法",
+        "性价比",
+        "用户体验",
+        "痛点",
+        "场景化",
+        "垂直领域",
+        "私域流量",
+        "公域流量",
+        "转化漏斗",
+        "用户画像",
+        "底层逻辑",
+        "顶层设计",
+        "组合拳",
+        "闭环",
+        "抓手",
+        "赋能",
+        "对齐",
+        "颗粒度",
+        "调性",
+        "打法",
     }
 
     # Overly rational / perfect behaviours
     PERFECT_RATIONALITY_PATTERNS: list[str] = [
-        r"计算.*NPV", r"Excel.*比价", r"全平台.*统计",
-        r"精确到小数点后", r"制作.*对比表", r"量化.*分析",
+        r"计算.*NPV",
+        r"Excel.*比价",
+        r"全平台.*统计",
+        r"精确到小数点后",
+        r"制作.*对比表",
+        r"量化.*分析",
     ]
 
     def score(self, persona: PersonaProfile) -> AuthenticityResult:
@@ -160,11 +179,15 @@ class AuthenticityScorer:
         routine = l4.daily_routine.strip() if l4.daily_routine else ""
 
         if not stress or not routine:
-            return DimensionScore(name="情境敏感性", score=0, rationale="缺少日常轨迹或压力反应描述")
+            return DimensionScore(
+                name="情境敏感性", score=0, rationale="缺少日常轨迹或压力反应描述"
+            )
 
         # Check if stress response is meaningfully different from routine
         if stress == routine:
-            return DimensionScore(name="情境敏感性", score=0, rationale="压力反应与日常轨迹完全相同")
+            return DimensionScore(
+                name="情境敏感性", score=0, rationale="压力反应与日常轨迹完全相同"
+            )
 
         # Language samples should show some emotional range
         if len(samples) >= 2:
@@ -265,8 +288,17 @@ class AuthenticityScorer:
         l3 = persona.layer3_psychology
 
         friction_markers = [
-            "但是", "不过", "其实", "说实话", "纠结", "犹豫",
-            "面子", "不好意思", "怕别人", "虽然", "可是",
+            "但是",
+            "不过",
+            "其实",
+            "说实话",
+            "纠结",
+            "犹豫",
+            "面子",
+            "不好意思",
+            "怕别人",
+            "虽然",
+            "可是",
         ]
         friction_count = sum(1 for m in friction_markers if m in samples_text)
 
@@ -420,8 +452,16 @@ class AuthenticityScorer:
 
         # Positive: uncertainty / ignorance markers
         uncertainty_markers = [
-            "不知道", "不清楚", "没研究", "没注意", "不太懂",
-            "大概", "可能", "也许", "听说", "好像",
+            "不知道",
+            "不清楚",
+            "没研究",
+            "没注意",
+            "不太懂",
+            "大概",
+            "可能",
+            "也许",
+            "听说",
+            "好像",
         ]
         uncertainty_count = sum(1 for m in uncertainty_markers if m in samples_text)
 

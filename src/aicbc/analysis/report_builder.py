@@ -7,7 +7,6 @@ is installed; otherwise callers should handle the missing dependency gracefully.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 
 from aicbc.analysis.models import (
     AnalysisResultResponse,
@@ -79,8 +78,7 @@ class ReportBuilder:
             lines.append("## 支付意愿 (WTP)")
             pc = self.wtp.price_coefficient_summary
             lines.append(
-                f"- **价格系数均值**: {pc.mean:.4f} "
-                f"({'✅ 为负' if pc.mean < 0 else '⚠️ 非负'})"
+                f"- **价格系数均值**: {pc.mean:.4f} ({'✅ 为负' if pc.mean < 0 else '⚠️ 非负'})"
             )
             lines.append(f"- **负系数比例**: {pc.negative_rate * 100:.1f}%")
             lines.append(f"- **正异常值数**: {pc.n_positive_outliers}")
@@ -102,9 +100,7 @@ class ReportBuilder:
             lines.append("|------|----------|--------|")
             for share in self.market_sim.scenarios:
                 ci = f"[{share.share_ci_95_lower * 100:.1f}%, {share.share_ci_95_upper * 100:.1f}%]"
-                lines.append(
-                    f"| {share.name} | {share.predicted_share * 100:.2f}% | {ci} |"
-                )
+                lines.append(f"| {share.name} | {share.predicted_share * 100:.2f}% | {ci} |")
             lines.append("")
 
         lines.append("---")
@@ -168,13 +164,21 @@ class ReportBuilder:
             out.append("<table>")
             header = table_rows[0]
             cells = [c.strip() for c in header.split("|") if c.strip()]
-            out.append("  <thead><tr>" + "".join(f"<th>{ReportBuilder._escape_html(c)}</th>" for c in cells) + "</tr></thead>")
+            out.append(
+                "  <thead><tr>"
+                + "".join(f"<th>{ReportBuilder._escape_html(c)}</th>" for c in cells)
+                + "</tr></thead>"
+            )
             out.append("  <tbody>")
             for row in table_rows[2:]:  # skip header and separator
                 cells = [c.strip() for c in row.split("|") if c.strip()]
                 if not cells:
                     continue
-                out.append("    <tr>" + "".join(f"<td>{ReportBuilder._escape_html(c)}</td>" for c in cells) + "</tr>")
+                out.append(
+                    "    <tr>"
+                    + "".join(f"<td>{ReportBuilder._escape_html(c)}</td>" for c in cells)
+                    + "</tr>"
+                )
             out.append("  </tbody></table>")
             table_rows.clear()
             in_table = False
@@ -204,11 +208,7 @@ class ReportBuilder:
 
     @staticmethod
     def _escape_html(text: str) -> str:
-        return (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-        )
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def build_report(

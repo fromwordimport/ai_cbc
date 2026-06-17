@@ -35,9 +35,7 @@ class AnalysisJobStatus(BaseModel):
 
     analysis_id: str
     study_id: str
-    status: str = Field(
-        pattern=r"^(PENDING|QUEUED|RUNNING|COMPLETED|FAILED|CANCELLED|TIMED_OUT)$"
-    )
+    status: str = Field(pattern=r"^(PENDING|QUEUED|RUNNING|COMPLETED|FAILED|CANCELLED|TIMED_OUT)$")
     model_type: str
     queued_at: datetime
     started_at: datetime | None = None

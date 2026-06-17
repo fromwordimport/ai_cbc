@@ -140,11 +140,13 @@ class AgentState:
     def record_turn(self, action: str, result: dict[str, Any]) -> None:
         """Record a turn in the agent history."""
         self.turn_count += 1
-        self.history.append({
-            "turn": self.turn_count,
-            "action": action,
-            "result": result,
-        })
+        self.history.append(
+            {
+                "turn": self.turn_count,
+                "action": action,
+                "result": result,
+            }
+        )
         # SEC-010: Enforce max history length to prevent unbounded growth
         if len(self.history) > _MAX_HISTORY_LENGTH:
             # Keep most recent entries, drop oldest
@@ -153,11 +155,13 @@ class AgentState:
     def record_correction(self, reason: str) -> None:
         """Record a self-correction event."""
         self.correction_count += 1
-        self.history.append({
-            "turn": self.turn_count,
-            "action": "self_correction",
-            "reason": reason,
-        })
+        self.history.append(
+            {
+                "turn": self.turn_count,
+                "action": "self_correction",
+                "reason": reason,
+            }
+        )
         # SEC-010: Enforce max history length
         if len(self.history) > _MAX_HISTORY_LENGTH:
             self.history = self.history[-_MAX_HISTORY_LENGTH:]
@@ -288,7 +292,9 @@ class BaseAgent(ABC, Generic[T]):
     # Prompt assembly
     # ------------------------------------------------------------------
 
-    def build_prompt(self, task_context: str, extra_rules: list[str] | None = None) -> list[dict[str, str]]:
+    def build_prompt(
+        self, task_context: str, extra_rules: list[str] | None = None
+    ) -> list[dict[str, str]]:
         """Build the full three-layer prompt as OpenAI-style messages.
 
         Returns a list of message dicts ready for LLMClient.generate().
@@ -310,9 +316,7 @@ class BaseAgent(ABC, Generic[T]):
         rules_content = rules.render()
 
         # Layer 3: Dynamic examples
-        examples_content = "\n\n".join(
-            ex.render() for ex in self.examples
-        )
+        examples_content = "\n\n".join(ex.render() for ex in self.examples)
 
         # Assemble system message
         parts = [system_content]
@@ -390,9 +394,7 @@ class BaseAgent(ABC, Generic[T]):
 
         return result, self.state
 
-    def _build_correction_feedback(
-        self, reason: str, evaluation: dict[str, Any]
-    ) -> str:
+    def _build_correction_feedback(self, reason: str, evaluation: dict[str, Any]) -> str:
         """Build feedback text to inject on correction."""
         parts = [f"上次生成存在问题：{reason}"]
         if "details" in evaluation:

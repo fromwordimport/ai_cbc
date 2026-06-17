@@ -11,7 +11,6 @@ the change automatically.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Literal
 
 # ── per-1K-token prices in USD ──────────────────────────────────────────

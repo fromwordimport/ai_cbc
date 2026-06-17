@@ -25,7 +25,6 @@ from typing import Any
 
 import structlog
 
-from aicbc.config.pricing import QUALITY_TIER, MAX_CONTEXT
 from aicbc.config.settings import get_settings
 from aicbc.cost.fuse import CostFuse
 
@@ -201,6 +200,7 @@ class ModelRouter:
                 else:
                     # Simple YAML-like parsing for models config
                     import yaml
+
                     data = yaml.safe_load(f)
 
             if "models" in data:
@@ -212,15 +212,15 @@ class ModelRouter:
                     self.routes[task] = RoutingRule(**rule)
 
             if "budget_thresholds" in data:
-                self.budget_threshold = BudgetThreshold(
-                    **data["budget_thresholds"]
-                )
+                self.budget_threshold = BudgetThreshold(**data["budget_thresholds"])
 
             logger.info("model_config_loaded", path=path)
         except Exception as exc:
             logger.warning("model_config_load_failed", path=path, error=str(exc))
 
-    def update_budget_status(self, current_cost: float, budget: float | None = None) -> BudgetStatus:
+    def update_budget_status(
+        self, current_cost: float, budget: float | None = None
+    ) -> BudgetStatus:
         """Update budget status based on current spending.
 
         Args:
@@ -309,9 +309,7 @@ class ModelRouter:
 
         if budget_status == BudgetStatus.FUSE:
             logger.error("budget_fuse_all_calls_blocked")
-            raise RuntimeError(
-                "Budget fuse triggered: All LLM calls are paused."
-            )
+            raise RuntimeError("Budget fuse triggered: All LLM calls are paused.")
 
         if budget_status == BudgetStatus.DEGRADE:
             # Use CostFuse-recommended degraded model if available
@@ -333,10 +331,7 @@ class ModelRouter:
             logger.warning("degrade_model_unavailable_using_default")
             return rule.default_model
 
-        if (
-            budget_status == BudgetStatus.WARNING
-            and (complexity == "low" or urgency == "low")
-        ):
+        if budget_status == BudgetStatus.WARNING and (complexity == "low" or urgency == "low"):
             # For non-critical tasks, use degrade model
             model = rule.degrade_model or self._degrade_model
             if model and model in self.models and self.models[model].enabled:
@@ -432,10 +427,7 @@ class ModelRouter:
         if new_model not in self.models:
             raise ValueError(f"Unknown model: {new_model}")
 
-        old_defaults = {
-            task: rule.default_model
-            for task, rule in self.routes.items()
-        }
+        old_defaults = {task: rule.default_model for task, rule in self.routes.items()}
 
         # Update all routes to use new model as default
         for rule in self.routes.values():
@@ -455,9 +447,7 @@ class ModelRouter:
             "current_daily_cost": self._current_daily_cost,
             "daily_budget": self._daily_budget,
             "budget_ratio": (
-                self._current_daily_cost / self._daily_budget
-                if self._daily_budget > 0
-                else 0
+                self._current_daily_cost / self._daily_budget if self._daily_budget > 0 else 0
             ),
             "models": self.get_model_info(),
             "routes": {

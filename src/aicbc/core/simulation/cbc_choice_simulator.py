@@ -125,9 +125,7 @@ class PersonaUtilityMapper:
             offset = self._param_offsets[attr.id]
 
             if attr.type == AttributeType.PRICE:
-                beta[offset] = _price_coefficient_from_sensitivity(
-                    l2.price_sensitivity
-                )
+                beta[offset] = _price_coefficient_from_sensitivity(l2.price_sensitivity)
             elif attr.type in (AttributeType.CATEGORICAL, AttributeType.ORDINAL):
                 n_levels = len(attr.levels)
                 importance = _attribute_importance(
@@ -217,10 +215,9 @@ class CBCChoiceSimulator:
             alt_profiles = [alt.attributes for alt in cs.alternatives]
 
             # Encode all alternatives in the set
-            utilities = np.array([
-                float(encode_profile(p, self.attributes) @ beta)
-                for p in alt_profiles
-            ])
+            utilities = np.array(
+                [float(encode_profile(p, self.attributes) @ beta) for p in alt_profiles]
+            )
 
             # Handle "none" option
             if include_none:
@@ -228,16 +225,16 @@ class CBCChoiceSimulator:
                 if max_u < none_threshold:
                     chosen_idx = None  # "none"
                 else:
-                    chosen_idx = int(np.argmax(utilities)) if deterministic else int(
-                        rng.choice(len(utilities), p=_softmax(utilities))
+                    chosen_idx = (
+                        int(np.argmax(utilities))
+                        if deterministic
+                        else int(rng.choice(len(utilities), p=_softmax(utilities)))
                     )
             else:
                 if deterministic:
                     chosen_idx = int(np.argmax(utilities))
                 else:
-                    chosen_idx = int(
-                        rng.choice(len(utilities), p=_softmax(utilities))
-                    )
+                    chosen_idx = int(rng.choice(len(utilities), p=_softmax(utilities)))
 
             alt_records = [
                 AlternativeRecord(
@@ -248,22 +245,26 @@ class CBCChoiceSimulator:
                 for alt in cs.alternatives
             ]
 
-            choice_records.append(ChoiceRecord(
-                respondent_id=persona.persona_id,
-                respondent_index=0,  # filled later by batch runner
-                segment=persona.segment,
-                choice_set_id=cs.choice_set_id,
-                choice_set_index=cs_idx,
-                alternatives=alt_records,
-                none_chosen=(chosen_idx is None),
-            ))
+            choice_records.append(
+                ChoiceRecord(
+                    respondent_id=persona.persona_id,
+                    respondent_index=0,  # filled later by batch runner
+                    segment=persona.segment,
+                    choice_set_id=cs.choice_set_id,
+                    choice_set_index=cs_idx,
+                    alternatives=alt_records,
+                    none_chosen=(chosen_idx is None),
+                )
+            )
 
-            single_choices.append(SingleChoiceDetail(
-                choice_set_id=cs.choice_set_id,
-                chosen_alt_index=chosen_idx,
-                reasoning=_build_reasoning(chosen_idx, utilities, cs.alternatives),
-                confidence=_compute_confidence(utilities, chosen_idx),
-            ))
+            single_choices.append(
+                SingleChoiceDetail(
+                    choice_set_id=cs.choice_set_id,
+                    chosen_alt_index=chosen_idx,
+                    reasoning=_build_reasoning(chosen_idx, utilities, cs.alternatives),
+                    confidence=_compute_confidence(utilities, chosen_idx),
+                )
+            )
 
         raw_dataset = CBCRawDataset(
             metadata=DatasetMetadata(

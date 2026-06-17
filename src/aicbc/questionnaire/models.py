@@ -149,8 +149,10 @@ class ProhibitedPair(BaseModel):
             # Legacy single-attribute form → wrap into conditions
             if "conditions" not in data and "attribute_id" in data:
                 data["conditions"] = [
-                    {"attribute_id": data.pop("attribute_id", None),
-                     "level_value": data.pop("level_value", None)}
+                    {
+                        "attribute_id": data.pop("attribute_id", None),
+                        "level_value": data.pop("level_value", None),
+                    }
                 ]
             # Drop leftover legacy keys if conditions already present
             if "conditions" in data:
@@ -165,9 +167,7 @@ class CBCStudy(BaseModel):
     study_id: str = Field(..., description="Unique study identifier")
     product_category: str = Field(..., description="Product category (e.g. '洗碗机')")
     research_goal: str = Field(..., description="Research objective")
-    target_segments: list[str] = Field(
-        default_factory=list, description="Target consumer segments"
-    )
+    target_segments: list[str] = Field(default_factory=list, description="Target consumer segments")
     sample_size: int = Field(
         default=200,
         ge=30,
@@ -242,9 +242,7 @@ class CBCQuestionnaire(BaseModel):
     d_efficiency: float | None = Field(
         default=None, description="D-efficiency score (0-1, target >= 0.85)"
     )
-    a_efficiency: float | None = Field(
-        default=None, description="A-efficiency score (0-1)"
-    )
+    a_efficiency: float | None = Field(default=None, description="A-efficiency score (0-1)")
     iterations: int | None = Field(
         default=None, description="Number of optimization iterations performed"
     )
@@ -258,9 +256,7 @@ class CBCQuestionnaire(BaseModel):
         expected = self.design_parameters.n_choice_sets
         actual = len(self.choice_sets)
         if actual != expected:
-            raise ValueError(
-                f"expected {expected} choice sets, got {actual}"
-            )
+            raise ValueError(f"expected {expected} choice sets, got {actual}")
         return self
 
     @model_validator(mode="after")
@@ -270,7 +266,6 @@ class CBCQuestionnaire(BaseModel):
             actual = len(cs.alternatives)
             if actual != expected:
                 raise ValueError(
-                    f"choice_set {cs.choice_set_id}: expected {expected} alternatives, "
-                    f"got {actual}"
+                    f"choice_set {cs.choice_set_id}: expected {expected} alternatives, got {actual}"
                 )
         return self

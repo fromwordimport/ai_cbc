@@ -71,9 +71,7 @@ class MongoPersonaStore:
         canonical = json.dumps(key_data, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-    def _doc_from_persona(
-        self, persona: PersonaProfile
-    ) -> PersonaDocument:
+    def _doc_from_persona(self, persona: PersonaProfile) -> PersonaDocument:
         """Convert a PersonaProfile to a PersonaDocument."""
         return PersonaDocument(
             persona_id=persona.persona_id,
@@ -106,9 +104,7 @@ class MongoPersonaStore:
     async def asave(self, persona: PersonaProfile) -> bool:
         """Async version of :meth:`save`."""
         fp = self._compute_fingerprint(persona)
-        existing = await PersonaDocument.find_one(
-            PersonaDocument.persona_id == persona.persona_id
-        )
+        existing = await PersonaDocument.find_one(PersonaDocument.persona_id == persona.persona_id)
         if existing is not None:
             doc = self._doc_from_persona(persona)
             doc.id = existing.id
@@ -209,9 +205,7 @@ class MongoPersonaStore:
     async def adelete_by_study(self, study_id: str) -> int:
         """Async version of :meth:`delete_by_study`."""
         prefix = f"persona-{study_id}-"
-        docs = await PersonaDocument.find(
-            {"persona_id": {"$regex": f"^{prefix}"}}
-        ).to_list()
+        docs = await PersonaDocument.find({"persona_id": {"$regex": f"^{prefix}"}}).to_list()
         for doc in docs:
             await doc.delete()
         return len(docs)
@@ -289,9 +283,7 @@ class MongoQuestionnaireStore:
     ) -> tuple[list[CBCStudy], int]:
         """Query studies with optional filters."""
         return asyncio.run(
-            self.alist_studies(
-                product_category=product_category, page=page, page_size=page_size
-            )
+            self.alist_studies(product_category=product_category, page=page, page_size=page_size)
         )
 
     async def alist_studies(
@@ -340,9 +332,7 @@ class MongoQuestionnaireStore:
 
     async def aget_questionnaire(self, study_id: str) -> CBCQuestionnaire | None:
         """Async version of :meth:`get_questionnaire`."""
-        doc = await QuestionnaireDocument.find_one(
-            QuestionnaireDocument.study_id == study_id
-        )
+        doc = await QuestionnaireDocument.find_one(QuestionnaireDocument.study_id == study_id)
         if doc is None:
             return None
         return CBCQuestionnaire.model_validate(doc.data)
@@ -362,9 +352,7 @@ class MongoResponseStore:
 
     async def asave_response(self, response: PersonaResponse) -> None:
         """Async version of :meth:`save_response`."""
-        doc = await ResponseDocument.find_one(
-            ResponseDocument.response_id == response.response_id
-        )
+        doc = await ResponseDocument.find_one(ResponseDocument.response_id == response.response_id)
         data = response.model_dump(mode="json")
         if doc is not None:
             doc.data = data
@@ -385,9 +373,7 @@ class MongoResponseStore:
 
     async def aget_response(self, response_id: str) -> PersonaResponse | None:
         """Async version of :meth:`get_response`."""
-        doc = await ResponseDocument.find_one(
-            ResponseDocument.response_id == response_id
-        )
+        doc = await ResponseDocument.find_one(ResponseDocument.response_id == response_id)
         if doc is None:
             return None
         return PersonaResponse.model_validate(doc.data)
@@ -399,9 +385,7 @@ class MongoResponseStore:
         page_size: int = 100,
     ) -> tuple[list[PersonaResponse], int]:
         """Query responses for a study."""
-        return asyncio.run(
-            self.alist_responses_by_study(study_id, page=page, page_size=page_size)
-        )
+        return asyncio.run(self.alist_responses_by_study(study_id, page=page, page_size=page_size))
 
     async def alist_responses_by_study(
         self,
@@ -455,9 +439,7 @@ class MongoResponseStore:
 
     async def adelete_response(self, response_id: str) -> bool:
         """Async version of :meth:`delete_response`."""
-        doc = await ResponseDocument.find_one(
-            ResponseDocument.response_id == response_id
-        )
+        doc = await ResponseDocument.find_one(ResponseDocument.response_id == response_id)
         if doc is None:
             return False
         await doc.delete()
@@ -481,9 +463,7 @@ class MongoResponseStore:
 
     async def adelete_by_study(self, study_id: str) -> int:
         """Async version of :meth:`delete_by_study`."""
-        response_docs = await ResponseDocument.find(
-            ResponseDocument.study_id == study_id
-        ).to_list()
+        response_docs = await ResponseDocument.find(ResponseDocument.study_id == study_id).to_list()
         for doc in response_docs:
             await doc.delete()
         dataset_deleted = await self.adelete_dataset(study_id)
@@ -495,9 +475,7 @@ class MongoResponseStore:
 
     async def adelete_by_persona(self, persona_id: str) -> int:
         """Async version of :meth:`delete_by_persona`."""
-        docs = await ResponseDocument.find(
-            ResponseDocument.persona_id == persona_id
-        ).to_list()
+        docs = await ResponseDocument.find(ResponseDocument.persona_id == persona_id).to_list()
         for doc in docs:
             await doc.delete()
         return len(docs)
@@ -527,9 +505,7 @@ class MongoAnalysisStore:
 
     async def asave_job(self, job: AnalysisJobStatus) -> None:
         """Async version of :meth:`save_job`."""
-        doc = await AnalysisJobDocument.find_one(
-            AnalysisJobDocument.analysis_id == job.analysis_id
-        )
+        doc = await AnalysisJobDocument.find_one(AnalysisJobDocument.analysis_id == job.analysis_id)
         data = job.model_dump(mode="json")
         if doc is not None:
             doc.data = data
@@ -549,9 +525,7 @@ class MongoAnalysisStore:
 
     async def aget_job(self, analysis_id: str) -> AnalysisJobStatus | None:
         """Async version of :meth:`get_job`."""
-        doc = await AnalysisJobDocument.find_one(
-            AnalysisJobDocument.analysis_id == analysis_id
-        )
+        doc = await AnalysisJobDocument.find_one(AnalysisJobDocument.analysis_id == analysis_id)
         if doc is None:
             return None
         return AnalysisJobStatus.model_validate(doc.data)
@@ -572,9 +546,7 @@ class MongoAnalysisStore:
         progress: float | None = None,
     ) -> AnalysisJobStatus | None:
         """Async version of :meth:`update_job_status`."""
-        doc = await AnalysisJobDocument.find_one(
-            AnalysisJobDocument.analysis_id == analysis_id
-        )
+        doc = await AnalysisJobDocument.find_one(AnalysisJobDocument.analysis_id == analysis_id)
         if doc is None:
             return None
 
@@ -638,19 +610,13 @@ class MongoAnalysisStore:
             return None
         return AnalysisResultResponse.model_validate(doc.data)
 
-    def save_convergence(
-        self, analysis_id: str, diag: ConvergenceDiagnostics
-    ) -> None:
+    def save_convergence(self, analysis_id: str, diag: ConvergenceDiagnostics) -> None:
         """Persist convergence diagnostics."""
         asyncio.run(self.asave_convergence(analysis_id, diag))
 
-    async def asave_convergence(
-        self, analysis_id: str, diag: ConvergenceDiagnostics
-    ) -> None:
+    async def asave_convergence(self, analysis_id: str, diag: ConvergenceDiagnostics) -> None:
         """Async version of :meth:`save_convergence`."""
-        await self._save_derivative(
-            analysis_id, "convergence", None, diag.model_dump(mode="json")
-        )
+        await self._save_derivative(analysis_id, "convergence", None, diag.model_dump(mode="json"))
 
     def get_convergence(self, analysis_id: str) -> ConvergenceDiagnostics | None:
         """Retrieve convergence diagnostics."""
@@ -663,15 +629,11 @@ class MongoAnalysisStore:
             return None
         return ConvergenceDiagnostics.model_validate(doc.data)
 
-    def save_importance(
-        self, analysis_id: str, importance: ImportanceResponse
-    ) -> None:
+    def save_importance(self, analysis_id: str, importance: ImportanceResponse) -> None:
         """Persist attribute importance results."""
         asyncio.run(self.asave_importance(analysis_id, importance))
 
-    async def asave_importance(
-        self, analysis_id: str, importance: ImportanceResponse
-    ) -> None:
+    async def asave_importance(self, analysis_id: str, importance: ImportanceResponse) -> None:
         """Async version of :meth:`save_importance`."""
         await self._save_derivative(
             analysis_id, "importance", None, importance.model_dump(mode="json")
@@ -694,9 +656,7 @@ class MongoAnalysisStore:
 
     async def asave_wtp(self, analysis_id: str, wtp: WTPResponse) -> None:
         """Async version of :meth:`save_wtp`."""
-        await self._save_derivative(
-            analysis_id, "wtp", None, wtp.model_dump(mode="json")
-        )
+        await self._save_derivative(analysis_id, "wtp", None, wtp.model_dump(mode="json"))
 
     def get_wtp(self, analysis_id: str) -> WTPResponse | None:
         """Retrieve WTP results."""
@@ -709,9 +669,7 @@ class MongoAnalysisStore:
             return None
         return WTPResponse.model_validate(doc.data)
 
-    def save_market_sim(
-        self, analysis_id: str, sim_id: str, result: MarketSimResponse
-    ) -> None:
+    def save_market_sim(self, analysis_id: str, sim_id: str, result: MarketSimResponse) -> None:
         """Persist market simulation result keyed by analysis_id + sim_id."""
         asyncio.run(self.asave_market_sim(analysis_id, sim_id, result))
 
@@ -726,15 +684,11 @@ class MongoAnalysisStore:
             result.model_dump(mode="json"),
         )
 
-    def get_market_sim(
-        self, analysis_id: str, sim_id: str
-    ) -> MarketSimResponse | None:
+    def get_market_sim(self, analysis_id: str, sim_id: str) -> MarketSimResponse | None:
         """Retrieve market simulation result."""
         return asyncio.run(self.aget_market_sim(analysis_id, sim_id))
 
-    async def aget_market_sim(
-        self, analysis_id: str, sim_id: str
-    ) -> MarketSimResponse | None:
+    async def aget_market_sim(self, analysis_id: str, sim_id: str) -> MarketSimResponse | None:
         """Async version of :meth:`get_market_sim`."""
         doc = await self._get_derivative(analysis_id, "market_sim", sim_id)
         if doc is None:
@@ -747,25 +701,25 @@ class MongoAnalysisStore:
 
     async def aget_latest_market_sim(self, analysis_id: str) -> MarketSimResponse | None:
         """Async version of :meth:`get_latest_market_sim`."""
-        docs = await AnalysisDerivativeDocument.find(
-            {
-                "analysis_id": analysis_id,
-                "kind": "market_sim",
-            }
-        ).sort("created_at", -1).to_list()
+        docs = (
+            await AnalysisDerivativeDocument.find(
+                {
+                    "analysis_id": analysis_id,
+                    "kind": "market_sim",
+                }
+            )
+            .sort("created_at", -1)
+            .to_list()
+        )
         if not docs:
             return None
         return MarketSimResponse.model_validate(docs[0].data)
 
-    def save_latent_class_result(
-        self, analysis_id: str, result: dict[str, Any]
-    ) -> None:
+    def save_latent_class_result(self, analysis_id: str, result: dict[str, Any]) -> None:
         """Store a latent class model result."""
         asyncio.run(self.asave_latent_class_result(analysis_id, result))
 
-    async def asave_latent_class_result(
-        self, analysis_id: str, result: dict[str, Any]
-    ) -> None:
+    async def asave_latent_class_result(self, analysis_id: str, result: dict[str, Any]) -> None:
         """Async version of :meth:`save_latent_class_result`."""
         await self._save_derivative(
             analysis_id,
@@ -774,15 +728,11 @@ class MongoAnalysisStore:
             result,
         )
 
-    def get_latent_class_result(
-        self, analysis_id: str
-    ) -> dict[str, Any] | None:
+    def get_latent_class_result(self, analysis_id: str) -> dict[str, Any] | None:
         """Retrieve a latent class model result."""
         return asyncio.run(self.aget_latent_class_result(analysis_id))
 
-    async def aget_latent_class_result(
-        self, analysis_id: str
-    ) -> dict[str, Any] | None:
+    async def aget_latent_class_result(self, analysis_id: str) -> dict[str, Any] | None:
         """Async version of :meth:`get_latent_class_result`."""
         doc = await self._get_derivative(analysis_id, "latent_class", None)
         if doc is None:
@@ -797,9 +747,7 @@ class MongoAnalysisStore:
         result: SegmentComparisonResponse,
     ) -> None:
         """Persist segment comparison result."""
-        asyncio.run(
-            self.asave_segment_comparison(analysis_id, segment_a, segment_b, result)
-        )
+        asyncio.run(self.asave_segment_comparison(analysis_id, segment_a, segment_b, result))
 
     async def asave_segment_comparison(
         self,
@@ -824,9 +772,7 @@ class MongoAnalysisStore:
         segment_b: str | None = None,
     ) -> SegmentComparisonResponse | None:
         """Retrieve segment comparison result."""
-        return asyncio.run(
-            self.aget_segment_comparison(analysis_id, segment_a, segment_b)
-        )
+        return asyncio.run(self.aget_segment_comparison(analysis_id, segment_a, segment_b))
 
     async def aget_segment_comparison(
         self,
@@ -843,12 +789,16 @@ class MongoAnalysisStore:
             return SegmentComparisonResponse.model_validate(doc.data)
 
         # Backward-compatible prefix scan.
-        docs = await AnalysisDerivativeDocument.find(
-            {
-                "analysis_id": analysis_id,
-                "kind": "segment_comparison",
-            }
-        ).sort("created_at", -1).to_list()
+        docs = (
+            await AnalysisDerivativeDocument.find(
+                {
+                    "analysis_id": analysis_id,
+                    "kind": "segment_comparison",
+                }
+            )
+            .sort("created_at", -1)
+            .to_list()
+        )
         if not docs:
             return None
         return SegmentComparisonResponse.model_validate(docs[0].data)
@@ -859,9 +809,7 @@ class MongoAnalysisStore:
 
     async def alist_jobs_by_study(self, study_id: str) -> list[AnalysisJobStatus]:
         """Async version of :meth:`list_jobs_by_study`."""
-        docs = await AnalysisJobDocument.find(
-            AnalysisJobDocument.study_id == study_id
-        ).to_list()
+        docs = await AnalysisJobDocument.find(AnalysisJobDocument.study_id == study_id).to_list()
         return [AnalysisJobStatus.model_validate(doc.data) for doc in docs]
 
     def delete_analysis(self, analysis_id: str) -> bool:
@@ -870,9 +818,7 @@ class MongoAnalysisStore:
 
     async def adelete_analysis(self, analysis_id: str) -> bool:
         """Async version of :meth:`delete_analysis`."""
-        job_doc = await AnalysisJobDocument.find_one(
-            AnalysisJobDocument.analysis_id == analysis_id
-        )
+        job_doc = await AnalysisJobDocument.find_one(AnalysisJobDocument.analysis_id == analysis_id)
         if job_doc is None:
             return False
 
@@ -897,9 +843,7 @@ class MongoAnalysisStore:
 
     async def adelete_by_study(self, study_id: str) -> int:
         """Async version of :meth:`delete_by_study`."""
-        docs = await AnalysisJobDocument.find(
-            AnalysisJobDocument.study_id == study_id
-        ).to_list()
+        docs = await AnalysisJobDocument.find(AnalysisJobDocument.study_id == study_id).to_list()
         for doc in docs:
             await self.adelete_analysis(doc.analysis_id)
         return len(docs)

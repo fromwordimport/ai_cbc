@@ -52,7 +52,7 @@ def build_importance_chart_option(importance: ImportanceResponse) -> dict[str, A
                         "value": mean,
                         "ci": [lower, upper],
                     }
-                    for mean, lower, upper in zip(means, lowers, uppers)
+                    for mean, lower, upper in zip(means, lowers, uppers, strict=False)
                 ],
                 "itemStyle": {
                     "color": "#5470c6",
@@ -70,9 +70,7 @@ def build_importance_pie_option(importance: ImportanceResponse) -> dict[str, Any
 
     data = [
         {"name": name, "value": round(stats.mean * 100, 2)}
-        for name, stats in sorted(
-            importance.overall.items(), key=lambda x: x[1].mean, reverse=True
-        )
+        for name, stats in sorted(importance.overall.items(), key=lambda x: x[1].mean, reverse=True)
     ]
     return {
         "tooltip": {"trigger": "item", "formatter": "{b}: {c}% ({d}%)"},
@@ -144,10 +142,7 @@ def build_utility_distribution_option(
             {
                 "name": "效用分布",
                 "type": "boxplot",
-                "data": [
-                    [s["min"], s["q1"], s["median"], s["q3"], s["max"]]
-                    for s in stats
-                ],
+                "data": [[s["min"], s["q1"], s["median"], s["q3"], s["max"]] for s in stats],
             }
         ],
     }

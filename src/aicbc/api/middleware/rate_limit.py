@@ -70,9 +70,7 @@ class InMemoryRateLimiter:
             bucket = self._buckets.get(key)
 
             if bucket is None:
-                self._buckets[key] = _BucketState(
-                    tokens=config.requests - 1, last_update=now
-                )
+                self._buckets[key] = _BucketState(tokens=config.requests - 1, last_update=now)
                 return True, 0.0
 
             elapsed = now - bucket.last_update
@@ -84,9 +82,7 @@ class InMemoryRateLimiter:
                 bucket.tokens -= 1.0
                 return True, 0.0
 
-            retry_after = (1.0 - bucket.tokens) / (
-                config.requests / config.window_seconds
-            )
+            retry_after = (1.0 - bucket.tokens) / (config.requests / config.window_seconds)
             return False, retry_after
 
     def reset(self) -> None:
@@ -96,9 +92,7 @@ class InMemoryRateLimiter:
     def cleanup(self, max_age_seconds: float = 300.0) -> int:
         """Remove stale bucket entries. Returns number removed."""
         now = time.time()
-        stale = [
-            k for k, b in self._buckets.items() if now - b.last_update > max_age_seconds
-        ]
+        stale = [k for k, b in self._buckets.items() if now - b.last_update > max_age_seconds]
         for k in stale:
             del self._buckets[k]
         return len(stale)
@@ -186,12 +180,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
       - Sensitive endpoints (/personas/generate, /studies/*/simulate-responses): 10 / 60s
     """
 
-    DEFAULT_GLOBAL: ClassVar[RateLimitConfig] = RateLimitConfig(
-        requests=120, window_seconds=60.0
-    )
-    DEFAULT_SENSITIVE: ClassVar[RateLimitConfig] = RateLimitConfig(
-        requests=10, window_seconds=60.0
-    )
+    DEFAULT_GLOBAL: ClassVar[RateLimitConfig] = RateLimitConfig(requests=120, window_seconds=60.0)
+    DEFAULT_SENSITIVE: ClassVar[RateLimitConfig] = RateLimitConfig(requests=10, window_seconds=60.0)
 
     _SENSITIVE_PATHS: ClassVar[tuple[str, ...]] = (
         "/personas/generate",

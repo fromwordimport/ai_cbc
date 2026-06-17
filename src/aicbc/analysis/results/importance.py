@@ -6,6 +6,9 @@ Importance = attribute range / sum of all attribute ranges.
 
 from __future__ import annotations
 
+import numpy as np
+import pandas as pd
+
 from aicbc.questionnaire.models import Attribute, AttributeType
 
 
@@ -53,9 +56,7 @@ def compute_importance(
                     prices = [float(level.value) for level in attr.levels]
                     price_range = max(prices) - min(prices)
                     std = price_std if price_std > 0 else 1.0
-                    attr_ranges[attr.id] = (
-                        abs(float(util_row[price_col])) * price_range / std
-                    )
+                    attr_ranges[attr.id] = abs(float(util_row[price_col])) * price_range / std
                 else:
                     attr_ranges[attr.id] = 0.0
             else:
@@ -89,6 +90,7 @@ def _recover_level_utilities(
     """
     n_levels = len(attribute.levels)
     import numpy as np
+
     params = []
 
     for i in range(n_levels - 1):
@@ -121,14 +123,16 @@ def aggregate_importance(
 
     import pandas as pd
 
-    return pd.DataFrame({
-        "mean": importance_df.mean(),
-        "std": importance_df.std(),
-        "median": importance_df.median(),
-        "min": importance_df.min(),
-        "max": importance_df.max(),
-        "q25": importance_df.quantile(0.25),
-        "q75": importance_df.quantile(0.75),
-        f"ci_{int(confidence * 100)}_lower": importance_df.quantile(lower_q),
-        f"ci_{int(confidence * 100)}_upper": importance_df.quantile(upper_q),
-    })
+    return pd.DataFrame(
+        {
+            "mean": importance_df.mean(),
+            "std": importance_df.std(),
+            "median": importance_df.median(),
+            "min": importance_df.min(),
+            "max": importance_df.max(),
+            "q25": importance_df.quantile(0.25),
+            "q75": importance_df.quantile(0.75),
+            f"ci_{int(confidence * 100)}_lower": importance_df.quantile(lower_q),
+            f"ci_{int(confidence * 100)}_upper": importance_df.quantile(upper_q),
+        }
+    )

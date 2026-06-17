@@ -14,7 +14,7 @@ from aicbc.api.schemas import (
     PurchaseDecisionRequest,
     PurchaseDecisionResponse,
 )
-from aicbc.core.security import sanitize_id, sanitize_text
+from aicbc.core.security import sanitize_text
 from aicbc.core.simulation.behavior_simulator import BehaviorSimulator
 from aicbc.core.store import PersonaStore, get_store
 

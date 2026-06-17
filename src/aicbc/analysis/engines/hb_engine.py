@@ -91,7 +91,7 @@ class HBEngine:
         self._feature_cols = feature_cols
 
         self._tasks = []
-        for (resp, task), group in data.groupby([resp_id_col, task_id_col], sort=False):
+        for (resp, _task), group in data.groupby([resp_id_col, task_id_col], sort=False):
             X_task = group[feature_cols].values.astype(np.float64)
             chosen_mask = group[choice_col].values == 1
             if not chosen_mask.any():
@@ -99,11 +99,13 @@ class HBEngine:
             chosen_idx = int(np.argmax(chosen_mask))
             resp_idx = self._resp_map[resp]
 
-            self._tasks.append({
-                "X": X_task,
-                "y": chosen_idx,
-                "resp_idx": resp_idx,
-            })
+            self._tasks.append(
+                {
+                    "X": X_task,
+                    "y": chosen_idx,
+                    "resp_idx": resp_idx,
+                }
+            )
 
     def build_model(
         self,
@@ -173,7 +175,7 @@ class HBEngine:
             # Vectorized log-softmax for numerical stability
             log_probs = []
             for task in self._tasks:
-                X = task["X"]                    # (n_alts, n_features)
+                X = task["X"]  # (n_alts, n_features)
                 resp = task["resp_idx"]
                 chosen = task["y"]
 
@@ -210,7 +212,6 @@ class HBEngine:
             HBResult with posterior summaries and convergence diagnostics.
         """
         import pymc as pm
-        import arviz as az
 
         self.build_model(data, feature_cols, resp_id_col, task_id_col, choice_col)
         assert self.model is not None
@@ -346,8 +347,7 @@ class HBEngine:
         individual_utilities: dict[str, dict[str, float]] = {}
         for i, resp_id in enumerate(self._resp_ids):
             individual_utilities[resp_id] = {
-                col: float(beta_mean[i, j])
-                for j, col in enumerate(self._feature_cols)
+                col: float(beta_mean[i, j]) for j, col in enumerate(self._feature_cols)
             }
 
         return individual_utilities
@@ -412,10 +412,9 @@ class HBEngine:
 
         # Build design matrix from scenarios
         assert self._feature_cols is not None
-        X = np.array([
-            [s.get(col, 0.0) for col in self._feature_cols]
-            for s in scenarios
-        ], dtype=np.float64)
+        X = np.array(
+            [[s.get(col, 0.0) for col in self._feature_cols] for s in scenarios], dtype=np.float64
+        )
 
         utilities = X @ beta_mean
         exp_utils = np.exp(utilities - np.max(utilities))  # Numerical stability

@@ -91,9 +91,18 @@ class BiasAuditor:
 
     # Bias terms in language samples (should never appear)
     BIASED_TERMS: list[str] = [
-        "男人就应该", "女人天生", "典型的男性", "典型的女性",
-        "我们男的", "我们女的", "男的不懂", "女的不会",
-        "穷人思维", "富人思维", "乡下人", "土包子",
+        "男人就应该",
+        "女人天生",
+        "典型的男性",
+        "典型的女性",
+        "我们男的",
+        "我们女的",
+        "男的不懂",
+        "女的不会",
+        "穷人思维",
+        "富人思维",
+        "乡下人",
+        "土包子",
     ]
 
     def __init__(self) -> None:
@@ -131,9 +140,7 @@ class BiasAuditor:
     # Unified stereotype pattern check (replaces 3 old hardcoded rules)
     # ------------------------------------------------------------------
 
-    def _check_stereotype_patterns(
-        self, persona: PersonaProfile
-    ) -> list[BiasFinding]:
+    def _check_stereotype_patterns(self, persona: PersonaProfile) -> list[BiasFinding]:
         """Iterate over the 24-pattern library and flag any matches.
 
         For each pattern:
@@ -149,23 +156,15 @@ class BiasAuditor:
         # Per-category counters for backward-compatible rule_id generation
         cat_counters: dict[str, int] = {}
 
-        l1 = persona.layer1_demographics
-        l2 = persona.layer2_behavior
-        l3 = persona.layer3_psychology
-        l4 = persona.layer4_scenarios
-
         for pattern in self._patterns:
             # --- Step 1: demographic constraint check ---
             demo_match = pattern.get("demographic_match")
-            if demo_match is not None:
-                if not self._demographic_matches(persona, demo_match):
-                    continue
+            if demo_match is not None and not self._demographic_matches(persona, demo_match):
+                continue
 
             # --- Step 2: build text corpus based on match_fields ---
             match_fields = pattern.get("match_fields", [])
-            text_corpus = self._build_text_corpus(
-                persona, match_fields, pattern
-            )
+            text_corpus = self._build_text_corpus(persona, match_fields, pattern)
 
             # --- Step 3: keyword matching ---
             keywords = pattern.get("keywords_cn", [])
@@ -178,31 +177,31 @@ class BiasAuditor:
             cat = pattern["category"]
             cat_counters[cat] = cat_counters.get(cat, 0) + 1
             rule_id = self._get_or_generate_rule_id(pattern, cat_counters[cat])
-            findings.append(BiasFinding(
-                rule_id=rule_id,
-                category=pattern["category"],
-                severity=pattern["severity"],
-                description=(
-                    f"[{pattern['id']}] {pattern['description']}"
-                    f" — 匹配关键词: {', '.join(matched[:3])}"
-                ),
-            ))
+            findings.append(
+                BiasFinding(
+                    rule_id=rule_id,
+                    category=pattern["category"],
+                    severity=pattern["severity"],
+                    description=(
+                        f"[{pattern['id']}] {pattern['description']}"
+                        f" — 匹配关键词: {', '.join(matched[:3])}"
+                    ),
+                )
+            )
 
         return findings
 
-    def _demographic_matches(
-        self, persona: PersonaProfile, demo_match: dict
-    ) -> bool:
+    def _demographic_matches(self, persona: PersonaProfile, demo_match: dict) -> bool:
         """Check if persona demographics satisfy the pattern's constraints."""
         l1 = persona.layer1_demographics
 
         # Simple exact field match
-        for field, expected in demo_match.items():
+        for field_name, expected in demo_match.items():
             if field in ("city_keywords", "occupation_keywords", "age_keywords", "income_keywords"):
                 continue  # handled below
             if field == "check_field":
                 continue  # meta-field, not a demographic
-            actual = getattr(l1, field, "")
+            actual = getattr(l1, field_name, "")
             # Handle list fields (e.g. purchase_channels, information_source)
             if isinstance(actual, list):
                 if not any(expected in str(item) for item in actual):
@@ -211,27 +210,14 @@ class BiasAuditor:
                 return False
 
         # City keyword match
-        city_kws = demo_match.get("city_keywords")
-        if city_kws is not None:
-            if not any(kw in l1.city for kw in city_kws):
-                return False
-
-        # Occupation keyword match
-        occ_kws = demo_match.get("occupation_keywords")
-        if occ_kws is not None:
-            if not any(kw in l1.occupation for kw in occ_kws):
-                return False
-
-        # Age keyword match
-        age_kws = demo_match.get("age_keywords")
-        if age_kws is not None:
-            if not any(kw in l1.age for kw in age_kws):
-                return False
-
-        # Income keyword match
-        income_kws = demo_match.get("income_keywords")
-        if income_kws is not None:
-            if not any(kw in l1.income for kw in income_kws):
+        for key, attr_value in (
+            ("city_keywords", l1.city),
+            ("occupation_keywords", l1.occupation),
+            ("age_keywords", l1.age),
+            ("income_keywords", l1.income),
+        ):
+            kws = demo_match.get(key)
+            if kws is not None and not any(kw in attr_value for kw in kws):
                 return False
 
         # check_field: used to limit which field the keywords are checked against
@@ -275,49 +261,63 @@ class BiasAuditor:
         if not match_fields:
             # Scan all fields
             match_fields = [
-                "demographics", "behavior", "psychology",
-                "scenarios", "language",
+                "demographics",
+                "behavior",
+                "psychology",
+                "scenarios",
+                "language",
             ]
 
         for mf in match_fields:
             if mf == "demographics":
-                parts.extend([
-                    l1.age, l1.gender, l1.city, l1.income,
-                    l1.occupation, l1.education, l1.marital_status,
-                    l1.living_type,
-                ])
+                parts.extend(
+                    [
+                        l1.age,
+                        l1.gender,
+                        l1.city,
+                        l1.income,
+                        l1.occupation,
+                        l1.education,
+                        l1.marital_status,
+                        l1.living_type,
+                    ]
+                )
             elif mf == "behavior":
-                parts.extend([
-                    l2.price_sensitivity,
-                    l2.decision_style,
-                    l2.brand_loyalty,
-                    " ".join(l2.purchase_channels),
-                    " ".join(l2.information_source),
-                ])
+                parts.extend(
+                    [
+                        l2.price_sensitivity,
+                        l2.decision_style,
+                        l2.brand_loyalty,
+                        " ".join(l2.purchase_channels),
+                        " ".join(l2.information_source),
+                    ]
+                )
             elif mf == "psychology":
-                parts.extend([
-                    " ".join(l3.core_values),
-                    " ".join(l3.core_anxieties),
-                    " ".join(l3.tension_combination.labels),
-                    l3.tension_combination.narrative_explanation,
-                    l3.secret_motivation,
-                    l3.defense_mechanism,
-                ])
+                parts.extend(
+                    [
+                        " ".join(l3.core_values),
+                        " ".join(l3.core_anxieties),
+                        " ".join(l3.tension_combination.labels),
+                        l3.tension_combination.narrative_explanation,
+                        l3.secret_motivation,
+                        l3.defense_mechanism,
+                    ]
+                )
             elif mf == "scenarios":
-                parts.extend([
-                    l4.daily_routine,
-                    l4.purchase_trigger,
-                    l4.stress_response,
-                    l4.social_behavior,
-                ])
+                parts.extend(
+                    [
+                        l4.daily_routine,
+                        l4.purchase_trigger,
+                        l4.stress_response,
+                        l4.social_behavior,
+                    ]
+                )
             elif mf == "language":
                 parts.extend(persona.language_samples)
 
         return (" " + " ".join(parts) + " ").lower()
 
-    def _get_or_generate_rule_id(
-        self, pattern: dict, counter: int
-    ) -> str:
+    def _get_or_generate_rule_id(self, pattern: dict, counter: int) -> str:
         """Return the rule_id for a pattern.
 
         Uses backward-compatible BIAS-xxx-NNN format for categories that
@@ -336,21 +336,21 @@ class BiasAuditor:
     # Language bias terms (explicit slurs — kept as dedicated check)
     # ------------------------------------------------------------------
 
-    def _check_language_bias_terms(
-        self, persona: PersonaProfile
-    ) -> list[BiasFinding]:
+    def _check_language_bias_terms(self, persona: PersonaProfile) -> list[BiasFinding]:
         """Flag explicit bias terms in language samples."""
         findings: list[BiasFinding] = []
         samples_text = " ".join(persona.language_samples)
 
         for term in self.BIASED_TERMS:
             if term in samples_text:
-                findings.append(BiasFinding(
-                    rule_id="BIAS-LANG-001",
-                    category="language",
-                    severity="high",
-                    description=f"语言样本中出现偏见术语: '{term}'",
-                ))
+                findings.append(
+                    BiasFinding(
+                        rule_id="BIAS-LANG-001",
+                        category="language",
+                        severity="high",
+                        description=f"语言样本中出现偏见术语: '{term}'",
+                    )
+                )
 
         return findings
 
@@ -358,9 +358,7 @@ class BiasAuditor:
     # Demographic diversity (overly-average template detection)
     # ------------------------------------------------------------------
 
-    def _check_demographic_diversity(
-        self, persona: PersonaProfile
-    ) -> list[BiasFinding]:
+    def _check_demographic_diversity(self, persona: PersonaProfile) -> list[BiasFinding]:
         """Check for overly 'average' demographics that lack diversity."""
         findings: list[BiasFinding] = []
         l1 = persona.layer1_demographics
@@ -379,15 +377,17 @@ class BiasAuditor:
             average_markers += 1
 
         if average_markers >= 4:
-            findings.append(BiasFinding(
-                rule_id="BIAS-DIV-001",
-                category="diversity",
-                severity="low",
-                description=(
-                    f"画像呈现高度'平均化'特征({average_markers}/5项)，"
-                    f"可能反映模型输出集中在典型模板"
-                ),
-            ))
+            findings.append(
+                BiasFinding(
+                    rule_id="BIAS-DIV-001",
+                    category="diversity",
+                    severity="low",
+                    description=(
+                        f"画像呈现高度'平均化'特征({average_markers}/5项)，"
+                        f"可能反映模型输出集中在典型模板"
+                    ),
+                )
+            )
 
         return findings
 
@@ -395,9 +395,7 @@ class BiasAuditor:
     # Batch audit helper
     # ------------------------------------------------------------------
 
-    def audit_batch(
-        self, personas: list[PersonaProfile]
-    ) -> dict[str, Any]:
+    def audit_batch(self, personas: list[PersonaProfile]) -> dict[str, Any]:
         """Audit a batch and report aggregate statistics."""
         results = [self.audit(p) for p in personas]
 
@@ -412,9 +410,7 @@ class BiasAuditor:
         # Count by category
         category_counts: dict[str, int] = {}
         for f in all_findings:
-            category_counts[f.category] = (
-                category_counts.get(f.category, 0) + 1
-            )
+            category_counts[f.category] = category_counts.get(f.category, 0) + 1
 
         return {
             "total_audited": total,
@@ -423,10 +419,6 @@ class BiasAuditor:
             "pass_rate": round(passed / total, 3) if total else 0,
             "total_findings": len(all_findings),
             "findings_by_category": category_counts,
-            "critical_severity_findings": sum(
-                1 for f in all_findings if f.severity == "critical"
-            ),
-            "high_severity_findings": sum(
-                1 for f in all_findings if f.severity == "high"
-            ),
+            "critical_severity_findings": sum(1 for f in all_findings if f.severity == "critical"),
+            "high_severity_findings": sum(1 for f in all_findings if f.severity == "high"),
         }

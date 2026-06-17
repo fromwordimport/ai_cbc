@@ -66,10 +66,7 @@ def _generate_full_factorial(attributes: list[Attribute]) -> list[dict[str, Any]
     """Generate all possible attribute-level combinations."""
     level_lists = [[level.value for level in attr.levels] for attr in attributes]
     attr_ids = [attr.id for attr in attributes]
-    return [
-        dict(zip(attr_ids, combo, strict=True))
-        for combo in product(*level_lists)
-    ]
+    return [dict(zip(attr_ids, combo, strict=True)) for combo in product(*level_lists)]
 
 
 def _is_prohibited(profile: dict[str, Any], prohibited_pairs: list[ProhibitedPair]) -> bool:
@@ -80,17 +77,12 @@ def _is_prohibited(profile: dict[str, Any], prohibited_pairs: list[ProhibitedPai
     matching pair causes rejection.
     """
     for pair in prohibited_pairs:
-        if all(
-            profile.get(cond.attribute_id) == cond.level_value
-            for cond in pair.conditions
-        ):
+        if all(profile.get(cond.attribute_id) == cond.level_value for cond in pair.conditions):
             return True
     return False
 
 
-def _has_duplicates_in_set(
-    profiles: list[dict[str, Any]], set_start: int, set_end: int
-) -> bool:
+def _has_duplicates_in_set(profiles: list[dict[str, Any]], set_start: int, set_end: int) -> bool:
     """Check for duplicate profiles within a choice set range."""
     seen: set[tuple[tuple[str, Any], ...]] = set()
     for i in range(set_start, set_end):
@@ -141,9 +133,7 @@ def _precompute_candidate_vectors(
     return np.vstack(rows)
 
 
-def _compute_info_zeroprior(
-    encoded_design: np.ndarray, alts_per_set: int
-) -> np.ndarray:
+def _compute_info_zeroprior(encoded_design: np.ndarray, alts_per_set: int) -> np.ndarray:
     """Information matrix for a zero-parameter prior (all utilities equal).
 
     When beta=0 the choice probabilities are identical (1/J) within every
@@ -267,8 +257,7 @@ def d_optimal_design(
         sign, current_logdet = np.linalg.slogdet(info_mat)
         if sign <= 0:
             raise RuntimeError(
-                "initial information matrix is not positive-definite "
-                "even after regularisation"
+                "initial information matrix is not positive-definite even after regularisation"
             )
 
     # ------------------------------------------------------------------
@@ -331,9 +320,7 @@ def d_optimal_design(
             set_start = set_idx * J
             set_end = set_start + J
             other_keys = {
-                candidate_keys[current_indices[p]]
-                for p in range(set_start, set_end)
-                if p != pos
+                candidate_keys[current_indices[p]] for p in range(set_start, set_end) if p != pos
             }
             for ci in range(C):
                 if mask[ci] and candidate_keys[ci] in other_keys:
@@ -358,11 +345,7 @@ def d_optimal_design(
 
                 # Rank-3 update to info_mat:
                 #   M' = M + v·d^T + d·v^T + α·d·d^T
-                info_mat += (
-                    np.outer(v, d)
-                    + np.outer(d, v)
-                    + alpha * np.outer(d, d)
-                )
+                info_mat += np.outer(v, d) + np.outer(d, v) + alpha * np.outer(d, d)
 
                 # Update internal state
                 encoded_current[pos] = new_vec
@@ -374,11 +357,7 @@ def d_optimal_design(
                 sign, current_logdet = np.linalg.slogdet(info_mat)
                 if sign <= 0:
                     # Degenerate design — rollback (shouldn't happen in practice)
-                    info_mat -= (
-                        np.outer(v, d)
-                        + np.outer(d, v)
-                        + alpha * np.outer(d, d)
-                    )
+                    info_mat -= np.outer(v, d) + np.outer(d, v) + alpha * np.outer(d, d)
                     encoded_current[pos] = old_vec
                     current_indices[pos] = old_idx  # restore
                     current_design[pos] = candidate_set[old_idx]
@@ -400,10 +379,7 @@ def d_optimal_design(
     choice_sets: list[ChoiceSet] = []
     for i in range(num_sets):
         start = i * J
-        alts = [
-            Alternative(alt_index=j, attributes=current_design[start + j])
-            for j in range(J)
-        ]
+        alts = [Alternative(alt_index=j, attributes=current_design[start + j]) for j in range(J)]
         choice_sets.append(ChoiceSet(choice_set_id=i + 1, alternatives=alts))
 
     # Final efficiency metrics (use the canonical function for accuracy)

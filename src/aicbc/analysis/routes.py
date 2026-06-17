@@ -13,29 +13,6 @@ from datetime import UTC, datetime
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from aicbc.analysis.models import (
-    AnalyzeRequest,
-    AnalysisJobStatus,
-    AnalysisResultResponse,
-    ConvergenceDiagnostics,
-    ImportanceResponse,
-    ImportanceStats,
-    LatentClassRequest,
-    LatentClassResponse,
-    MarketSimRequest,
-    MarketSimResponse,
-    ParseScenarioRequest,
-    PerAttributeTest,
-    PriceCoefficientSummary,
-    ProductScenario,
-    ScenarioShare,
-    SegmentComparisonResponse,
-    WTPAttribute,
-    WTPComparison,
-    WTPResponse,
-)
-from aicbc.analysis.nl_scenario_parser import parse_nl_scenario
-from aicbc.analysis.report_builder import build_report
 from aicbc.analysis.cbc_visualizer import (
     build_dashboard_option,
     build_importance_chart_option,
@@ -44,24 +21,39 @@ from aicbc.analysis.cbc_visualizer import (
     build_utility_distribution_option,
     build_wtp_chart_option,
 )
-from aicbc.analysis.preprocessing import get_feature_columns, to_long_format, validate_dataset
-from aicbc.analysis.results.importance import aggregate_importance, compute_importance
+from aicbc.analysis.models import (
+    AnalysisJobStatus,
+    AnalysisResultResponse,
+    AnalyzeRequest,
+    ConvergenceDiagnostics,
+    ImportanceResponse,
+    LatentClassRequest,
+    LatentClassResponse,
+    MarketSimRequest,
+    MarketSimResponse,
+    ParseScenarioRequest,
+    PerAttributeTest,
+    ProductScenario,
+    ScenarioShare,
+    SegmentComparisonResponse,
+    WTPResponse,
+)
+from aicbc.analysis.nl_scenario_parser import parse_nl_scenario
+from aicbc.analysis.preprocessing import validate_dataset
+from aicbc.analysis.report_builder import build_report
 from aicbc.analysis.results.segment_comparison import compare_segments as seg_compare
-from aicbc.analysis.results.wtp import WTPCalculator
 from aicbc.analysis.simulation.market_simulator import MarketSimulator
 from aicbc.analysis.store import AnalysisStore, get_analysis_store
 from aicbc.analysis.tasks import run_analysis_task, run_latent_class_task
 from aicbc.core.store import get_questionnaire_store, get_response_store
-from aicbc.questionnaire.models import Attribute, AttributeType
+from aicbc.questionnaire.models import Attribute
 from aicbc.questionnaire.response_models import CBCRawDataset
 
 router = APIRouter()
 logger = structlog.get_logger("aicbc.api.analysis")
 
 
-async def _verify_study_ownership(
-    study_id: str, analysis_id: str, store: AnalysisStore
-) -> None:
+async def _verify_study_ownership(study_id: str, analysis_id: str, store: AnalysisStore) -> None:
     """Verify that analysis_id belongs to study_id (isolation check).
 
     Prevents cross-study data access via manipulated URL paths.
@@ -112,7 +104,7 @@ async def _get_dataset(study_id: str) -> CBCRawDataset:
 )
 async def analyze_study(
     study_id: str,
-    request: "AnalyzeRequest",
+    request: AnalyzeRequest,
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> AnalysisJobStatus:
     """Enqueue a conjoint analysis job for a study (HB/MNL/LatentClass).
@@ -151,19 +143,27 @@ async def analyze_study(
         model_type=request.model_type,
         queued_at=datetime.now(UTC),
         started_at=None,
-        estimated_duration_seconds=300 if request.model_type == "hb" else 600 if request.model_type == "latent_class" else 30,
+        estimated_duration_seconds=300
+        if request.model_type == "hb"
+        else 600
+        if request.model_type == "latent_class"
+        else 30,
         progress_percent=0.0,
     )
     await analysis_store.asave_job(job)
 
     # ── Enqueue Celery task ─────────────────────────────────────────────
-    config_json = json.dumps({
-        "n_draws": request.n_draws,
-        "n_tune": request.n_tune,
-        "n_chains": request.n_chains,
-        "target_accept": request.target_accept,
-        "n_classes": request.prior_config.get("n_classes", 3) if request.model_type == "latent_class" else None,
-    })
+    config_json = json.dumps(
+        {
+            "n_draws": request.n_draws,
+            "n_tune": request.n_tune,
+            "n_chains": request.n_chains,
+            "target_accept": request.target_accept,
+            "n_classes": request.prior_config.get("n_classes", 3)
+            if request.model_type == "latent_class"
+            else None,
+        }
+    )
 
     if request.model_type == "latent_class":
         result = run_latent_class_task.delay(
@@ -204,7 +204,7 @@ async def get_analysis_result(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Analysis '{analysis_id}' is still {job.status}. "
-                       f"Retry when status is COMPLETED.",
+                f"Retry when status is COMPLETED.",
             )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -243,6 +243,7 @@ async def get_analysis_status(
     celery_task_id = job.metadata.get("celery_task_id")
     if job.status in ("QUEUED", "PENDING") and celery_task_id:
         from aicbc.analysis.tasks import celery_app
+
         try:
             task_result = celery_app.AsyncResult(celery_task_id)
             celery_state = task_result.state
@@ -263,11 +264,10 @@ async def get_analysis_status(
             pass  # Celery backend unavailable — fall through to store status
 
     # Zombie recovery: if RUNNING longer than hard timeout, mark FAILED
-    _HARD_TIMEOUT = 600  # must match Celery task time_limit
+    hard_timeout = 600  # must match Celery task time_limit
     if job.status == "RUNNING" and job.started_at is not None:
-        from datetime import UTC, datetime
         elapsed = (datetime.now(UTC) - job.started_at).total_seconds()
-        if elapsed > _HARD_TIMEOUT:
+        if elapsed > hard_timeout:
             await analysis_store.aupdate_job_status(analysis_id, "FAILED", progress=0.0)
             job.status = "FAILED"
 
@@ -412,15 +412,10 @@ async def simulate_market(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Analysis has no individual utility estimates",
         )
-    util_df = pd.DataFrame.from_dict(
-        result.individual_utilities, orient="index"
-    )
+    util_df = pd.DataFrame.from_dict(result.individual_utilities, orient="index")
 
     # Build scenarios dynamically from ProductScenario.attributes dict
-    scenarios = [
-        {"name": s.name, **s.attributes}
-        for s in request.scenarios
-    ]
+    scenarios = [{"name": s.name, **s.attributes} for s in request.scenarios]
 
     # Run simulation with error handling
     try:
@@ -498,9 +493,7 @@ async def compare_segments(
     # Build utilities DataFrame
     import pandas as pd
 
-    util_df = pd.DataFrame.from_dict(
-        result.individual_utilities, orient="index"
-    )
+    util_df = pd.DataFrame.from_dict(result.individual_utilities, orient="index")
 
     # Build segment labels series
     segment_map: dict[str, str] = {}
@@ -577,9 +570,7 @@ async def compare_segments(
         interpretation=comparison["interpretation"],
     )
 
-    await analysis_store.asave_segment_comparison(
-        analysis_id, segment_a, segment_b, response
-    )
+    await analysis_store.asave_segment_comparison(analysis_id, segment_a, segment_b, response)
     return response
 
 
@@ -647,7 +638,9 @@ async def get_visualization(
         ...,
         pattern=r"^(importance_bar|importance_pie|utility_distribution|market_share|wtp|dashboard)$",
     ),
-    sim_id: str | None = Query(default=None, description="Market simulation ID (for market_share / dashboard)"),
+    sim_id: str | None = Query(
+        default=None, description="Market simulation ID (for market_share / dashboard)"
+    ),
     analysis_store: AnalysisStore = Depends(get_analysis_store),
 ) -> dict:
     """Return an ECharts-compatible JSON option for the requested chart."""
@@ -727,13 +720,15 @@ async def run_latent_class(
     )
     await analysis_store.asave_job(job)
 
-    config_json = json.dumps({
-        "n_classes": request.n_classes,
-        "n_draws": request.n_draws,
-        "n_tune": request.n_tune,
-        "n_chains": request.n_chains,
-        "target_accept": request.target_accept,
-    })
+    config_json = json.dumps(
+        {
+            "n_classes": request.n_classes,
+            "n_draws": request.n_draws,
+            "n_tune": request.n_tune,
+            "n_chains": request.n_chains,
+            "target_accept": request.target_accept,
+        }
+    )
     celery_result = run_latent_class_task.delay(
         study_id=study_id,
         analysis_id=analysis_id,

@@ -85,7 +85,7 @@ class LatentClassEngine:
         self._resp_tasks = {rid: [] for rid in self._resp_ids}
 
         self._tasks = []
-        for (resp, task), group in data.groupby([resp_id_col, task_id_col], sort=False):
+        for (resp, _task), group in data.groupby([resp_id_col, task_id_col], sort=False):
             X_task = group[feature_cols].values.astype(np.float64)
             chosen_mask = group[choice_col].values == 1
             if not chosen_mask.any():
@@ -170,7 +170,6 @@ class LatentClassEngine:
     ) -> LatentClassResult:
         """Fit the latent class model and return results."""
         import pymc as pm
-        import arviz as az
 
         self.build_model(data, feature_cols, resp_id_col, task_id_col, choice_col)
         assert self.model is not None
@@ -191,8 +190,7 @@ class LatentClassEngine:
         class_utilities = self._extract_class_utilities()
         individual_class_probs = self._compute_individual_class_probs(data, feature_cols)
         assigned_class = {
-            rid: max(probs, key=probs.get)
-            for rid, probs in individual_class_probs.items()
+            rid: max(probs, key=probs.get) for rid, probs in individual_class_probs.items()
         }
 
         return LatentClassResult(
@@ -253,9 +251,7 @@ class LatentClassEngine:
         beta = self.trace.posterior["beta"].mean(dim=["chain", "draw"]).values
         assert self._feature_cols is not None
         return {
-            f"class_{c}": {
-                col: float(beta[c, i]) for i, col in enumerate(self._feature_cols)
-            }
+            f"class_{c}": {col: float(beta[c, i]) for i, col in enumerate(self._feature_cols)}
             for c in range(beta.shape[0])
         }
 
@@ -271,9 +267,7 @@ class LatentClassEngine:
         if self.trace is None:
             raise RuntimeError("Model must be fit first")
 
-        class_probs = (
-            self.trace.posterior["class_probs"].mean(dim=["chain", "draw"]).values
-        )
+        class_probs = self.trace.posterior["class_probs"].mean(dim=["chain", "draw"]).values
         beta = self.trace.posterior["beta"].mean(dim=["chain", "draw"]).values
 
         result: dict[str, dict[str, float]] = {}
@@ -284,7 +278,11 @@ class LatentClassEngine:
                 X = group[feature_cols].values.astype(np.float64)
                 chosen = int(np.argmax(group[choice_col].values))
                 utilities = X @ beta.T  # (n_alts, n_classes)
-                log_softmax = utilities - np.log(np.sum(np.exp(utilities - np.max(utilities, axis=0)), axis=0)) - np.max(utilities, axis=0)
+                log_softmax = (
+                    utilities
+                    - np.log(np.sum(np.exp(utilities - np.max(utilities, axis=0)), axis=0))
+                    - np.max(utilities, axis=0)
+                )
                 log_lik += log_softmax[chosen, :]
             probs = np.exp(log_lik - np.max(log_lik))
             probs = probs / probs.sum()

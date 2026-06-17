@@ -10,8 +10,12 @@ def main() -> int:
     with open("pip-audit.json", encoding="utf-8") as f:
         data = json.load(f)
 
+    dependencies = data.get("dependencies", []) if isinstance(data, dict) else data
+
     failures: list[tuple[str | None, str | None, str | None, str]] = []
-    for dep in data:
+    for dep in dependencies:
+        if not isinstance(dep, dict):
+            continue
         for vuln in dep.get("vulns", []):
             severity = vuln.get("severity", "UNKNOWN")
             if severity in ("HIGH", "CRITICAL"):

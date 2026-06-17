@@ -31,17 +31,38 @@ _LAYER_META: dict[int, dict[str, Any]] = {
     1: {
         "name": "Layer 1: 人口统计层 (Demographics)",
         "description": "生成消费者的基础人口统计信息",
-        "fields": ["age", "gender", "city", "income", "occupation", "education", "marital_status", "living_type"],
+        "fields": [
+            "age",
+            "gender",
+            "city",
+            "income",
+            "occupation",
+            "education",
+            "marital_status",
+            "living_type",
+        ],
     },
     2: {
         "name": "Layer 2: 消费行为层 (Behavior)",
         "description": "基于Layer 1的人口统计信息，生成消费行为特征",
-        "fields": ["price_sensitivity", "purchase_channels", "decision_style", "brand_loyalty", "information_source"],
+        "fields": [
+            "price_sensitivity",
+            "purchase_channels",
+            "decision_style",
+            "brand_loyalty",
+            "information_source",
+        ],
     },
     3: {
         "name": "Layer 3: 心理动机层 (Psychology)",
         "description": "基于Layer 1-2的信息，生成深层心理动机和张力组合",
-        "fields": ["core_values", "core_anxieties", "tension_combination", "secret_motivation", "defense_mechanism"],
+        "fields": [
+            "core_values",
+            "core_anxieties",
+            "tension_combination",
+            "secret_motivation",
+            "defense_mechanism",
+        ],
     },
     4: {
         "name": "Layer 4: 情境叙事层 (Scenarios)",
@@ -182,7 +203,9 @@ class ProfileGenerator:
             study_id: Optional study identifier for cost tracking.
         """
         self._llm = llm_client or LLMClient()
-        self._prompt_path = Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        self._prompt_path = (
+            Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        )
         self._template = self._load_template()
         self._study_id = study_id
 
@@ -296,10 +319,13 @@ class ProfileGenerator:
             A fully rendered prompt string.
         """
         meta = _LAYER_META[layer_num]
-        tension_pairs_str = "\n".join(
-            f"  - {p.tag_a} vs {p.tag_b} (张力值: {p.tension_value}): {p.narrative}"
-            for p in seed_config.tension_pairs
-        ) or "  无预定义张力组合"
+        tension_pairs_str = (
+            "\n".join(
+                f"  - {p.tag_a} vs {p.tag_b} (张力值: {p.tension_value}): {p.narrative}"
+                for p in seed_config.tension_pairs
+            )
+            or "  无预定义张力组合"
+        )
 
         previous_layers_str = ""
         if previous_layers:
@@ -360,7 +386,10 @@ class ProfileGenerator:
         try:
             response = self._llm.generate(
                 messages=[
-                    {"role": "system", "content": "你是一个专业的消费者研究专家，擅长生成真实、立体的消费者画像。"},
+                    {
+                        "role": "system",
+                        "content": "你是一个专业的消费者研究专家，擅长生成真实、立体的消费者画像。",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 json_mode=True,

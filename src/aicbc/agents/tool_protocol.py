@@ -20,13 +20,14 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
-import json
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, TypeVar
+from enum import StrEnum
+from typing import Any
 
 import structlog
 
@@ -38,7 +39,7 @@ logger = structlog.get_logger("aicbc.agents.tool_protocol")
 # ---------------------------------------------------------------------------
 
 
-class ToolStatus(str, Enum):
+class ToolStatus(StrEnum):
     """Execution status of a tool call."""
 
     SUCCESS = "success"
@@ -135,8 +136,7 @@ class ToolParameter:
 
         if value is not None and not isinstance(value, expected):
             return False, (
-                f"Parameter '{self.name}' expected {self.param_type}, "
-                f"got {type(value).__name__}"
+                f"Parameter '{self.name}' expected {self.param_type}, got {type(value).__name__}"
             )
 
         return True, ""
@@ -202,6 +202,25 @@ class ToolSpec:
         }
 
     @classmethod
+    def _from_param(
+        cls,
+        name: str,
+        description: str,
+        *,
+        required: bool = True,
+        default: Any = None,
+        param_type: str = "any",
+    ) -> ToolParameter:
+        """Build a ToolParameter for use in a ToolSpec schema."""
+        return ToolParameter(
+            name=name,
+            description=description,
+            param_type=param_type,
+            required=required,
+            default=default,
+        )
+
+    @classmethod
     def from_callable(
         cls,
         fn: Callable,
@@ -250,9 +269,8 @@ class ToolSpec:
 
         return_cls = sig.return_annotation
         return_type = "any"
-        if return_cls != inspect.Signature.empty and return_cls != inspect.Parameter.empty:
-            if return_cls in (str, int, float, bool, list, dict):
-                return_type = return_cls.__name__
+        if return_cls in (str, int, float, bool, list, dict):
+            return_type = return_cls.__name__
 
         return cls(
             name=name or fn.__name__,
@@ -314,7 +332,9 @@ class ToolRegistry:
             ValueError: If tool already registered and override=False.
         """
         if spec.name in self._tools and not override:
-            raise ValueError(f"Tool '{spec.name}' already registered. Use override=True to replace.")
+            raise ValueError(
+                f"Tool '{spec.name}' already registered. Use override=True to replace."
+            )
 
         self._tools[spec.name] = fn
         self._specs[spec.name] = spec
@@ -367,10 +387,7 @@ class ToolRegistry:
         """List all registered tool names, optionally filtered by tag."""
         if tag is None:
             return list(self._tools.keys())
-        return [
-            name for name, spec in self._specs.items()
-            if tag in spec.tags
-        ]
+        return [name for name, spec in self._specs.items() if tag in spec.tags]
 
     def list_specs(self) -> list[ToolSpec]:
         """Return all tool specifications."""
@@ -492,9 +509,7 @@ class ToolCaller:
         timeout = spec.timeout_seconds or self.default_timeout
         max_retries = spec.max_retries or self.default_retries
 
-        result = self._execute_with_retry(
-            fn, kwargs, spec, call_id, timeout, max_retries
-        )
+        result = self._execute_with_retry(fn, kwargs, spec, call_id, timeout, max_retries)
         record.result = result
         self._record_call(record)
         return result
@@ -545,7 +560,7 @@ class ToolCaller:
                 )
                 if attempt < max_retries:
                     # Exponential backoff: 2^attempt seconds
-                    time.sleep(min(2 ** attempt, 10))
+                    time.sleep(min(2**attempt, 10))
 
             except Exception as exc:
                 duration_ms = (time.perf_counter() - start) * 1000
@@ -559,7 +574,7 @@ class ToolCaller:
                     error=str(exc),
                 )
                 if attempt < max_retries:
-                    time.sleep(min(2 ** attempt, 10))
+                    time.sleep(min(2**attempt, 10))
 
         # All retries exhausted
         status = (
@@ -640,9 +655,7 @@ class ToolCaller:
         timeout = spec.timeout_seconds or self.default_timeout
         max_retries = spec.max_retries or self.default_retries
 
-        result = await self._aexecute_with_retry(
-            fn, kwargs, spec, call_id, timeout, max_retries
-        )
+        result = await self._aexecute_with_retry(fn, kwargs, spec, call_id, timeout, max_retries)
         record.result = result
         self._record_call(record)
         return result
@@ -682,10 +695,10 @@ class ToolCaller:
                     metadata={"retry_count": retry_count},
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 duration_ms = (time.perf_counter() - start) * 1000
                 retry_count += 1
-                last_error = asyncio.TimeoutError(f"Timeout after {timeout}s")
+                last_error = TimeoutError(f"Timeout after {timeout}s")
                 self._log.warning(
                     "tool_timeout_async",
                     tool=spec.name,
@@ -693,7 +706,7 @@ class ToolCaller:
                     max_retries=max_retries,
                 )
                 if attempt < max_retries:
-                    await asyncio.sleep(min(2 ** attempt, 10))
+                    await asyncio.sleep(min(2**attempt, 10))
 
             except Exception as exc:
                 duration_ms = (time.perf_counter() - start) * 1000
@@ -707,7 +720,7 @@ class ToolCaller:
                     error=str(exc),
                 )
                 if attempt < max_retries:
-                    await asyncio.sleep(min(2 ** attempt, 10))
+                    await asyncio.sleep(min(2**attempt, 10))
 
         status = (
             ToolStatus.TIMEOUT
@@ -757,9 +770,7 @@ class ToolCaller:
         total = len(self._call_history)
         successes = sum(1 for r in self._call_history if r.result and r.result.is_success)
         failures = total - successes
-        avg_duration = (
-            sum(r.result.duration_ms for r in self._call_history if r.result) / total
-        )
+        avg_duration = sum(r.result.duration_ms for r in self._call_history if r.result) / total
 
         by_tool: dict[str, dict[str, int]] = {}
         for r in self._call_history:
@@ -801,6 +812,7 @@ def tool(
         def fit_model(data: pd.DataFrame, feature_cols: list[str]) -> dict:
             ...
     """
+
     def decorator(fn: Callable) -> Callable:
         reg = registry or ToolRegistry.global_registry()
         spec = ToolSpec.from_callable(
@@ -814,6 +826,7 @@ def tool(
         reg.register(spec, fn)
         fn._tool_spec = spec  # type: ignore
         return fn
+
     return decorator
 
 

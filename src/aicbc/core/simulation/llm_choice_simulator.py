@@ -100,22 +100,26 @@ class LLMChoiceSimulator:
                 for alt in cs.alternatives
             ]
 
-            choice_records.append(ChoiceRecord(
-                respondent_id=persona.persona_id,
-                respondent_index=0,
-                segment=persona.segment,
-                choice_set_id=cs.choice_set_id,
-                choice_set_index=cs_idx,
-                alternatives=alt_records,
-                none_chosen=False,
-            ))
+            choice_records.append(
+                ChoiceRecord(
+                    respondent_id=persona.persona_id,
+                    respondent_index=0,
+                    segment=persona.segment,
+                    choice_set_id=cs.choice_set_id,
+                    choice_set_index=cs_idx,
+                    alternatives=alt_records,
+                    none_chosen=False,
+                )
+            )
 
-            single_choices.append(SingleChoiceDetail(
-                choice_set_id=cs.choice_set_id,
-                chosen_alt_index=chosen_idx,
-                reasoning=reasoning,
-                confidence=confidence,
-            ))
+            single_choices.append(
+                SingleChoiceDetail(
+                    choice_set_id=cs.choice_set_id,
+                    chosen_alt_index=chosen_idx,
+                    reasoning=reasoning,
+                    confidence=confidence,
+                )
+            )
 
         raw_dataset = CBCRawDataset(
             metadata=DatasetMetadata(
@@ -186,13 +190,15 @@ class LLMChoiceSimulator:
                 rng=rng,
                 study_id=self._study_id,
             )
-            results.append({
-                "choice_set_index": cs_idx,
-                "chosen_alt_index": chosen_idx if chosen_idx is not None else 0,
-                "reasoning": reasoning,
-                "confidence": confidence,
-                "cost_usd": cost_usd,
-            })
+            results.append(
+                {
+                    "choice_set_index": cs_idx,
+                    "chosen_alt_index": chosen_idx if chosen_idx is not None else 0,
+                    "reasoning": reasoning,
+                    "confidence": confidence,
+                    "cost_usd": cost_usd,
+                }
+            )
         return results
 
 
@@ -250,8 +256,7 @@ def _build_choice_prompt(
     """Build the user prompt describing a single choice set."""
     lines = [
         "【产品选择任务】\n",
-        "你正在考虑购买一台洗碗机。以下是几个可选方案，"
-        "请凭直觉选出你最倾向的一个：\n",
+        "你正在考虑购买一台洗碗机。以下是几个可选方案，请凭直觉选出你最倾向的一个：\n",
     ]
 
     for alt in choice_set.alternatives:
@@ -262,11 +267,7 @@ def _build_choice_prompt(
             if val is not None:
                 lines.append(f"  - {attr.name}: {val}")
 
-    lines.append(
-        "\n\n请直接做出选择，不要过度分析。"
-        "选你直觉上更倾向的那个。\n"
-        "输出严格JSON格式:\n"
-    )
+    lines.append("\n\n请直接做出选择，不要过度分析。选你直觉上更倾向的那个。\n输出严格JSON格式:\n")
 
     example = {
         "chosen_alt_index": 0,

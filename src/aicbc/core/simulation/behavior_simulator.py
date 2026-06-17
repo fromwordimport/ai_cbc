@@ -13,9 +13,8 @@ from typing import Any
 
 import structlog
 
-from aicbc.core.security.input_sanitizer import sanitize_text
-
 from aicbc.core.models.persona import PersonaProfile
+from aicbc.core.security.input_sanitizer import sanitize_text
 from aicbc.llm.client import LLMClient
 
 logger = structlog.get_logger("aicbc.simulation")
@@ -227,13 +226,17 @@ class BehaviorSimulator:
             f"核心卖点: {', '.join(product.get('core_selling_points', []))}\n\n"
             "请基于以上画像，模拟消费者第一次看到该产品时的反应。\n"
             "输出严格JSON格式:\n"
-            + json.dumps({
-                "first_notice": "最先注意到的元素",
-                "initial_emotion": "情绪标签: curious/反感/无感/excited",
-                "three_second_judgment": "3秒直觉判断: buy/not_buy/再看看",
-                "interest_score": 0.0,  # 0-1
-                "internal_dialogue": "内心OS，体现人物特征",
-            }, ensure_ascii=False, indent=2)
+            + json.dumps(
+                {
+                    "first_notice": "最先注意到的元素",
+                    "initial_emotion": "情绪标签: curious/反感/无感/excited",
+                    "three_second_judgment": "3秒直觉判断: buy/not_buy/再看看",
+                    "interest_score": 0.0,  # 0-1
+                    "internal_dialogue": "内心OS，体现人物特征",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
         )
 
         try:
@@ -268,14 +271,18 @@ class BehaviorSimulator:
             "消费者对产品产生了兴趣，现在进入主动探索阶段。\n"
             "请模拟消费者可能采取的行动和提出的问题。\n"
             "输出严格JSON格式:\n"
-            + json.dumps({
-                "questions_asked": ["问题1", "问题2"],
-                "search_terms": ["搜索词1", "搜索词2"],
-                "will_check_reviews": True,
-                "will_compare_prices": True,
-                "concerns": ["顾虑1", "顾虑2"],
-                "excitement_triggers": ["兴奋点1"],
-            }, ensure_ascii=False, indent=2)
+            + json.dumps(
+                {
+                    "questions_asked": ["问题1", "问题2"],
+                    "search_terms": ["搜索词1", "搜索词2"],
+                    "will_check_reviews": True,
+                    "will_compare_prices": True,
+                    "concerns": ["顾虑1", "顾虑2"],
+                    "excitement_triggers": ["兴奋点1"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
         )
 
         try:
@@ -311,14 +318,18 @@ class BehaviorSimulator:
             "压力情境: 限时24小时优惠，仅剩5件库存\n\n"
             "请模拟消费者在压力下的最终决策过程。\n"
             "输出严格JSON格式:\n"
-            + json.dumps({
-                "decision": "buy/not_buy/defer",
-                "confidence": 0.0,  # 0-1
-                "decision_speed_change": "加速/减速/不变",
-                "typical_behaviors": ["凑单", "询问亲友", "加入购物车"],
-                "emotion_shift": "情绪变化描述",
-                "rationalization": "消费者如何合理化自己的决策",
-            }, ensure_ascii=False, indent=2)
+            + json.dumps(
+                {
+                    "decision": "buy/not_buy/defer",
+                    "confidence": 0.0,  # 0-1
+                    "decision_speed_change": "加速/减速/不变",
+                    "typical_behaviors": ["凑单", "询问亲友", "加入购物车"],
+                    "emotion_shift": "情绪变化描述",
+                    "rationalization": "消费者如何合理化自己的决策",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
         )
 
         try:
@@ -384,8 +395,8 @@ class BehaviorSimulator:
             + "".join(
                 f"· {_s(sample, f'language_sample_{i}')}\n"
                 for i, sample in enumerate(persona.language_samples)
-            ) +
-            "\n"
+            )
+            + "\n"
             "【回应规则】\n"
             "1. 你不会直接说出自己的'标签'，行为是标签的自然流露\n"
             "2. 你可能会说谎——尤其是涉及面子、隐私或社会期望的问题\n"
@@ -419,9 +430,13 @@ class BehaviorSimulator:
             f"{question}\n\n"
             "请用第一人称回答，保持人物的语言风格和情绪状态。\n"
             "输出严格JSON格式:\n"
-            + json.dumps({
-                "response": "你的回答（口语化、可能矛盾、可能跑题）",
-                "emotion": "当前情绪: calm/defensive/excited/anxious/neutral",
-                "inconsistency_warning": False,  # 如果回答与之前立场明显矛盾
-            }, ensure_ascii=False, indent=2)
+            + json.dumps(
+                {
+                    "response": "你的回答（口语化、可能矛盾、可能跑题）",
+                    "emotion": "当前情绪: calm/defensive/excited/anxious/neutral",
+                    "inconsistency_warning": False,  # 如果回答与之前立场明显矛盾
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
         )

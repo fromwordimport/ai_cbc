@@ -43,7 +43,7 @@ logger = structlog.get_logger("aicbc.analysis.tasks")
 @celery_app.task(
     bind=True,
     name="aicbc.analysis.run_analysis_task",
-    time_limit=600,       # Hard timeout: 10 minutes (HB NUTS worst-case)
+    time_limit=600,  # Hard timeout: 10 minutes (HB NUTS worst-case)
     soft_time_limit=540,  # Soft timeout: 9 minutes (allows graceful cleanup)
 )
 def run_analysis_task(
@@ -81,13 +81,11 @@ def run_analysis_task(
     """
     from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine
     from aicbc.analysis.engines.mnl_engine import MNLEngine
-    from aicbc.analysis.engines.latent_class_engine import LatentClassConfig, LatentClassEngine
     from aicbc.analysis.models import (
         AnalysisResultResponse,
         ConvergenceDiagnostics,
         ImportanceResponse,
         ImportanceStats,
-        LatentClassResponse,
         PriceCoefficientSummary,
         WTPAttribute,
         WTPComparison,
@@ -134,9 +132,7 @@ def run_analysis_task(
         # ── Validate (fail-fast) ─────────────────────────────────────
         validation = validate_dataset(dataset, attributes)
         if not validation["valid"]:
-            raise ValueError(
-                f"Dataset validation failed: {validation['errors']}"
-            )
+            raise ValueError(f"Dataset validation failed: {validation['errors']}")
 
         analysis_store.update_job_status(analysis_id, "RUNNING", progress=10.0)
 
@@ -174,9 +170,7 @@ def run_analysis_task(
         processing_time = (datetime.now(UTC) - started).total_seconds()
 
         # ── Build AnalysisResultResponse ─────────────────────────────
-        util_df = pd.DataFrame.from_dict(
-            result.individual_utilities, orient="index"
-        )
+        util_df = pd.DataFrame.from_dict(result.individual_utilities, orient="index")
 
         # Compute price_std BEFORE importance (used by both importance and WTP)
         price_attrs = [a for a in attributes if a.type == AttributeType.PRICE]
@@ -190,8 +184,7 @@ def run_analysis_task(
         importance_df = compute_importance(util_df, attributes, price_std=price_std)
         importance_agg = aggregate_importance(importance_df)
         importance_dict = {
-            attr_id: float(row["mean"])
-            for attr_id, row in importance_agg.iterrows()
+            attr_id: float(row["mean"]) for attr_id, row in importance_agg.iterrows()
         }
 
         # Convergence diagnostics — handle both HB (MCMC) and MNL (MLE)
@@ -199,33 +192,19 @@ def run_analysis_task(
         diag = result.diagnostics if is_hb and result.diagnostics else {}
         convergence = ConvergenceDiagnostics(
             rhat_max=result.rhat_max if hasattr(result, "rhat_max") else 0.0,
-            rhat_by_param=(
-                diag.get("rhat_by_param", {}) if is_hb else {}
-            ),
-            ess_bulk_min=(
-                int(result.ess_bulk_min) if hasattr(result, "ess_bulk_min") else 0
-            ),
-            ess_tail_min=(
-                int(result.ess_tail_min) if hasattr(result, "ess_tail_min") else 0
-            ),
-            ess_by_param=(
-                diag.get("ess_by_param", {}) if is_hb else {}
-            ),
+            rhat_by_param=(diag.get("rhat_by_param", {}) if is_hb else {}),
+            ess_bulk_min=(int(result.ess_bulk_min) if hasattr(result, "ess_bulk_min") else 0),
+            ess_tail_min=(int(result.ess_tail_min) if hasattr(result, "ess_tail_min") else 0),
+            ess_by_param=(diag.get("ess_by_param", {}) if is_hb else {}),
             converged=result.converged,
-            reliable_ess=(
-                diag.get("reliable_ess", False)
-                if is_hb
-                else result.converged
-            ),
+            reliable_ess=(diag.get("reliable_ess", False) if is_hb else result.converged),
             divergences=diag.get("divergences", 0) if is_hb else 0,
             tree_depth_max=diag.get("tree_depth_max", 0) if is_hb else 0,
         )
 
         # WTP
         if price_col in util_df.columns:
-            wtp_calc = WTPCalculator(
-                util_df, price_col=price_col, price_std=price_std
-            )
+            wtp_calc = WTPCalculator(util_df, price_col=price_col, price_std=price_std)
             wtp_data = wtp_calc.compute_all_wtp(attributes)
         else:
             wtp_data = {}
@@ -269,9 +248,7 @@ def run_analysis_task(
         # Individual distribution (for box/violin plots)
         individual_dict: dict[str, dict[str, float]] = {}
         for resp_id, imp_row in importance_df.iterrows():
-            individual_dict[resp_id] = {
-                col: float(imp_row[col]) for col in importance_df.columns
-            }
+            individual_dict[resp_id] = {col: float(imp_row[col]) for col in importance_df.columns}
 
         # By-segment importance (aggregated per segment)
         by_segment: dict[str, dict[str, ImportanceStats]] | None = None
@@ -343,25 +320,21 @@ def run_analysis_task(
             analysis_store.save_wtp(analysis_id, wtp_resp)
 
         # ── Mark COMPLETED ───────────────────────────────────────────
-        analysis_store.update_job_status(
-            analysis_id, "COMPLETED", progress=100.0
-        )
+        analysis_store.update_job_status(analysis_id, "COMPLETED", progress=100.0)
 
         log.info("analysis_task_completed")
         return {"status": "COMPLETED", "analysis_id": analysis_id}
 
     except Exception:
         log.exception("analysis_task_failed")
-        analysis_store.update_job_status(
-            analysis_id, "FAILED", progress=0.0
-        )
+        analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
         raise
 
 
 @celery_app.task(
     bind=True,
     name="aicbc.analysis.run_latent_class_task",
-    time_limit=900,       # 15 minutes — LCM can be slower than HB
+    time_limit=900,  # 15 minutes — LCM can be slower than HB
     soft_time_limit=780,
 )
 def run_latent_class_task(
@@ -455,9 +428,7 @@ def run_latent_class_task(
             processing_time_seconds=processing_time,
             completed_at=datetime.now(UTC),
         )
-        analysis_store.save_latent_class_result(
-            analysis_id, lc_response.model_dump(mode="json")
-        )
+        analysis_store.save_latent_class_result(analysis_id, lc_response.model_dump(mode="json"))
 
         # Save a lightweight AnalysisResultResponse so the standard result/status
         # endpoints can mark the job as COMPLETED.
@@ -468,26 +439,31 @@ def run_latent_class_task(
             model_type="latent_class",
             convergence=ConvergenceDiagnostics(
                 rhat_max=result.rhat_max,
-                rhat_by_param=result.diagnostics.get("rhat_by_param", {}) if result.diagnostics else {},
+                rhat_by_param=result.diagnostics.get("rhat_by_param", {})
+                if result.diagnostics
+                else {},
                 ess_bulk_min=float(result.ess_bulk_min),
                 ess_tail_min=float(result.ess_tail_min),
-                ess_by_param=result.diagnostics.get("ess_by_param", {}) if result.diagnostics else {},
+                ess_by_param=result.diagnostics.get("ess_by_param", {})
+                if result.diagnostics
+                else {},
                 converged=result.converged,
-                reliable_ess=result.diagnostics.get("reliable_ess", False) if result.diagnostics else False,
+                reliable_ess=result.diagnostics.get("reliable_ess", False)
+                if result.diagnostics
+                else False,
                 divergences=result.diagnostics.get("divergences", 0) if result.diagnostics else 0,
-                tree_depth_max=result.diagnostics.get("tree_depth_max", 0) if result.diagnostics else 0,
+                tree_depth_max=result.diagnostics.get("tree_depth_max", 0)
+                if result.diagnostics
+                else 0,
             ),
             population_params={"mu": {}, "sigma": {}}
             if not result.class_utilities
             else {
                 "mu": result.class_utilities.get("class_0", {}),
-                "sigma": {
-                    k: 0.0 for k in result.class_utilities.get("class_0", {})
-                },
+                "sigma": dict.fromkeys(result.class_utilities.get("class_0", {}), 0.0),
             },
             individual_utilities={
-                rid: {cls: prob for cls, prob in probs.items()}
-                for rid, probs in result.individual_class_probs.items()
+                rid: dict(probs.items()) for rid, probs in result.individual_class_probs.items()
             },
             importance={},
             wtp={},
