@@ -73,6 +73,7 @@ Standard interfaces (full schemas in [`docs/数据字典.md`](docs/数据字典.
 
 ## Editing Conventions
 
+- Always reply to the user in Chinese.
 - Specification documents use Markdown with Chinese as the primary language.
 - Frontmatter uses Chinese blockquote style (`> **版本**：v1.0`), not YAML.
 - Cross-references use relative paths with `[]()` links.
