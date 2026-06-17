@@ -39,6 +39,7 @@ analysis = [
     "pymc>=5.15.0",
     "arviz>=0.18.0",
     "scipy>=1.13.0",
+    "statsmodels>=0.14.0",
 ]
 
 [build-system]
