@@ -130,7 +130,9 @@ jobs:
       - name: Dependency vulnerability scan
         run: |
           pip install pip-audit
-          pip-audit --desc --format=json -o pip-audit.json
+          # pip-audit exits non-zero when any vulnerability is found; capture the
+          # report and let the helper script enforce the HIGH/CRITICAL policy.
+          pip-audit --desc --format=json -o pip-audit.json || true
           cat pip-audit.json
           # Fail if any vulnerability with severity HIGH or CRITICAL found
           python scripts/ci_check_pip_audit.py
@@ -158,7 +160,7 @@ jobs:
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('trivy-results.sarif') != ''
         with:
           sarif_file: 'trivy-results.sarif'
 

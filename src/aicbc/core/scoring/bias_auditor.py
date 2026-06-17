@@ -197,7 +197,12 @@ class BiasAuditor:
 
         # Simple exact field match
         for field_name, expected in demo_match.items():
-            if field_name in ("city_keywords", "occupation_keywords", "age_keywords", "income_keywords"):
+            if field_name in (
+                "city_keywords",
+                "occupation_keywords",
+                "age_keywords",
+                "income_keywords",
+            ):
                 continue  # handled below
             if field_name == "check_field":
                 continue  # meta-field, not a demographic
