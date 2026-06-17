@@ -392,7 +392,7 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     needs: [build]
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.KUBECONFIG_STAGING != ''
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     environment:
       name: staging
       url: https://staging.aicbc.example.com
@@ -402,18 +402,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check staging kubeconfig secret
+        id: kubeconfig_check
+        run: |
+          if [ -n "${{ secrets.KUBECONFIG_STAGING }}" ]; then
+            echo "has_kubeconfig=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_kubeconfig=false" >> "$GITHUB_OUTPUT"
+            echo "KUBECONFIG_STAGING secret not configured; skipping staging deployment"
+          fi
+
       - name: Set up kubectl
+        if: steps.kubeconfig_check.outputs.has_kubeconfig == 'true'
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.30.0'
 
       - name: Configure kubeconfig
+        if: steps.kubeconfig_check.outputs.has_kubeconfig == 'true'
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > ~/.kube/config
           kubectl config current-context
 
       - name: Update image tag in staging overlay
+        if: steps.kubeconfig_check.outputs.has_kubeconfig == 'true'
         run: |
           # Use Kustomize images transformer for clean overlay management
           # Match both 'latest' (legacy) and '0.1.0' (current base tag)
@@ -421,16 +434,19 @@ jobs:
           sed -i "s|newTag: 0.1.0|newTag: ${{ github.sha }}|g" k8s/overlays/staging/kustomization.yaml
 
       - name: Deploy to staging namespace
+        if: steps.kubeconfig_check.outputs.has_kubeconfig == 'true'
         run: |
           kubectl apply -k k8s/overlays/staging/
 
       - name: Wait for rollout
+        if: steps.kubeconfig_check.outputs.has_kubeconfig == 'true'
         run: |
           kubectl rollout status deployment/aicbc-api --namespace=aicbc-staging --timeout=300s
           kubectl rollout status deployment/aicbc-worker --namespace=aicbc-staging --timeout=300s
           kubectl rollout status deployment/aicbc-beat --namespace=aicbc-staging --timeout=300s
 
       - name: Smoke test staging
+        if: steps.kubeconfig_check.outputs.has_kubeconfig == 'true'
         run: |
           kubectl run smoke-test --rm -i --restart=Never \
             --image=curlimages/curl:latest \
