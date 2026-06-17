@@ -75,8 +75,10 @@ async def _check_redis() -> DependencyCheck:
 
         settings = get_settings()
         r = aioredis.from_url(settings.database.redis_url, decode_responses=True)
-        await r.ping()
-        await r.close()
+        try:
+            await r.ping()
+        finally:
+            await r.aclose()
         latency = (asyncio.get_event_loop().time() - start) * 1000
         return DependencyCheck(
             name="redis",

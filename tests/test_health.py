@@ -80,13 +80,33 @@ async def test_check_mongodb_fail():
 async def test_check_redis_pings():
     mock_redis = MagicMock()
     mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.close = AsyncMock()
+    mock_redis.aclose = AsyncMock()
 
-    with patch("redis.asyncio.from_url", return_value=mock_redis):
-        with patch("aicbc.config.settings.get_settings") as mock_settings:
-            mock_settings.return_value.database.redis_url = "redis://localhost:6379/0"
-            result = await _check_redis()
+    with (
+        patch("redis.asyncio.from_url", return_value=mock_redis),
+        patch("aicbc.config.settings.get_settings") as mock_settings,
+    ):
+        mock_settings.return_value.database.redis_url = "redis://localhost:6379/0"
+        result = await _check_redis()
 
     assert result.status == "ok"
     mock_redis.ping.assert_awaited_once()
-    mock_redis.close.assert_awaited_once()
+    mock_redis.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_check_redis_fail():
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(side_effect=ConnectionError("Redis is down"))
+    mock_redis.aclose = AsyncMock()
+
+    with (
+        patch("redis.asyncio.from_url", return_value=mock_redis),
+        patch("aicbc.config.settings.get_settings") as mock_settings,
+    ):
+        mock_settings.return_value.database.redis_url = "redis://localhost:6379/0"
+        result = await _check_redis()
+
+    assert result.status == "fail"
+    mock_redis.ping.assert_awaited_once()
+    mock_redis.aclose.assert_awaited_once()
