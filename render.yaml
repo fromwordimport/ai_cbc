@@ -83,13 +83,8 @@ services:
     runtime: static
     repo: https://github.com/fromwordimport/ai_cbc.git
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && cp dist/index.html dist/404.html
     staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-        status: 200
     domains:
       - aicbc.fromworldimport.com
     envVars:
