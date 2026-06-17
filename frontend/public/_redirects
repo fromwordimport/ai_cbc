@@ -1,3 +1,1 @@
-# SPA fallback: serve index.html for all non-asset routes so React Router
-# can handle client-side routing. Assets that exist are still served first.
-/*    /index.html   200
+/* /index.html 200
