@@ -171,7 +171,7 @@ class CostFuse:
         if settings.llm.model:
             return settings.llm.model
         # Fall back to the active provider's default model.
-        from aicbc.llm.client import LLMClient, Provider
+        from aicbc.llm.client import LLMClient
 
         provider = LLMClient._detect_provider("")
         return LLMClient._default_model_for_provider(provider)

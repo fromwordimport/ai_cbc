@@ -11,8 +11,9 @@ the change automatically.
 
 from __future__ import annotations
 
-import structlog
 from typing import Literal
+
+import structlog
 
 logger = structlog.get_logger("aicbc.config.pricing")
 
