@@ -1,9 +1,26 @@
 /// <reference types="vitest" />
+import fs from 'fs'
+import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { compression } from 'vite-plugin-compression2'
 import { visualizer } from 'rollup-plugin-visualizer'
-import path from 'path'
+
+// Copy the built index.html to 404.html so static hosts (Render, GitHub Pages,
+// Cloudflare Pages) serve the SPA for unknown paths instead of a bare 404.
+function spaFallbackPlugin() {
+  return {
+    name: 'spa-fallback',
+    closeBundle() {
+      const dist = path.resolve(__dirname, 'dist')
+      const indexPath = path.join(dist, 'index.html')
+      const fallbackPath = path.join(dist, '404.html')
+      if (fs.existsSync(indexPath)) {
+        fs.copyFileSync(indexPath, fallbackPath)
+      }
+    },
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -14,6 +31,7 @@ export default defineConfig({
     compression({ algorithm: 'brotliCompress', include: /\.(js|css|html|svg|json)$/ }),
     // Emit bundle analysis report on build
     visualizer({ open: false, filename: 'dist/stats.html' }),
+    spaFallbackPlugin(),
   ],
   test: {
     globals: true,
