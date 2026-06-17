@@ -55,7 +55,9 @@ The CI/CD pipeline in `../.github/workflows/ci-cd.yml` updates image tags and de
 
 ## Secret Management
 
-`secret.yaml` is a **template** and must not be applied directly. It contains base64-encoded placeholder values that are intentionally invalid.
+`secret.yaml` is a **template only** and must not be applied directly. It contains base64-encoded placeholder values that are intentionally invalid.
+
+See also the ESO example: [`base/external-secret.yaml.example`](base/external-secret.yaml.example).
 
 ### Recommended approaches (in order of preference)
 
@@ -71,6 +73,7 @@ The CI/CD pipeline in `../.github/workflows/ci-cd.yml` updates image tags and de
 
 2. **External Secrets Operator (ESO)** — sync from AWS Secrets Manager, Azure Key Vault, or HashiCorp Vault:
    - See: https://external-secrets.io/latest/
+   - Example manifest: `base/external-secret.yaml.example` (copy, customize remoteRef keys, and apply separately — it is **not** included in `kustomization.yaml` resources).
 
 3. **CI/CD variable injection** — replace placeholders during deployment:
    ```bash

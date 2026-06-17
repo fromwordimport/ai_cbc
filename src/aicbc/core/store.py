@@ -7,6 +7,7 @@ local development and tests.  The in-memory classes remain available as
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -21,7 +22,7 @@ from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
 _MongoStores: Any | None = None
 
 
-def _get_mongo_stores():
+def _get_mongo_stores() -> Any:
     global _MongoStores
     if _MongoStores is None:
         from aicbc.core import store_mongo
@@ -140,6 +141,10 @@ class MemoryQuestionnaireStore:
         with self._lock:
             self._studies.clear()
             self._questionnaires.clear()
+
+    async def aclear(self) -> None:
+        """Async-compatible clear (delegates to sync implementation)."""
+        self.clear()
 
 
 class MemoryResponseStore:
@@ -271,6 +276,10 @@ class MemoryResponseStore:
         with self._lock:
             self._responses.clear()
             self._datasets.clear()
+
+    async def aclear(self) -> None:
+        """Async-compatible clear (delegates to sync implementation)."""
+        self.clear()
 
 
 class MemoryPersonaStore:
@@ -478,6 +487,10 @@ class MemoryPersonaStore:
             self._bias_status_index.clear()
             self._fingerprints.clear()
 
+    async def aclear(self) -> None:
+        """Async-compatible clear (delegates to sync implementation)."""
+        self.clear()
+
 
 # Aliases for backward compatibility.
 QuestionnaireStore = MemoryQuestionnaireStore
@@ -537,16 +550,47 @@ def get_response_store() -> ResponseStore:
 
 
 def reset_stores() -> None:
-    """Reset all global store singletons to clean state."""
+    """Reset all global store singletons to clean state.
+
+    When called from an async context, callers should use :func:`areset_stores`
+    instead.  This sync wrapper dispatches to ``aclear()`` for Mongo-backed
+    stores and ``clear()`` for memory stores, using ``asyncio.run`` only when
+    no event loop is running.
+    """
     global _store, _questionnaire_store, _response_store
     _store = None
     _questionnaire_store = None
     _response_store = None
-    # Also clear the underlying memory stores if they are currently active.
-    get_store().clear()
-    get_questionnaire_store().clear()
-    get_response_store().clear()
-    # Then reset again so next callers get fresh instances.
+    try:
+        asyncio.get_running_loop()
+        # Called from an async context — caller should use areset_stores().
+        # Fall back to direct clear() for memory stores (safe because memory
+        # clear() is synchronous).  Mongo stores would need aclear() here.
+        get_store().clear()
+        get_questionnaire_store().clear()
+        get_response_store().clear()
+    except RuntimeError:
+        # No event loop running — safe to use asyncio.run for Mongo stores.
+        asyncio.run(areset_stores())
+    # Reset again so next callers get fresh instances.
+    _store = None
+    _questionnaire_store = None
+    _response_store = None
+
+
+async def areset_stores() -> None:
+    """Async version of :func:`reset_stores`.
+
+    Awaits each store's ``aclear()`` so Mongo-backed stores are cleaned
+    without blocking the event loop.
+    """
+    global _store, _questionnaire_store, _response_store
+    _store = None
+    _questionnaire_store = None
+    _response_store = None
+    await get_store().aclear()
+    await get_questionnaire_store().aclear()
+    await get_response_store().aclear()
     _store = None
     _questionnaire_store = None
     _response_store = None

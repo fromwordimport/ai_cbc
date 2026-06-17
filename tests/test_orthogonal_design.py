@@ -167,7 +167,7 @@ class TestGenerateOrthogonalQuestionnaire:
 
     def test_basic_generation(self) -> None:
         attrs = _make_attrs()
-        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.ORTHOGONAL, seed=42)
+        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42)
         q = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
         )
@@ -178,7 +178,7 @@ class TestGenerateOrthogonalQuestionnaire:
 
     def test_efficiency_reported(self) -> None:
         attrs = _make_attrs()
-        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.ORTHOGONAL, seed=42)
+        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42)
         q = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
         )
@@ -189,7 +189,7 @@ class TestGenerateOrthogonalQuestionnaire:
 
     def test_reproducibility(self) -> None:
         attrs = _make_attrs()
-        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.ORTHOGONAL, seed=42)
+        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42)
         q1 = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
         )
@@ -206,7 +206,7 @@ class TestGenerateOrthogonalQuestionnaire:
         from aicbc.questionnaire.generator import _dishwasher_default_attributes
 
         attrs = _dishwasher_default_attributes()
-        dp = DesignParameters(n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.ORTHOGONAL, seed=42)
+        dp = DesignParameters(n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.BALANCED, seed=42)
         q = generate_orthogonal_questionnaire(
             study_id="dw-orth", attributes=attrs, design_parameters=dp, seed=42
         )

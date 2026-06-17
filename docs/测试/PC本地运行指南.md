@@ -84,9 +84,9 @@ if (-not (Test-Path "node_modules")) {
 
 ---
 
-## 3. 启动后端（Mock 模式）
+## 3. 启动后端
 
-### 3.1 启动 Mock 后端
+### 3.1 启动后端
 
 ```bash
 # 清理残留 Python 进程（PowerShell）
@@ -95,8 +95,8 @@ Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force
 # 进入项目根目录
 cd E:\machine_learning_study\AI_CBC
 
-# 启动 mock 后端
-.venv\Scripts\python scripts\dev_server_with_mocks.py
+# 启动后端
+uv run uvicorn src.aicbc.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **期望输出：**
@@ -124,11 +124,11 @@ curl http://127.0.0.1:8000/api/v1/health
 
 ### 3.3 关于完整后端
 
-> **当前状态**：完整后端（`uv run python -m aicbc.main`）因 pydantic Settings SECRET_KEY 校验错误（需 ≥32 字符）无法启动。Mock 后端已覆盖所有前端测试需求，包含：
+> **当前状态**：后端使用 `uv run uvicorn src.aicbc.main:app --reload` 启动，支持所有前端功能。Windows 上之前的 pandas/prometheus 导入问题已解决。后端包含：
 >
-> - 健康检查、成本状态
+> - 健康检查、成本状态、监控指标
 > - 研究管理（列表/详情/创建/删除）
-> - 问卷生成与查看
+> - 问卷生成与查看（D-optimal 设计）
 > - 画像生成与管理（含 4 层数据）
 > - 作答模拟与导出
 > - HB 分析（含收敛诊断、属性重要性、WTP）
@@ -230,7 +230,7 @@ curl -s http://127.0.0.1:8000/api/v1/cost-status
 
 | 症状 | 原因 | 解决方案 |
 |------|------|---------|
-| `SECRET_KEY` 校验错误 | pydantic Settings 要求 ≥32 字符 | 使用 mock 后端：`scripts/dev_server_with_mocks.py` |
+| `SECRET_KEY` 校验错误 | pydantic Settings 要求 ≥32 字符 | 在 `.env` 中设置 `SECRET_KEY=your-32-char-secret-key-here` |
 | `ModuleNotFoundError` | 依赖未安装 | 运行 `uv pip install -e .` |
 | 端口 8000 被占用 | 其他进程占用 | `Get-Process python \| Stop-Process` 后重试 |
 | 中文乱码 | 终端编码问题 | 使用 PowerShell 或设置 `chcp 65001` |

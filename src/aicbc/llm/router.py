@@ -147,8 +147,8 @@ class ModelRouter:
         ),
         TaskType.DEEP_ANALYSIS: RoutingRule(
             task_type=TaskType.DEEP_ANALYSIS,
-            default_model="claude-opus-4-8",
-            degrade_model="claude-sonnet-4-6",
+            default_model="claude-sonnet-4-6",
+            degrade_model="claude-haiku-4-5",
             fallback_model="gpt-4o",
         ),
         TaskType.DEFAULT: RoutingRule(

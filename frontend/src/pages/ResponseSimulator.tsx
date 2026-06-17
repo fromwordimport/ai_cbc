@@ -25,7 +25,7 @@ const ResponseSimulator: React.FC = () => {
       try {
         const res = await getPersonas(1, 100)
         setPersonas(res.personas)
-      } catch (err) {
+      } catch {
         message.error('加载画像失败')
       } finally {
         setLoading(false)
@@ -67,7 +67,7 @@ const ResponseSimulator: React.FC = () => {
     try {
       const res = await exportDataset(studyId)
       message.success(`数据集导出成功：${res.n_total_records} 条记录`)
-    } catch (err) {
+    } catch {
       message.error('导出失败')
     } finally {
       setExporting(false)

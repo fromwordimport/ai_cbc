@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
 import type {
   StudyListResponse,
@@ -69,8 +69,8 @@ const rootApi = axios.create({
 // Request interceptor: inject API Key
 // ---------------------------------------------------------------------------
 
-export const injectApiKey = (config: any) => {
-  config.headers['X-API-Key'] = API_KEY
+export const injectApiKey = (config: InternalAxiosRequestConfig) => {
+  config.headers.set('X-API-Key', API_KEY)
   return config
 }
 
@@ -81,7 +81,7 @@ rootApi.interceptors.request.use(injectApiKey, (error) => Promise.reject(error))
 // Response interceptor: unified error handling
 // ---------------------------------------------------------------------------
 
-export const handleError = (error: any) => {
+export const handleError = (error: { response?: { status: number; data?: { detail?: string; error?: string } }; request?: unknown; message?: string }) => {
   if (error.response) {
     const status = error.response.status
     const detail = error.response.data?.detail || error.response.data?.error || '未知错误'
@@ -101,7 +101,7 @@ export const handleError = (error: any) => {
   } else if (error.request) {
     message.error('网络连接失败，请检查后端服务是否运行')
   } else {
-    message.error(`请求配置错误: ${error.message}`)
+    message.error(`请求配置错误: ${error.message || '未知'}`)
   }
   return Promise.reject(error)
 }

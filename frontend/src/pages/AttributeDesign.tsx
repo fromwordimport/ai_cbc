@@ -178,7 +178,7 @@ const AttributeDesign: React.FC = () => {
           setAttributes([...DEFAULT_ATTRIBUTES])
         }
         setProhibitedPairs(res.prohibited_pairs || [])
-      } catch (err) {
+      } catch {
         setAttributes([...DEFAULT_ATTRIBUTES])
         setProhibitedPairs([])
         setError('后端接口暂未就绪，使用默认属性配置。保存后将尝试提交。')

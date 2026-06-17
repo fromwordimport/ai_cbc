@@ -35,13 +35,8 @@ All Python commands use `uv`.
 uv venv
 uv pip install -e ".[dev,analysis]"
 
-# Run server (Linux/macOS/CI)
+# Run server (all platforms)
 uv run uvicorn src.aicbc.main:app --reload --host 0.0.0.0 --port 8000
-
-# Windows development workaround
-# The full import chain can crash on Windows due to pandas/prometheus C-extensions.
-# Use the mocked dev server instead:
-uv run python scripts/dev_server_with_mocks.py
 
 # Tests
 uv run pytest tests/ -v

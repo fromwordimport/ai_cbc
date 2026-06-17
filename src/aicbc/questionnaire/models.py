@@ -27,7 +27,6 @@ class DesignAlgorithm(StrEnum):
     """Experimental design algorithm options."""
 
     BALANCED = "balanced"
-    ORTHOGONAL = "orthogonal"  # deprecated — maps to BALANCED
     D_OPTIMAL = "d_optimal"
 
 
@@ -112,6 +111,13 @@ class DesignParameters(BaseModel):
         description="Random seed for reproducible designs",
     )
 
+    @field_validator("algorithm", mode="before")
+    @classmethod
+    def _normalize_legacy_algorithm(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.lower() == "orthogonal":
+            return "balanced"
+        return v
+
 
 class Condition(BaseModel):
     """A single attribute-level constraint — one leg of a prohibited combination."""
@@ -126,11 +132,6 @@ class ProhibitedPair(BaseModel):
     ``conditions`` are AND-ed: *every* condition must match for a profile
     to be rejected.  Multiple ``ProhibitedPair`` entries in a study are
     OR-ed: any matching pair blocks the profile.
-
-    Legacy single-attribute format is auto-converted on construction::
-
-        ProhibitedPair(attribute_id="brand", level_value="美的")
-        → ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="美的")])
     """
 
     conditions: list[Condition] = Field(
@@ -138,27 +139,6 @@ class ProhibitedPair(BaseModel):
         min_length=1,
         description="AND-ed conditions; all must match to trigger rejection",
     )
-    # Legacy fields — accepted during construction, converted to conditions[0]
-    attribute_id: str | None = Field(default=None, exclude=True)
-    level_value: Any = Field(default=None, exclude=True)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            # Legacy single-attribute form → wrap into conditions
-            if "conditions" not in data and "attribute_id" in data:
-                data["conditions"] = [
-                    {
-                        "attribute_id": data.pop("attribute_id", None),
-                        "level_value": data.pop("level_value", None),
-                    }
-                ]
-            # Drop leftover legacy keys if conditions already present
-            if "conditions" in data:
-                data.pop("attribute_id", None)
-                data.pop("level_value", None)
-        return data
 
 
 class CBCStudy(BaseModel):

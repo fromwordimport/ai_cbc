@@ -95,7 +95,7 @@ class TestQuestionnaireGeneratorStudyCreation:
 
     def test_create_study_with_custom_parameters(self) -> None:
         gen = QuestionnaireGenerator()
-        dp = DesignParameters(n_choice_sets=8, n_alternatives=2, algorithm=DesignAlgorithm.ORTHOGONAL)
+        dp = DesignParameters(n_choice_sets=8, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED)
         study = gen.create_study(
             study_id="param-test",
             product_category="洗碗机",
@@ -104,7 +104,7 @@ class TestQuestionnaireGeneratorStudyCreation:
         )
         assert study.design_parameters.n_choice_sets == 8
         assert study.design_parameters.n_alternatives == 2
-        assert study.design_parameters.algorithm == DesignAlgorithm.ORTHOGONAL
+        assert study.design_parameters.algorithm == DesignAlgorithm.BALANCED
 
     def test_create_study_with_segments(self) -> None:
         gen = QuestionnaireGenerator()
@@ -120,21 +120,21 @@ class TestQuestionnaireGeneratorStudyCreation:
 class TestQuestionnaireGeneratorGenerate:
     """Tests for questionnaire generation."""
 
-    def test_orthogonal_generation(self) -> None:
+    def test_balanced_generation(self) -> None:
         gen = QuestionnaireGenerator()
         study = gen.create_study(
-            study_id="orth-test",
+            study_id="bal-test",
             product_category="洗碗机",
             research_goal="测试",
             design_parameters=DesignParameters(
                 n_choice_sets=6,
                 n_alternatives=2,
-                algorithm=DesignAlgorithm.ORTHOGONAL,
+                algorithm=DesignAlgorithm.BALANCED,
                 seed=42,
             ),
         )
         q = gen.generate_questionnaire(study, seed=42)
-        assert q.study_id == "orth-test"
+        assert q.study_id == "bal-test"
         assert len(q.choice_sets) == 6
         assert all(len(cs.alternatives) == 2 for cs in q.choice_sets)
         assert q.questionnaire_id.startswith("q-")

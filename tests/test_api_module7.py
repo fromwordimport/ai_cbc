@@ -21,7 +21,7 @@ from aicbc.analysis.models import (
     WTPComparison,
     WTPResponse,
 )
-from aicbc.analysis.store import get_analysis_store, reset_analysis_store
+from aicbc.analysis.store import get_analysis_store, areset_analysis_store
 from aicbc.config.settings import get_settings
 from aicbc.core.store import get_questionnaire_store
 from aicbc.main import app
@@ -30,17 +30,17 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def _clean_stores():
+async def _clean_stores():
     """Reset all in-memory stores before and after each test."""
     settings = get_settings()
     original_debug = settings.debug
     settings.debug = True
     app.state.debug = True
     get_questionnaire_store().clear()
-    reset_analysis_store()
+    await areset_analysis_store()
     yield
     get_questionnaire_store().clear()
-    reset_analysis_store()
+    await areset_analysis_store()
     settings.debug = original_debug
     app.state.debug = original_debug
 

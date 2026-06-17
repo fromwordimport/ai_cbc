@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator, Generator
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,8 +22,8 @@ from aicbc.core.models.persona import (
     PersonaProfile,
     TensionCombination,
 )
-from aicbc.core.store import PersonaStore, reset_stores
-from aicbc.cost.tracker import reset_cost_tracker
+from aicbc.core.store import PersonaStore, areset_stores
+from aicbc.cost.tracker import _REDIS_KEY, reset_cost_tracker
 from aicbc.llm.client import LLMResponse, Provider
 
 # ---------------------------------------------------------------------------
@@ -31,25 +33,43 @@ from aicbc.llm.client import LLMResponse, Provider
 _COST_STATE_FILE = Path("./data/cost_state.json")
 
 
+def _delete_cost_state_file() -> None:
+    """Delete the on-disk cost state file, ignoring errors."""
+    try:
+        if _COST_STATE_FILE.exists():
+            _COST_STATE_FILE.unlink()
+    except Exception:
+        pass
+
+
+def _delete_cost_state_redis() -> None:
+    """Delete the Redis cost state key, ignoring errors."""
+    try:
+        from aicbc.config.settings import get_settings
+
+        settings = get_settings()
+        if settings.cost_tracker.backend == "redis":
+            import redis
+
+            r = redis.Redis.from_url(settings.database.redis_url, decode_responses=True)
+            r.delete(_REDIS_KEY)
+    except Exception:
+        pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _clean_cost_state_on_disk() -> Generator[None, None, None]:
-    """Delete persisted cost state file before any tests run.
+    """Delete persisted cost state before any tests run.
 
     This prevents stale cost data from previous test runs from leaking into
     CostTracker instances that call _load_state() in __init__.
     """
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    _delete_cost_state_file()
+    _delete_cost_state_redis()
     yield
     # Clean up after session as well
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    _delete_cost_state_file()
+    _delete_cost_state_redis()
 
 
 # ---------------------------------------------------------------------------
@@ -73,12 +93,12 @@ def _lazy_reset_dependencies() -> None:
     _reset_dependencies_fn()
 
 
-def _lazy_reset_analysis_store() -> None:
+async def _lazy_areset_analysis_store() -> None:
     global _reset_analysis_store_fn
     if _reset_analysis_store_fn is None:
-        from aicbc.analysis.store import reset_analysis_store as fn
+        from aicbc.analysis.store import areset_analysis_store as fn
         _reset_analysis_store_fn = fn
-    _reset_analysis_store_fn()
+    await _reset_analysis_store_fn()
 
 
 def _lazy_clear_app_overrides() -> None:
@@ -97,9 +117,29 @@ def _lazy_reset_rate_limits() -> None:
     _reset_rate_limits_fn()
 
 
+async def _reset_all() -> None:
+    """Reset all global singletons and persisted state, suppressing errors."""
+    with suppress(Exception):
+        _lazy_reset_dependencies()
+    with suppress(Exception):
+        await areset_stores()
+    with suppress(Exception):
+        await _lazy_areset_analysis_store()
+    with suppress(Exception):
+        reset_cost_tracker()
+    with suppress(Exception):
+        _lazy_clear_app_overrides()
+    with suppress(Exception):
+        _lazy_reset_rate_limits()
+    with suppress(Exception):
+        _delete_cost_state_file()
+    with suppress(Exception):
+        _delete_cost_state_redis()
+
+
 @pytest.fixture(autouse=True)
-def _clean_global_state() -> Generator[None, None, None]:
-    """Reset all module-level global singletons before each test.
+async def _clean_global_state() -> AsyncGenerator[None, None]:
+    """Reset all module-level global singletons before and after each test.
 
     Prevents state leakage between test files caused by:
     - store.py:  _store, _questionnaire_store, _response_store singletons
@@ -110,66 +150,10 @@ def _clean_global_state() -> Generator[None, None, None]:
     Heavy imports (aicbc.main, aicbc.analysis.store, etc.) are resolved lazily
     once and cached so the fixture body is cheap on subsequent calls.
     """
-    try:
-        _lazy_reset_dependencies()
-    except Exception:
-        pass
-    try:
-        reset_stores()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_analysis_store()
-    except Exception:
-        pass
-    try:
-        reset_cost_tracker()
-    except Exception:
-        pass
-    try:
-        _lazy_clear_app_overrides()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_rate_limits()
-    except Exception:
-        pass
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    await _reset_all()
     yield
-    # Post-test safety-net cleanup
-    try:
-        _lazy_reset_dependencies()
-    except Exception:
-        pass
-    try:
-        reset_stores()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_analysis_store()
-    except Exception:
-        pass
-    try:
-        reset_cost_tracker()
-    except Exception:
-        pass
-    try:
-        _lazy_clear_app_overrides()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_rate_limits()
-    except Exception:
-        pass
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    await _reset_all()
+
 
 # ---------------------------------------------------------------------------
 # Settings

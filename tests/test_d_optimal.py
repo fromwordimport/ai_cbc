@@ -11,6 +11,7 @@ from aicbc.questionnaire.models import (
     Attribute,
     AttributeLevel,
     AttributeType,
+    Condition,
     DesignAlgorithm,
     DesignParameters,
     ProhibitedPair,
@@ -46,7 +47,7 @@ class TestCandidateSet:
 
     def test_prohibited_pairs_filter(self) -> None:
         attrs = _dishwasher_attrs()
-        prohibited = [ProhibitedPair(attribute_id="brand", level_value="美的")]
+        prohibited = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="美的")])]
         candidates = generate_candidate_set(attrs, prohibited)
         # Remove all profiles where brand == "美的" (3*3 = 9)
         assert len(candidates) == 18
