@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 
 from aicbc.main import app
 
-
 client = TestClient(app)
 
 pytestmark = pytest.mark.slow

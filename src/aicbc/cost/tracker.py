@@ -3,7 +3,8 @@
 Thread-safe singleton that aggregates LLM call costs across all
 subsystems and exposes real-time fuse-status checks.
 
-State is persisted to ``./data/cost_state.json`` so that budget
+State is persisted to ``./data/cost_state.json`` (default) or Redis
+when ``COST_TRACKER_BACKEND=redis`` is set, so that budget
 accumulation survives process restarts.
 """
 
@@ -25,8 +26,13 @@ logger = structlog.get_logger("aicbc.cost")
 
 _USD_TO_CNY = 7.2
 
-# Persistent state file path
+# Persistent state file path (fallback)
 _STATE_FILE = Path("./data/cost_state.json")
+
+# Redis key for cost state
+_REDIS_KEY = "aicbc:cost:state"
+# TTL: 7 days
+_REDIS_TTL = 604800
 
 
 class FuseStatus(StrEnum):
@@ -81,6 +87,8 @@ class CostTracker:
 
     def __init__(self, settings: CostFuseSettings | None = None) -> None:
         self._settings = settings or get_settings().cost_fuse
+        self._tracker_settings = get_settings().cost_tracker
+        self._backend = self._tracker_settings.backend
         self._lock = threading.Lock()
 
         # Dimension buckets
@@ -98,12 +106,28 @@ class CostTracker:
         # Budget reset tracking
         self._last_reset_date: str = datetime.now(UTC).strftime("%Y-%m-%d")
 
-        # Write throttling: avoid disk I/O on every record() call
+        # Write throttling: avoid I/O on every record() call
         self._dirty: bool = False
         self._last_save_time: float = 0.0
 
+        # Lazy Redis client (only instantiated when backend is redis)
+        self._redis: Any | None = None
+
         # Load persisted state on init
         self._load_state()
+
+    # ------------------------------------------------------------------
+    # Redis client (lazy singleton)
+    # ------------------------------------------------------------------
+
+    def _get_redis(self) -> Any:
+        """Return a sync Redis client, creating it lazily once."""
+        if self._redis is None:
+            import redis as redis_lib
+
+            redis_url = get_settings().database.redis_url
+            self._redis = redis_lib.Redis.from_url(redis_url, decode_responses=True)
+        return self._redis
 
     # ------------------------------------------------------------------
     # Recording
@@ -196,51 +220,104 @@ class CostTracker:
     # Persistence
     # ------------------------------------------------------------------
 
+    def _serialize_state(self) -> dict[str, Any]:
+        """Build a JSON-serializable state dict from in-memory buckets."""
+        return {
+            "per_study": {
+                k: {
+                    "total_cny": v.total_cny,
+                    "total_calls": v.total_calls,
+                    "total_tokens": v.total_tokens,
+                }
+                for k, v in self._per_study.items()
+            },
+            "daily": {
+                k: {
+                    "total_cny": v.total_cny,
+                    "total_calls": v.total_calls,
+                    "total_tokens": v.total_tokens,
+                }
+                for k, v in self._daily.items()
+            },
+            "weekly": {
+                k: {
+                    "total_cny": v.total_cny,
+                    "total_calls": v.total_calls,
+                    "total_tokens": v.total_tokens,
+                }
+                for k, v in self._weekly.items()
+            },
+            "monthly": {
+                k: {
+                    "total_cny": v.total_cny,
+                    "total_calls": v.total_calls,
+                    "total_tokens": v.total_tokens,
+                }
+                for k, v in self._monthly.items()
+            },
+            "global_total_cny": self._global_total_cny,
+            "last_reset_date": self._last_reset_date,
+            "saved_at": datetime.now(UTC).isoformat(),
+        }
+
+    def _deserialize_state(self, state: dict[str, Any]) -> None:
+        """Populate in-memory buckets from a JSON state dict."""
+        for k, v in state.get("per_study", {}).items():
+            self._per_study[k] = CostSummary(
+                total_cny=v.get("total_cny", 0.0),
+                total_calls=v.get("total_calls", 0),
+                total_tokens=v.get("total_tokens", 0),
+            )
+        for k, v in state.get("daily", {}).items():
+            self._daily[k] = CostSummary(
+                total_cny=v.get("total_cny", 0.0),
+                total_calls=v.get("total_calls", 0),
+                total_tokens=v.get("total_tokens", 0),
+            )
+        for k, v in state.get("weekly", {}).items():
+            self._weekly[k] = CostSummary(
+                total_cny=v.get("total_cny", 0.0),
+                total_calls=v.get("total_calls", 0),
+                total_tokens=v.get("total_tokens", 0),
+            )
+        for k, v in state.get("monthly", {}).items():
+            self._monthly[k] = CostSummary(
+                total_cny=v.get("total_cny", 0.0),
+                total_calls=v.get("total_calls", 0),
+                total_tokens=v.get("total_tokens", 0),
+            )
+        self._global_total_cny = state.get("global_total_cny", 0.0)
+        self._last_reset_date = state.get("last_reset_date", datetime.now(UTC).strftime("%Y-%m-%d"))
+
     def _save_state(self) -> None:
+        """Persist current cost state to the configured backend."""
+        if self._backend == "redis":
+            self._save_state_redis()
+        else:
+            self._save_state_file()
+
+    def _save_state_file(self) -> None:
         """Persist current cost state to disk."""
         try:
             _STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            state = {
-                "per_study": {
-                    k: {
-                        "total_cny": v.total_cny,
-                        "total_calls": v.total_calls,
-                        "total_tokens": v.total_tokens,
-                    }
-                    for k, v in self._per_study.items()
-                },
-                "daily": {
-                    k: {
-                        "total_cny": v.total_cny,
-                        "total_calls": v.total_calls,
-                        "total_tokens": v.total_tokens,
-                    }
-                    for k, v in self._daily.items()
-                },
-                "weekly": {
-                    k: {
-                        "total_cny": v.total_cny,
-                        "total_calls": v.total_calls,
-                        "total_tokens": v.total_tokens,
-                    }
-                    for k, v in self._weekly.items()
-                },
-                "monthly": {
-                    k: {
-                        "total_cny": v.total_cny,
-                        "total_calls": v.total_calls,
-                        "total_tokens": v.total_tokens,
-                    }
-                    for k, v in self._monthly.items()
-                },
-                "global_total_cny": self._global_total_cny,
-                "last_reset_date": self._last_reset_date,
-                "saved_at": datetime.now(UTC).isoformat(),
-            }
+            state = self._serialize_state()
             with open(_STATE_FILE, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
         except Exception as exc:
             logger.warning("cost_state_save_failed", error=str(exc))
+
+    def _save_state_redis(self) -> None:
+        """Persist current cost state to Redis with TTL."""
+        try:
+            r = self._get_redis()
+            state = self._serialize_state()
+            r.setex(
+                self._tracker_settings.redis_key,
+                self._tracker_settings.redis_ttl,
+                json.dumps(state, ensure_ascii=False),
+            )
+        except Exception as exc:
+            logger.warning("cost_state_save_redis_failed", error=str(exc))
 
     def _maybe_save(self) -> None:
         """Throttled save: persist only if dirty and 30+ seconds since last write."""
@@ -253,44 +330,36 @@ class CostTracker:
             self._last_save_time = now
 
     def _load_state(self) -> None:
+        """Load persisted cost state from the configured backend."""
+        if self._backend == "redis":
+            self._load_state_redis()
+        else:
+            self._load_state_file()
+
+    def _load_state_file(self) -> None:
         """Load persisted cost state from disk."""
         if not _STATE_FILE.exists():
             return
         try:
             with open(_STATE_FILE, encoding="utf-8") as f:
                 state = json.load(f)
-
-            for k, v in state.get("per_study", {}).items():
-                self._per_study[k] = CostSummary(
-                    total_cny=v.get("total_cny", 0.0),
-                    total_calls=v.get("total_calls", 0),
-                    total_tokens=v.get("total_tokens", 0),
-                )
-            for k, v in state.get("daily", {}).items():
-                self._daily[k] = CostSummary(
-                    total_cny=v.get("total_cny", 0.0),
-                    total_calls=v.get("total_calls", 0),
-                    total_tokens=v.get("total_tokens", 0),
-                )
-            for k, v in state.get("weekly", {}).items():
-                self._weekly[k] = CostSummary(
-                    total_cny=v.get("total_cny", 0.0),
-                    total_calls=v.get("total_calls", 0),
-                    total_tokens=v.get("total_tokens", 0),
-                )
-            for k, v in state.get("monthly", {}).items():
-                self._monthly[k] = CostSummary(
-                    total_cny=v.get("total_cny", 0.0),
-                    total_calls=v.get("total_calls", 0),
-                    total_tokens=v.get("total_tokens", 0),
-                )
-            self._global_total_cny = state.get("global_total_cny", 0.0)
-            self._last_reset_date = state.get(
-                "last_reset_date", datetime.now(UTC).strftime("%Y-%m-%d")
-            )
+            self._deserialize_state(state)
             logger.info("cost_state_loaded", file=str(_STATE_FILE))
         except Exception as exc:
             logger.warning("cost_state_load_failed", error=str(exc))
+
+    def _load_state_redis(self) -> None:
+        """Load persisted cost state from Redis."""
+        try:
+            r = self._get_redis()
+            raw = r.get(self._tracker_settings.redis_key)
+            if raw is None:
+                return
+            state = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode("utf-8"))
+            self._deserialize_state(state)
+            logger.info("cost_state_loaded", backend="redis", key=self._tracker_settings.redis_key)
+        except Exception as exc:
+            logger.warning("cost_state_load_redis_failed", error=str(exc))
 
     # ------------------------------------------------------------------
     # Auto-reset
@@ -493,12 +562,20 @@ class CostTracker:
             self._global_total_cny = 0.0
             self._last_notified_status = None
             self._last_reset_date = datetime.now(UTC).strftime("%Y-%m-%d")
-        # Remove persisted state file so subsequent fresh instances start clean
-        try:
-            if _STATE_FILE.exists():
-                _STATE_FILE.unlink()
-        except Exception as exc:
-            logger.warning("cost_state_file_remove_failed", error=str(exc))
+
+        # Remove persisted state from whichever backend is active
+        if self._backend == "redis":
+            try:
+                r = self._get_redis()
+                r.delete(self._tracker_settings.redis_key)
+            except Exception as exc:
+                logger.warning("cost_state_redis_remove_failed", error=str(exc))
+        else:
+            try:
+                if _STATE_FILE.exists():
+                    _STATE_FILE.unlink()
+            except Exception as exc:
+                logger.warning("cost_state_file_remove_failed", error=str(exc))
 
 
 # Module-level singleton

@@ -102,6 +102,16 @@ class CostFuseSettings(BaseSettings):
     degrade_model: str = "claude-haiku-4-5"
 
 
+class CostTrackerSettings(BaseSettings):
+    """Cost tracker persistence configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="COST_TRACKER_")
+
+    backend: str = "file"
+    redis_key: str = "aicbc:cost:state"
+    redis_ttl: int = 604800
+
+
 class StudySettings(BaseSettings):
     """Default study parameters."""
 
@@ -164,6 +174,7 @@ class Settings(BaseSettings):
     glm: GLMSettings = Field(default_factory=GLMSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     cost_fuse: CostFuseSettings = Field(default_factory=CostFuseSettings)
+    cost_tracker: CostTrackerSettings = Field(default_factory=CostTrackerSettings)
     study: StudySettings = Field(default_factory=StudySettings)
     authenticity: AuthenticitySettings = Field(default_factory=AuthenticitySettings)
     bias_audit: BiasAuditSettings = Field(default_factory=BiasAuditSettings)

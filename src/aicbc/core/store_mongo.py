@@ -40,21 +40,6 @@ from aicbc.questionnaire.models import CBCQuestionnaire, CBCStudy
 from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
 
 
-def _run(awaitable: Any) -> Any:
-    """Run an awaitable Beanie query synchronously.
-
-    Sync callers (Celery tasks, sync routes, tests) use this helper to
-    execute Beanie coroutines.  It must NOT be called from an async context
-    because ``asyncio.run`` cannot be nested; async routes should call the
-    corresponding ``a*`` async method instead.
-    """
-
-    async def _execute() -> Any:
-        return await awaitable
-
-    return asyncio.run(_execute())
-
-
 class MongoPersonaStore:
     """MongoDB-backed persona store."""
 
@@ -218,9 +203,9 @@ class MongoPersonaStore:
         """Async total number of stored personas."""
         return await PersonaDocument.count()
 
-    def clear(self) -> None:
-        """Delete all personas."""
-        _run(PersonaDocument.delete_all())
+    async def aclear(self) -> None:
+        """Delete all personas (async)."""
+        await PersonaDocument.delete_all()
 
 
 class MongoQuestionnaireStore:
@@ -337,10 +322,10 @@ class MongoQuestionnaireStore:
             return None
         return CBCQuestionnaire.model_validate(doc.data)
 
-    def clear(self) -> None:
-        """Delete all studies and questionnaires."""
-        _run(StudyDocument.delete_all())
-        _run(QuestionnaireDocument.delete_all())
+    async def aclear(self) -> None:
+        """Delete all studies and questionnaires (async)."""
+        await StudyDocument.delete_all()
+        await QuestionnaireDocument.delete_all()
 
 
 class MongoResponseStore:
@@ -480,10 +465,10 @@ class MongoResponseStore:
             await doc.delete()
         return len(docs)
 
-    def clear(self) -> None:
-        """Delete all responses and datasets."""
-        _run(ResponseDocument.delete_all())
-        _run(DatasetDocument.delete_all())
+    async def aclear(self) -> None:
+        """Delete all responses and datasets (async)."""
+        await ResponseDocument.delete_all()
+        await DatasetDocument.delete_all()
 
 
 class MongoAnalysisStore:
@@ -837,6 +822,42 @@ class MongoAnalysisStore:
             await doc.delete()
         return True
 
+    async def _save_derivative(
+        self,
+        analysis_id: str,
+        kind: str,
+        key: str | None,
+        data: dict[str, Any],
+    ) -> None:
+        """Upsert a derivative artefact for an analysis."""
+        query: dict[str, Any] = {"analysis_id": analysis_id, "kind": kind}
+        if key is not None:
+            query["key"] = key
+        doc = await AnalysisDerivativeDocument.find_one(query)
+        if doc is not None:
+            doc.data = data
+            await doc.save()
+        else:
+            await AnalysisDerivativeDocument(
+                analysis_id=analysis_id,
+                study_id="",
+                kind=kind,
+                key=key,
+                data=data,
+            ).insert()
+
+    async def _get_derivative(
+        self,
+        analysis_id: str,
+        kind: str,
+        key: str | None,
+    ) -> AnalysisDerivativeDocument | None:
+        """Fetch a derivative artefact for an analysis."""
+        query: dict[str, Any] = {"analysis_id": analysis_id, "kind": kind}
+        if key is not None:
+            query["key"] = key
+        return await AnalysisDerivativeDocument.find_one(query)
+
     def delete_by_study(self, study_id: str) -> int:
         """Delete all analyses belonging to a study."""
         return asyncio.run(self.adelete_by_study(study_id))
@@ -848,8 +869,8 @@ class MongoAnalysisStore:
             await self.adelete_analysis(doc.analysis_id)
         return len(docs)
 
-    def clear(self) -> None:
-        """Delete all analysis data."""
-        _run(AnalysisJobDocument.delete_all())
-        _run(AnalysisResultDocument.delete_all())
-        _run(AnalysisDerivativeDocument.delete_all())
+    async def aclear(self) -> None:
+        """Delete all analysis data (async)."""
+        await AnalysisJobDocument.delete_all()
+        await AnalysisResultDocument.delete_all()
+        await AnalysisDerivativeDocument.delete_all()

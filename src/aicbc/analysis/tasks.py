@@ -33,11 +33,38 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
-    result_expires=3600,  # Results expire after 1 hour
-    result_extended=True,  # Store task name and args for better traceability
+    result_expires=300,  # Results expire after 5 minutes to reduce Redis memory/commands
+    result_extended=False,  # Do not store task name/args in result backend
+    task_ignore_result=True,  # Most tasks only need state (PENDING/STARTED/SUCCESS), not return value
 )
 
 logger = structlog.get_logger("aicbc.analysis.tasks")
+
+
+def _save_dead_letter(
+    task_name: str,
+    analysis_id: str | None,
+    study_id: str | None,
+    exception: Exception,
+) -> None:
+    """Persist a dead-letter record for a failed task."""
+    import asyncio
+
+    from aicbc.core.models.db_documents import DeadLetterDocument
+
+    async def _insert() -> None:
+        doc = DeadLetterDocument(
+            task_name=task_name,
+            analysis_id=analysis_id,
+            study_id=study_id,
+            exception=f"{type(exception).__name__}: {exception}",
+        )
+        await doc.insert()
+
+    try:
+        asyncio.run(_insert())
+    except Exception:
+        logger.exception("dead_letter_insert_failed")
 
 
 @celery_app.task(
@@ -325,9 +352,15 @@ def run_analysis_task(
         log.info("analysis_task_completed")
         return {"status": "COMPLETED", "analysis_id": analysis_id}
 
-    except Exception:
+    except Exception as exc:
         log.exception("analysis_task_failed")
         analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+        _save_dead_letter(
+            task_name="aicbc.analysis.run_analysis_task",
+            analysis_id=analysis_id,
+            study_id=study_id,
+            exception=exc,
+        )
         raise
 
 
@@ -477,7 +510,13 @@ def run_latent_class_task(
         log.info("latent_class_task_completed")
         return {"status": "COMPLETED", "analysis_id": analysis_id}
 
-    except Exception:
+    except Exception as exc:
         log.exception("latent_class_task_failed")
         analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+        _save_dead_letter(
+            task_name="aicbc.analysis.run_latent_class_task",
+            analysis_id=analysis_id,
+            study_id=study_id,
+            exception=exc,
+        )
         raise

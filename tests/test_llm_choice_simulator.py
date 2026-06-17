@@ -140,9 +140,11 @@ class TestCallLLMForChoice:
     """Tests for _call_llm_for_choice."""
 
     def test_successful_choice(self) -> None:
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 1, "reasoning": " cheaper", "confidence": 0.9}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 1, "reasoning": " cheaper", "confidence": 0.9}'},
+            ]
+        )
         chosen, reasoning, conf, _emotion, cost = _call_llm_for_choice(
             llm=client,
             model=None,
@@ -157,9 +159,11 @@ class TestCallLLMForChoice:
         assert cost == 0.001
 
     def test_invalid_index_fallback(self) -> None:
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 5, "reasoning": "bad", "confidence": 0.5}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 5, "reasoning": "bad", "confidence": 0.5}'},
+            ]
+        )
         chosen, reasoning, conf, _emotion, cost = _call_llm_for_choice(
             llm=client,
             model=None,
@@ -190,9 +194,11 @@ class TestCallLLMForChoice:
         assert cost == 0.0
 
     def test_json_parse_failure(self) -> None:
-        client = _MockLLMClient([
-            {"content": "not json at all"},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": "not json at all"},
+            ]
+        )
         chosen, reasoning, conf, _emotion, cost = _call_llm_for_choice(
             llm=client,
             model=None,
@@ -205,9 +211,11 @@ class TestCallLLMForChoice:
         assert cost == 0.001
 
     def test_missing_confidence_defaults(self) -> None:
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 0, "reasoning": "ok"}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 0, "reasoning": "ok"}'},
+            ]
+        )
         chosen, _reasoning, conf, _emotion, _cost = _call_llm_for_choice(
             llm=client,
             model=None,
@@ -227,11 +235,13 @@ class TestLLMChoiceSimulator:
         attrs = _make_test_attributes()
         persona = _make_persona()
 
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r1", "confidence": 0.8}'},
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r2", "confidence": 0.7}'},
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r3", "confidence": 0.9}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r1", "confidence": 0.8}'},
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r2", "confidence": 0.7}'},
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r3", "confidence": 0.9}'},
+            ]
+        )
 
         simulator = LLMChoiceSimulator(attributes=attrs, llm_client=client)
         raw_dataset, persona_response = simulator.simulate(
@@ -255,11 +265,13 @@ class TestLLMChoiceSimulator:
         attrs = _make_test_attributes()
         persona = _make_persona()
 
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r1", "confidence": 0.8}'},
-            {"content": "bad json"},
-            {"content": '{"chosen_alt_index": 1, "reasoning": "r3", "confidence": 0.9}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r1", "confidence": 0.8}'},
+                {"content": "bad json"},
+                {"content": '{"chosen_alt_index": 1, "reasoning": "r3", "confidence": 0.9}'},
+            ]
+        )
 
         simulator = LLMChoiceSimulator(attributes=attrs, llm_client=client)
         raw_dataset, persona_response = simulator.simulate(
@@ -275,11 +287,13 @@ class TestLLMChoiceSimulator:
         attrs = _make_test_attributes()
         persona = _make_persona()
 
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 0, "reasoning": "价格便宜", "confidence": 0.8}'},
-            {"content": '{"chosen_alt_index": 1, "reasoning": "品牌好", "confidence": 0.7}'},
-            {"content": '{"chosen_alt_index": 0, "reasoning": "综合不错", "confidence": 0.9}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 0, "reasoning": "价格便宜", "confidence": 0.8}'},
+                {"content": '{"chosen_alt_index": 1, "reasoning": "品牌好", "confidence": 0.7}'},
+                {"content": '{"chosen_alt_index": 0, "reasoning": "综合不错", "confidence": 0.9}'},
+            ]
+        )
 
         simulator = LLMChoiceSimulator(attributes=attrs, llm_client=client)
         _raw_dataset, persona_response = simulator.simulate(
@@ -296,15 +310,19 @@ class TestLLMChoiceSimulator:
         attrs = _make_test_attributes()
         persona = _make_persona()
 
-        client = _MockLLMClient([
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r", "confidence": 0.8}'},
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r", "confidence": 0.8}'},
-            {"content": '{"chosen_alt_index": 0, "reasoning": "r", "confidence": 0.8}'},
-        ])
+        client = _MockLLMClient(
+            [
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r", "confidence": 0.8}'},
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r", "confidence": 0.8}'},
+                {"content": '{"chosen_alt_index": 0, "reasoning": "r", "confidence": 0.8}'},
+            ]
+        )
 
         simulator = LLMChoiceSimulator(attributes=attrs, llm_client=client)
         raw1, _resp1 = simulator.simulate(
-            persona=persona, questionnaire=simple_questionnaire, seed=42,
+            persona=persona,
+            questionnaire=simple_questionnaire,
+            seed=42,
         )
         # seed doesn't affect LLM calls, just accepted for compat
         assert len(raw1.choice_records) == 3

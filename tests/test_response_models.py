@@ -46,9 +46,7 @@ class TestAlternativeRecord:
     """Tests for AlternativeRecord model."""
 
     def test_valid_record(self) -> None:
-        alt = AlternativeRecord(
-            alt_index=0, chosen=True, attributes={"price": 2999}
-        )
+        alt = AlternativeRecord(alt_index=0, chosen=True, attributes={"price": 2999})
         assert alt.alt_index == 0
         assert alt.chosen is True
 

@@ -6,23 +6,18 @@ They are fast (no LLM calls, no MCMC sampling) and can run in CI.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import pytest
 
 from aicbc.analysis.validation.business_rules import (
-    MONOTONIC_EXPECTATIONS,
-    PRICE_NEGATIVE_RATE_MIN,
-    ValidationResult,
+    run_all_validations,
+    summarize_results,
     validate_level_monotonicity,
     validate_market_simulation,
     validate_price_coefficient,
     validate_segment_comparison,
     validate_wtp_plausibility,
-    run_all_validations,
-    summarize_results,
 )
-
 
 # ---------------------------------------------------------------------------
 # 1.  Price coefficient tests
@@ -148,7 +143,13 @@ class TestValidateLevelMonotonicity:
         # Effects coding: capacity_0 = -1 (6套 vs ref), capacity_1 = 0 (10套 vs ref)
         # Last level = -(sum) = -(-1 + 0) = 1
         util = pd.DataFrame(
-            {"capacity_0": [-1.0], "capacity_1": [0.0], "brand_0": [0.0], "brand_1": [0.0], "brand_2": [0.0]}
+            {
+                "capacity_0": [-1.0],
+                "capacity_1": [0.0],
+                "brand_0": [0.0],
+                "brand_1": [0.0],
+                "brand_2": [0.0],
+            }
         )
         results = validate_level_monotonicity(util, sample_attributes)
         capacity_result = [r for r in results if r.rule_name == "level_monotonicity_capacity"][0]
@@ -157,7 +158,13 @@ class TestValidateLevelMonotonicity:
     def test_non_monotonic_fails(self, sample_attributes):
         # Inverted: 6套=1, 10套=0, 13套=-1 (larger capacity = lower utility — wrong!)
         util = pd.DataFrame(
-            {"capacity_0": [1.0], "capacity_1": [0.0], "brand_0": [0.0], "brand_1": [0.0], "brand_2": [0.0]}
+            {
+                "capacity_0": [1.0],
+                "capacity_1": [0.0],
+                "brand_0": [0.0],
+                "brand_1": [0.0],
+                "brand_2": [0.0],
+            }
         )
         results = validate_level_monotonicity(util, sample_attributes)
         capacity_result = [r for r in results if r.rule_name == "level_monotonicity_capacity"][0]
@@ -175,7 +182,13 @@ class TestValidateLevelMonotonicity:
         # 二级=-0.5, 一级=0.0, 超一级=0.5
         # energy_0=-0.5 (二级), energy_1=0.0 (一级), recovered 超一级=0.5
         util = pd.DataFrame(
-            {"energy_0": [-0.5], "energy_1": [0.0], "brand_0": [0.0], "brand_1": [0.0], "brand_2": [0.0]}
+            {
+                "energy_0": [-0.5],
+                "energy_1": [0.0],
+                "brand_0": [0.0],
+                "brand_1": [0.0],
+                "brand_2": [0.0],
+            }
         )
         results = validate_level_monotonicity(util, sample_attributes)
         energy_result = [r for r in results if r.rule_name == "level_monotonicity_energy"][0]
@@ -192,7 +205,13 @@ class TestValidateLevelMonotonicity:
     def test_no_expectation_for_brand(self, sample_attributes):
         # brand is not in MONOTONIC_EXPECTATIONS → no result for it
         util = pd.DataFrame(
-            {"capacity_0": [-1.0], "capacity_1": [0.0], "brand_0": [0.0], "brand_1": [0.0], "brand_2": [0.0]}
+            {
+                "capacity_0": [-1.0],
+                "capacity_1": [0.0],
+                "brand_0": [0.0],
+                "brand_1": [0.0],
+                "brand_2": [0.0],
+            }
         )
         results = validate_level_monotonicity(util, sample_attributes)
         brand_results = [r for r in results if r.rule_name == "level_monotonicity_brand"]
@@ -206,42 +225,54 @@ class TestValidateLevelMonotonicity:
 
 class TestValidateSegmentComparison:
     def test_adequate_samples_passes(self):
-        result = validate_segment_comparison({
-            "n_a": 80,
-            "n_b": 80,
-            "overall_test": {"p_value": 0.03, "significant": True},
-        })
+        result = validate_segment_comparison(
+            {
+                "n_a": 80,
+                "n_b": 80,
+                "overall_test": {"p_value": 0.03, "significant": True},
+            }
+        )
         sample_result = [r for r in result if r.rule_name == "segment_comparison_sample_size"][0]
         assert sample_result.passed is True
 
     def test_small_samples_warns(self):
-        result = validate_segment_comparison({
-            "n_a": 5,
-            "n_b": 80,
-            "overall_test": {"p_value": 0.03, "significant": True},
-        })
+        result = validate_segment_comparison(
+            {
+                "n_a": 5,
+                "n_b": 80,
+                "overall_test": {"p_value": 0.03, "significant": True},
+            }
+        )
         sample_result = [r for r in result if r.rule_name == "segment_comparison_sample_size"][0]
         assert sample_result.passed is False
         assert sample_result.severity == "WARNING"
 
     def test_inconsistent_significance_fails(self):
         # p < 0.05 but significant=False → bug
-        result = validate_segment_comparison({
-            "n_a": 80,
-            "n_b": 80,
-            "overall_test": {"p_value": 0.01, "significant": False},
-        })
-        sig_result = [r for r in result if r.rule_name == "segment_comparison_significance_consistency"][0]
+        result = validate_segment_comparison(
+            {
+                "n_a": 80,
+                "n_b": 80,
+                "overall_test": {"p_value": 0.01, "significant": False},
+            }
+        )
+        sig_result = [
+            r for r in result if r.rule_name == "segment_comparison_significance_consistency"
+        ][0]
         assert sig_result.passed is False
         assert sig_result.severity == "HIGH"
 
     def test_consistent_nonsignificant_passes(self):
-        result = validate_segment_comparison({
-            "n_a": 80,
-            "n_b": 80,
-            "overall_test": {"p_value": 0.20, "significant": False},
-        })
-        sig_result = [r for r in result if r.rule_name == "segment_comparison_significance_consistency"][0]
+        result = validate_segment_comparison(
+            {
+                "n_a": 80,
+                "n_b": 80,
+                "overall_test": {"p_value": 0.20, "significant": False},
+            }
+        )
+        sig_result = [
+            r for r in result if r.rule_name == "segment_comparison_significance_consistency"
+        ][0]
         assert sig_result.passed is True
 
 
@@ -254,9 +285,24 @@ class TestValidateMarketSimulation:
     def test_valid_shares_passes(self):
         sim = {
             "scenarios": [
-                {"name": "A", "predicted_share": 0.35, "share_ci_95_lower": 0.30, "share_ci_95_upper": 0.40},
-                {"name": "B", "predicted_share": 0.40, "share_ci_95_lower": 0.35, "share_ci_95_upper": 0.45},
-                {"name": "C", "predicted_share": 0.25, "share_ci_95_lower": 0.20, "share_ci_95_upper": 0.30},
+                {
+                    "name": "A",
+                    "predicted_share": 0.35,
+                    "share_ci_95_lower": 0.30,
+                    "share_ci_95_upper": 0.40,
+                },
+                {
+                    "name": "B",
+                    "predicted_share": 0.40,
+                    "share_ci_95_lower": 0.35,
+                    "share_ci_95_upper": 0.45,
+                },
+                {
+                    "name": "C",
+                    "predicted_share": 0.25,
+                    "share_ci_95_lower": 0.20,
+                    "share_ci_95_upper": 0.30,
+                },
             ]
         }
         results = validate_market_simulation(sim)
@@ -291,7 +337,12 @@ class TestValidateMarketSimulation:
     def test_invalid_ci_fails(self):
         sim = {
             "scenarios": [
-                {"name": "A", "predicted_share": 0.5, "share_ci_95_lower": 0.6, "share_ci_95_upper": 0.4},
+                {
+                    "name": "A",
+                    "predicted_share": 0.5,
+                    "share_ci_95_lower": 0.6,
+                    "share_ci_95_upper": 0.4,
+                },
             ]
         }
         results = validate_market_simulation(sim)
@@ -315,11 +366,13 @@ class TestValidateMarketSimulation:
 class TestRunAllValidations:
     def test_full_run(self):
         # Synthetic data for a complete validation run
-        util = pd.DataFrame({
-            "price": [-1.0, -0.8, -1.2, -0.9],
-            "capacity_0": [-0.5, -0.3, -0.6, -0.4],
-            "capacity_1": [0.2, 0.3, 0.1, 0.25],
-        })
+        util = pd.DataFrame(
+            {
+                "price": [-1.0, -0.8, -1.2, -0.9],
+                "capacity_0": [-0.5, -0.3, -0.6, -0.4],
+                "capacity_1": [0.2, 0.3, 0.1, 0.25],
+            }
+        )
 
         wtp = {
             "capacity": {
@@ -341,8 +394,18 @@ class TestRunAllValidations:
 
         market_sim = {
             "scenarios": [
-                {"name": "A", "predicted_share": 0.5, "share_ci_95_lower": 0.45, "share_ci_95_upper": 0.55},
-                {"name": "B", "predicted_share": 0.5, "share_ci_95_lower": 0.45, "share_ci_95_upper": 0.55},
+                {
+                    "name": "A",
+                    "predicted_share": 0.5,
+                    "share_ci_95_lower": 0.45,
+                    "share_ci_95_upper": 0.55,
+                },
+                {
+                    "name": "B",
+                    "predicted_share": 0.5,
+                    "share_ci_95_lower": 0.45,
+                    "share_ci_95_upper": 0.55,
+                },
             ]
         }
 
@@ -369,11 +432,13 @@ class TestRunAllValidations:
 
     def test_run_with_failures(self):
         # Price coefficients with positive values → should fail
-        util = pd.DataFrame({
-            "price": [1.0, -0.8, 1.2, -0.9],  # 50% negative < 95%
-            "capacity_0": [0.5, 0.3, 0.6, 0.4],  # inverted: 6套 > 10套
-            "capacity_1": [0.2, 0.3, 0.1, 0.25],
-        })
+        util = pd.DataFrame(
+            {
+                "price": [1.0, -0.8, 1.2, -0.9],  # 50% negative < 95%
+                "capacity_0": [0.5, 0.3, 0.6, 0.4],  # inverted: 6套 > 10套
+                "capacity_1": [0.2, 0.3, 0.1, 0.25],
+            }
+        )
 
         wtp = {
             "capacity": {
@@ -398,7 +463,7 @@ class TestRunAllValidations:
         summary = summarize_results(results)
         assert summary["overall_passed"] is False
         assert summary["critical_failures"] >= 1  # price coefficient
-        assert summary["high_failures"] >= 1    # WTP + monotonicity
+        assert summary["high_failures"] >= 1  # WTP + monotonicity
 
 
 # ---------------------------------------------------------------------------
@@ -423,10 +488,12 @@ class TestEdgeCases:
     def test_monotonicity_with_multiple_respondents(self):
         # Mixed: some respondents have monotonic, some don't
         # Mean should still be monotonic if majority are
-        util = pd.DataFrame({
-            "capacity_0": [-1.0, -1.0, 1.0, -0.5],   # 6套 utility
-            "capacity_1": [0.0, 0.0, 0.0, 0.5],       # 10套 utility
-        })
+        util = pd.DataFrame(
+            {
+                "capacity_0": [-1.0, -1.0, 1.0, -0.5],  # 6套 utility
+                "capacity_1": [0.0, 0.0, 0.0, 0.5],  # 10套 utility
+            }
+        )
         # Recovered: 6套=[-1,-1,1,-0.5], 10套=[0,0,0,0.5], 13套=[1,1,-1,0]
         # Mean: 6套=-0.375, 10套=0.125, 13套=0.25 → monotonic ✓
         attributes = [

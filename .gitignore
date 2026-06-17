@@ -55,6 +55,7 @@ kustomize
 
 # Claude / local tooling
 .claude/
+.superpowers/
 
 # Generated audit/reports
 bandit-report.json

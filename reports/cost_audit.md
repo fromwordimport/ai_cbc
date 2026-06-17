@@ -25,7 +25,7 @@
 | Token 计费精度 | PASS | `_estimate_cost()` 按 `(prompt_tokens * input_price + completion_tokens * output_price) / 1000` 计算 |
 | 模型差异化定价 | PASS | `_COST_PER_1K` 字典覆盖 Anthropic 3 模型和 OpenAI 3 模型 |
 | 汇率转换 | PASS | `_USD_TO_CNY = 7.2` |
-| 价格表完整性 | WARN | `ModelRouter.DEFAULT_MODELS` 引用 `claude-opus-4-8`，但 `LLMClient._COST_PER_1K` 只有 `claude-opus-4-6` |
+| 价格表完整性 | WARN | `ModelRouter.DEFAULT_MODELS` 引用 `claude-sonnet-4-6` 作为 deep_analysis 默认模型，但 `LLMClient._COST_PER_1K` 定价一致 |
 | 定价双写风险 | WARN | `LLMClient._COST_PER_1K` 和 `ModelRouter.DEFAULT_MODELS` 各自维护定价表 |
 | 缓存计费 | PASS | `CostRecord` 有 `cached: bool` 字段 |
 
@@ -112,7 +112,7 @@
 | choice_simulation | claude-sonnet-4-6 | claude-haiku-4-5 | gpt-4o |
 | review_scoring | claude-haiku-4-5 | gpt-4o-mini | - |
 | result_interpretation | claude-haiku-4-5 | gpt-4o-mini | - |
-| deep_analysis | claude-opus-4-8 | claude-sonnet-4-6 | gpt-4o |
+| deep_analysis | claude-sonnet-4-6 | claude-haiku-4-5 | gpt-4o |
 | default | claude-sonnet-4-6 | claude-haiku-4-5 | gpt-4o |
 
 ### 3.3 关键问题：双预算状态机
@@ -193,7 +193,7 @@
 | 12 | 无管理 API |
 | 13 | 无 prompt 缓存降本 |
 | 14 | 降级模型不可用时的回退 |
-| 15 | `claude-opus-4-8` 定价缺失 |
+| 15 | `claude-sonnet-4-6` 已作为 deep_analysis 默认模型，定价完整 |
 
 ---
 

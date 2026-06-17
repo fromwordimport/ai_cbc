@@ -42,21 +42,18 @@ def synthetic_choice_data() -> pd.DataFrame:
                 price_std = (price - 3999) / 816.0
 
                 # True population coefficients: price=-0.5, brand_0=0.3, brand_1=-0.2
-                utility = (
-                    -0.5 * price_std
-                    + 0.3 * brand_0
-                    + (-0.2) * brand_1
-                    + rng.normal(0, 0.1)
-                )
+                utility = -0.5 * price_std + 0.3 * brand_0 + (-0.2) * brand_1 + rng.normal(0, 0.1)
                 utilities.append(utility)
-                alts.append({
-                    "resp_id": resp_id,
-                    "task_id": task_idx,
-                    "alt_id": alt_idx,
-                    "price": price_std,
-                    "brand_0": brand_0,
-                    "brand_1": brand_1,
-                })
+                alts.append(
+                    {
+                        "resp_id": resp_id,
+                        "task_id": task_idx,
+                        "alt_id": alt_idx,
+                        "price": price_std,
+                        "brand_0": brand_0,
+                        "brand_1": brand_1,
+                    }
+                )
 
             chosen_idx = int(np.argmax(utilities))
 
@@ -78,9 +75,7 @@ class TestMNLEngine:
         assert result.converged
         assert len(result.population_mu) == 3
 
-    def test_population_mu_has_expected_signs(
-        self, synthetic_choice_data: pd.DataFrame
-    ):
+    def test_population_mu_has_expected_signs(self, synthetic_choice_data: pd.DataFrame):
         """Price coefficient should be negative, brand_0 positive."""
         engine = MNLEngine()
         result = engine.fit(
@@ -90,9 +85,7 @@ class TestMNLEngine:
         assert result.population_mu["price"] < 0
         assert result.population_mu["brand_0"] > 0
 
-    def test_individual_utilities_all_same(
-        self, synthetic_choice_data: pd.DataFrame
-    ):
+    def test_individual_utilities_all_same(self, synthetic_choice_data: pd.DataFrame):
         """MNL has no heterogeneity: all respondents share same utilities."""
         engine = MNLEngine()
         result = engine.fit(
@@ -109,7 +102,7 @@ class TestMNLEngine:
 
     def test_model_fit_statistics(self, synthetic_choice_data: pd.DataFrame):
         engine = MNLEngine()
-        result = engine.fit(
+        engine.fit(
             data=synthetic_choice_data,
             feature_cols=["price", "brand_0", "brand_1"],
         )

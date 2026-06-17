@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aicbc.config.settings import get_settings
-from aicbc.core.audit import get_audit_logger, reset_audit_logger
+from aicbc.core.audit import reset_audit_logger
 from aicbc.core.security.encryption import is_encrypted
 from aicbc.core.store import get_questionnaire_store
 from aicbc.main import app

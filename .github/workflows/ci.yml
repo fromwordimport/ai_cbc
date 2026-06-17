@@ -36,7 +36,11 @@ jobs:
 
       - name: Check branch naming
         run: |
-          BRANCH=${GITHUB_REF#refs/heads/}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
           if [[ ! "$BRANCH" =~ ^(master|release/.*|hotfix/.*|feature/.*)$ ]]; then
             echo "Branch naming convention violated: $BRANCH"
             exit 1
@@ -45,7 +49,12 @@ jobs:
 
       - name: Check commit message format
         run: |
-          COMMIT_MSG=$(git log --format=%s -n 1)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            COMMIT_SHA="HEAD"
+          fi
+          COMMIT_MSG=$(git log --format=%s -n 1 "$COMMIT_SHA")
           if [[ ! "$COMMIT_MSG" =~ ^(feat|fix|docs|test|refactor|perf|security|cost|chore|ci)\(.+\):\ .+ ]]; then
             echo "Commit message format violation: $COMMIT_MSG"
             echo "Expected format: type(scope): description"
@@ -67,7 +76,7 @@ jobs:
           fi
 
       - name: Scan for secrets
-        uses: trufflesecurity/trufflehog@v3.88.1
+        uses: trufflesecurity/trufflehog@v3.95.5
         with:
           path: ./
           base: ${{ steps.trufflehog-base.outputs.base }}

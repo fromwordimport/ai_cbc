@@ -27,7 +27,11 @@ services:
     dockerfilePath: ./docker/Dockerfile
     # Health check endpoint used by Render
     healthCheckPath: /health
-    # Free plan sleeps after 15 min idle; acceptable for personal use
+    # WARNING: Render free plan puts web services to sleep after 15 minutes of
+    # inactivity. When asleep, the container is stopped, which means Celery
+    # Worker and Celery Beat also stop running. The next request will wake the
+    # service (cold start ~30s). This is acceptable for personal use but not
+    # for production workloads requiring reliable background task execution.
     plan: free
     domains:
       - aicbc-api.fromworldimport.com

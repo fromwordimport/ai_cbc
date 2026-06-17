@@ -7,11 +7,11 @@ from aicbc.analysis.models import (
     ImportanceStats,
     MarketSimResponse,
     PopulationParams,
+    PriceCoefficientSummary,
     ScenarioShare,
     WTPAttribute,
     WTPComparison,
     WTPResponse,
-    PriceCoefficientSummary,
 )
 from aicbc.analysis.report_builder import ReportBuilder, build_report
 

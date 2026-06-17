@@ -38,15 +38,15 @@ For detailed conventions and commands, see the CLAUDE.md in each directory:
 | [`configs/CLAUDE.md`](configs/CLAUDE.md) | Prompt templates and tag JSON assets |
 | [`docker/CLAUDE.md`](docker/CLAUDE.md) | Container build and local observability stack |
 | [`k8s/CLAUDE.md`](k8s/CLAUDE.md) | Kubernetes deployment manifests |
-| [`scripts/CLAUDE.md`](scripts/CLAUDE.md) | Dev server with mocks, batch simulation, endpoint verification |
+| [`scripts/CLAUDE.md`](scripts/CLAUDE.md) | Batch simulation and endpoint verification scripts |
 
 ## Quick Start
 
 ```bash
-# Backend (use mocked dev server on Windows; see src/CLAUDE.md for details)
+# Backend (all platforms; Windows previously needed a workaround, now resolved)
 uv venv
 uv pip install -e ".[dev,analysis]"
-uv run python scripts/dev_server_with_mocks.py
+uv run uvicorn src.aicbc.main:app --reload --host 0.0.0.0 --port 8000
 
 # Frontend
 cd frontend
@@ -73,6 +73,7 @@ Standard interfaces (full schemas in [`docs/数据字典.md`](docs/数据字典.
 
 ## Editing Conventions
 
+- Always reply to the user in Chinese.
 - Specification documents use Markdown with Chinese as the primary language.
 - Frontmatter uses Chinese blockquote style (`> **版本**：v1.0`), not YAML.
 - Cross-references use relative paths with `[]()` links.

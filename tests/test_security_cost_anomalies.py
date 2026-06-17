@@ -13,18 +13,21 @@ All tests use mocking — no real API calls.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from aicbc.agents.base import AgentState, BaseAgent, DynamicExample, RuleInjection, SystemInstruction, ToolSpec
+from aicbc.agents.base import (
+    BaseAgent,
+    DynamicExample,
+    RuleInjection,
+    SystemInstruction,
+)
 from aicbc.config.settings import CostFuseSettings
 from aicbc.cost.fuse import CostFuse, CostFuseError, DegradationLevel
 from aicbc.cost.tracker import CostTracker, FuseStatus
-from aicbc.llm.client import LLMClient, LLMResponse, Provider
-
+from aicbc.llm.client import LLMClient, Provider
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -209,9 +212,7 @@ class TestLLMClientSecurityAnomalies:
             client = LLMClient()
 
         with (
-            patch.object(
-                client._anthropic.messages, "create", return_value=mock_response
-            ),
+            patch.object(client._anthropic.messages, "create", return_value=mock_response),
             pytest.raises(RuntimeError, match="Failed to parse LLM response as JSON"),
         ):
             client.generate_json(
@@ -227,9 +228,7 @@ class TestLLMClientSecurityAnomalies:
             client = LLMClient()
 
         with (
-            patch.object(
-                client._anthropic.messages, "create", return_value=mock_response
-            ),
+            patch.object(client._anthropic.messages, "create", return_value=mock_response),
             pytest.raises(RuntimeError, match="Failed to parse LLM response as JSON"),
         ):
             client.generate_json(
@@ -237,20 +236,14 @@ class TestLLMClientSecurityAnomalies:
                 model="claude-sonnet-4-6",
             )
 
-    def test_generate_with_markdown_code_fences_stripped(
-        self, mock_settings: MagicMock
-    ) -> None:
+    def test_generate_with_markdown_code_fences_stripped(self, mock_settings: MagicMock) -> None:
         """Markdown code fences should be stripped from the response content."""
-        mock_response = _build_anthropic_response(
-            '```json\n{"key": "value"}\n```', 10, 10
-        )
+        mock_response = _build_anthropic_response('```json\n{"key": "value"}\n```', 10, 10)
 
         with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
             client = LLMClient()
 
-        with patch.object(
-            client._anthropic.messages, "create", return_value=mock_response
-        ):
+        with patch.object(client._anthropic.messages, "create", return_value=mock_response):
             result = client.generate(
                 messages=[{"role": "user", "content": "Hi"}],
                 model="claude-sonnet-4-6",
@@ -258,20 +251,14 @@ class TestLLMClientSecurityAnomalies:
 
         assert result.content == '{"key": "value"}'
 
-    def test_generate_with_generic_code_fences_stripped(
-        self, mock_settings: MagicMock
-    ) -> None:
+    def test_generate_with_generic_code_fences_stripped(self, mock_settings: MagicMock) -> None:
         """Generic markdown code fences should also be stripped."""
-        mock_response = _build_anthropic_response(
-            '```\nsome plain text\n```', 10, 10
-        )
+        mock_response = _build_anthropic_response("```\nsome plain text\n```", 10, 10)
 
         with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
             client = LLMClient()
 
-        with patch.object(
-            client._anthropic.messages, "create", return_value=mock_response
-        ):
+        with patch.object(client._anthropic.messages, "create", return_value=mock_response):
             result = client.generate(
                 messages=[{"role": "user", "content": "Hi"}],
                 model="claude-sonnet-4-6",
@@ -279,9 +266,7 @@ class TestLLMClientSecurityAnomalies:
 
         assert result.content == "some plain text"
 
-    def test_unconfigured_provider_raises_runtime_error(
-        self, mock_settings: MagicMock
-    ) -> None:
+    def test_unconfigured_provider_raises_runtime_error(self, mock_settings: MagicMock) -> None:
         """Using a provider without API key configured should raise RuntimeError."""
         mock_settings.anthropic.api_key = ""
         mock_settings.openai.api_key = ""
@@ -295,9 +280,7 @@ class TestLLMClientSecurityAnomalies:
                 model="claude-sonnet-4-6",
             )
 
-    def test_unknown_provider_defaults_to_anthropic(
-        self, mock_settings: MagicMock
-    ) -> None:
+    def test_unknown_provider_defaults_to_anthropic(self, mock_settings: MagicMock) -> None:
         """Unknown model names should default to Anthropic provider."""
         assert LLMClient._detect_provider("some-unknown-model") == Provider.ANTHROPIC
 
@@ -308,9 +291,7 @@ class TestLLMClientSecurityAnomalies:
         with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
             client = LLMClient()
 
-        with patch.object(
-            client._anthropic.messages, "create", return_value=mock_response
-        ):
+        with patch.object(client._anthropic.messages, "create", return_value=mock_response):
             result = client.generate(
                 messages=[{"role": "user", "content": "Hi"}],
                 model="claude-sonnet-4-6",
@@ -322,7 +303,9 @@ class TestLLMClientSecurityAnomalies:
 class TestLLMClientCostFuseSecurity:
     """Security tests: cost fuse should block calls before they reach the API."""
 
-    def test_cost_fuse_blocks_before_api_call(self, mock_settings: MagicMock, cost_fuse: CostFuse) -> None:
+    def test_cost_fuse_blocks_before_api_call(
+        self, mock_settings: MagicMock, cost_fuse: CostFuse
+    ) -> None:
         """When fuse is triggered, the API should never be called."""
         cost_fuse.tracker.record(cost_usd=20 / 7.2)  # Exhaust daily budget
 
@@ -376,9 +359,7 @@ class TestLLMClientCostFuseSecurity:
         with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
             client = LLMClient(cost_fuse=cost_fuse)
 
-        with patch.object(
-            client._anthropic.messages, "create", return_value=mock_response
-        ):
+        with patch.object(client._anthropic.messages, "create", return_value=mock_response):
             client.generate(
                 messages=[{"role": "user", "content": "Hi"}],
                 model="claude-sonnet-4-6",
@@ -474,9 +455,7 @@ class TestCostFuseBatchAnomalies:
             call_count += 1
             return mock_response
 
-        with patch.object(
-            client._anthropic.messages, "create", side_effect=_create_side_effect
-        ):
+        with patch.object(client._anthropic.messages, "create", side_effect=_create_side_effect):
             # First call — should succeed (degraded model)
             result1 = client.generate(
                 messages=[{"role": "user", "content": "Hi"}],
@@ -513,9 +492,7 @@ class TestCostFuseBatchAnomalies:
         assert status_a_after in (FuseStatus.FUSE, FuseStatus.EMERGENCY)
         assert status_b_after in (FuseStatus.FUSE, FuseStatus.EMERGENCY)
 
-    def test_cost_tracker_thread_safety_simulation(
-        self, cost_tracker: CostTracker
-    ) -> None:
+    def test_cost_tracker_thread_safety_simulation(self, cost_tracker: CostTracker) -> None:
         """Simulate concurrent cost recording to verify thread safety."""
         import threading
 
@@ -528,8 +505,7 @@ class TestCostFuseBatchAnomalies:
                 )
 
         threads = [
-            threading.Thread(target=_record_costs, args=(f"study-{i}", 50))
-            for i in range(4)
+            threading.Thread(target=_record_costs, args=(f"study-{i}", 50)) for i in range(4)
         ]
 
         for t in threads:
@@ -545,9 +521,7 @@ class TestCostFuseBatchAnomalies:
             summary = cost_tracker.get_study_summary(f"study-{i}")
             assert summary.total_calls == 50
 
-    def test_zero_cost_call_does_not_affect_status(
-        self, cost_tracker: CostTracker
-    ) -> None:
+    def test_zero_cost_call_does_not_affect_status(self, cost_tracker: CostTracker) -> None:
         """A zero-cost call should not change fuse status."""
         cost_tracker.record(cost_usd=5.0 / 7.2, study_id="study-001")
         status_before, _ = cost_tracker.check_fuse_status("study-001")
@@ -557,9 +531,7 @@ class TestCostFuseBatchAnomalies:
 
         assert status_before == status_after
 
-    def test_negative_cost_is_handled_gracefully(
-        self, cost_tracker: CostTracker
-    ) -> None:
+    def test_negative_cost_is_handled_gracefully(self, cost_tracker: CostTracker) -> None:
         """Negative cost (e.g., refund) should reduce total cost."""
         cost_tracker.record(cost_usd=5.0 / 7.2, study_id="study-001")
         initial = cost_tracker.get_study_cost("study-001")
@@ -579,9 +551,7 @@ class TestCostFuseNotificationAnomalies:
         assert cost_tracker.notify_if_changed(status, details) is True
         assert cost_tracker.notify_if_changed(status, details) is False
 
-    def test_notification_on_escalation_then_deescalation(
-        self, cost_tracker: CostTracker
-    ) -> None:
+    def test_notification_on_escalation_then_deescalation(self, cost_tracker: CostTracker) -> None:
         """Status going up then down should trigger notifications on each change."""
         # Start at NORMAL
         cost_tracker.notify_if_changed(FuseStatus.NORMAL, {})
@@ -788,9 +758,7 @@ class TestBaseAgentPromptBuilding:
 class TestBaseAgentDegradationUnderCostFuse:
     """Test agent behavior when cost fuse forces model degradation."""
 
-    def test_agent_execution_with_cost_fuse_blocked(
-        self, cost_fuse: CostFuse
-    ) -> None:
+    def test_agent_execution_with_cost_fuse_blocked(self, cost_fuse: CostFuse) -> None:
         """Agent execute should handle CostFuseError gracefully."""
         cost_fuse.tracker.record(cost_usd=20 / 7.2)  # Block daily budget
 
@@ -805,9 +773,7 @@ class TestBaseAgentDegradationUnderCostFuse:
         with pytest.raises(CostFuseError, match="Cost fuse triggered"):
             agent.execute()
 
-    def test_agent_execution_with_degraded_model(
-        self, cost_fuse: CostFuse
-    ) -> None:
+    def test_agent_execution_with_degraded_model(self, cost_fuse: CostFuse) -> None:
         """Agent should use degraded model when fuse status is DEGRADE."""
         cost_fuse.tracker.record(cost_usd=19 / 7.2)  # 95% of daily budget
 

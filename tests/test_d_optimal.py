@@ -11,6 +11,7 @@ from aicbc.questionnaire.models import (
     Attribute,
     AttributeLevel,
     AttributeType,
+    Condition,
     DesignAlgorithm,
     DesignParameters,
     ProhibitedPair,
@@ -46,7 +47,9 @@ class TestCandidateSet:
 
     def test_prohibited_pairs_filter(self) -> None:
         attrs = _dishwasher_attrs()
-        prohibited = [ProhibitedPair(attribute_id="brand", level_value="美的")]
+        prohibited = [
+            ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="美的")])
+        ]
         candidates = generate_candidate_set(attrs, prohibited)
         # Remove all profiles where brand == "美的" (3*3 = 9)
         assert len(candidates) == 18
@@ -59,7 +62,9 @@ class TestDoptimalDesign:
 
     def test_generates_correct_number_of_choice_sets(self) -> None:
         attrs = _dishwasher_attrs()
-        dp = DesignParameters(n_choice_sets=6, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=6, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
         result = d_optimal_design(attrs, dp, seed=42)
 
         assert len(result["design"]) == 6
@@ -68,16 +73,22 @@ class TestDoptimalDesign:
 
     def test_no_duplicates_within_choice_set(self) -> None:
         attrs = _dishwasher_attrs()
-        dp = DesignParameters(n_choice_sets=6, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=6, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
         result = d_optimal_design(attrs, dp, seed=42)
 
         for cs in result["design"]:
             profiles = [tuple(sorted(a.attributes.items())) for a in cs.alternatives]
-            assert len(profiles) == len(set(profiles)), f"Duplicates in choice set {cs.choice_set_id}"
+            assert len(profiles) == len(set(profiles)), (
+                f"Duplicates in choice set {cs.choice_set_id}"
+            )
 
     def test_d_efficiency_is_positive(self) -> None:
         attrs = _dishwasher_attrs()
-        dp = DesignParameters(n_choice_sets=8, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=8, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
         result = d_optimal_design(attrs, dp, seed=42)
 
         assert result["d_efficiency"] is not None
@@ -86,7 +97,9 @@ class TestDoptimalDesign:
 
     def test_converges_within_iterations(self) -> None:
         attrs = _dishwasher_attrs()
-        dp = DesignParameters(n_choice_sets=6, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=6, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
         result = d_optimal_design(attrs, dp, seed=42, max_iterations=200)
 
         assert result["iterations"] <= 200
@@ -94,7 +107,9 @@ class TestDoptimalDesign:
 
     def test_questionnaire_model(self) -> None:
         attrs = _dishwasher_attrs()
-        dp = DesignParameters(n_choice_sets=4, n_alternatives=2, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=4, n_alternatives=2, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
         q = generate_d_optimal_questionnaire("test-study", attrs, dp, seed=42)
 
         assert q.questionnaire_id.startswith("q-test-study")
@@ -104,7 +119,9 @@ class TestDoptimalDesign:
 
     def test_reproducibility_with_seed(self) -> None:
         attrs = _dishwasher_attrs()
-        dp = DesignParameters(n_choice_sets=4, n_alternatives=2, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=4, n_alternatives=2, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
 
         q1 = generate_d_optimal_questionnaire("s1", attrs, dp, seed=123)
         q2 = generate_d_optimal_questionnaire("s2", attrs, dp, seed=123)
@@ -122,7 +139,9 @@ class TestDoptimalDesign:
             _make_attr("install", ["台式", "嵌入式", "水槽式"]),
             _make_attr("features", ["基础", "智能", "全能"]),
         ]
-        dp = DesignParameters(n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL)
+        dp = DesignParameters(
+            n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.D_OPTIMAL
+        )
         result = d_optimal_design(attrs, dp, seed=42)
 
         assert result["d_efficiency"] is not None

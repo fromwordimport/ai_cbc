@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -43,13 +43,15 @@ class TestBudgetStatusUpdate:
         assert status == BudgetStatus.NORMAL
 
     def test_status_change_logged_only_once(self, router: ModelRouter) -> None:
-        with patch.object(router, "_current_budget_status", BudgetStatus.NORMAL):
-            with patch("aicbc.llm.router.logger.warning") as mock_warning:
-                router.update_budget_status(850.0, budget=1000.0)
-                assert mock_warning.called
-                mock_warning.reset_mock()
-                router.update_budget_status(860.0, budget=1000.0)
-                assert not mock_warning.called
+        with (
+            patch.object(router, "_current_budget_status", BudgetStatus.NORMAL),
+            patch("aicbc.llm.router.logger.warning") as mock_warning,
+        ):
+            router.update_budget_status(850.0, budget=1000.0)
+            assert mock_warning.called
+            mock_warning.reset_mock()
+            router.update_budget_status(860.0, budget=1000.0)
+            assert not mock_warning.called
 
 
 class TestRoute:
@@ -74,14 +76,24 @@ class TestRoute:
 
     def test_route_degrade_budget(self, router: ModelRouter) -> None:
         with patch("aicbc.llm.router.CostFuse") as mock_fuse_cls:
-            mock_fuse_cls.return_value.pre_call_check.return_value = (True, "degrade", "claude-haiku-4-5")
+            mock_fuse_cls.return_value.pre_call_check.return_value = (
+                True,
+                "degrade",
+                "claude-haiku-4-5",
+            )
             model = router.route({"type": TaskType.PERSONA_GENERATION})
             assert model == "claude-haiku-4-5"
 
-    def test_route_degrade_uses_fallback_when_degrade_unavailable(self, router: ModelRouter) -> None:
+    def test_route_degrade_uses_fallback_when_degrade_unavailable(
+        self, router: ModelRouter
+    ) -> None:
         router.models["claude-haiku-4-5"].enabled = False
         with patch("aicbc.llm.router.CostFuse") as mock_fuse_cls:
-            mock_fuse_cls.return_value.pre_call_check.return_value = (True, "degrade", "claude-haiku-4-5")
+            mock_fuse_cls.return_value.pre_call_check.return_value = (
+                True,
+                "degrade",
+                "claude-haiku-4-5",
+            )
             model = router.route({"type": TaskType.PERSONA_GENERATION})
             assert model == "gpt-4o"
 
@@ -89,7 +101,11 @@ class TestRoute:
         router.models["claude-haiku-4-5"].enabled = False
         router.models["gpt-4o"].enabled = False
         with patch("aicbc.llm.router.CostFuse") as mock_fuse_cls:
-            mock_fuse_cls.return_value.pre_call_check.return_value = (True, "degrade", "claude-haiku-4-5")
+            mock_fuse_cls.return_value.pre_call_check.return_value = (
+                True,
+                "degrade",
+                "claude-haiku-4-5",
+            )
             model = router.route({"type": TaskType.PERSONA_GENERATION})
             assert model == "claude-sonnet-4-6"
 
@@ -108,7 +124,9 @@ class TestRoute:
     def test_route_warning_high_priority_uses_default(self, router: ModelRouter) -> None:
         with patch("aicbc.llm.router.CostFuse") as mock_fuse_cls:
             mock_fuse_cls.return_value.pre_call_check.return_value = (True, "warning", "")
-            model = router.route({"type": TaskType.PERSONA_GENERATION, "complexity": "high", "urgency": "high"})
+            model = router.route(
+                {"type": TaskType.PERSONA_GENERATION, "complexity": "high", "urgency": "high"}
+            )
             assert model == "claude-sonnet-4-6"
 
     def test_route_fuse_budget_raises(self, router: ModelRouter) -> None:

@@ -16,7 +16,6 @@ import pytest
 
 from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -73,17 +72,19 @@ def synthetic_choice_data() -> pd.DataFrame:
             chosen_idx = max(range(n_alts), key=lambda i: utilities[i][1])
 
             for alt_idx, _, price_std, brand_0, brand_1 in utilities:
-                rows.append({
-                    "resp_id": resp_id,
-                    "resp_index": resp_idx,
-                    "task_id": task_idx,
-                    "task_index": task_idx,
-                    "alt_id": alt_idx,
-                    "chosen": 1 if alt_idx == chosen_idx else 0,
-                    "price": price_std,
-                    "brand_0": brand_0,
-                    "brand_1": brand_1,
-                })
+                rows.append(
+                    {
+                        "resp_id": resp_id,
+                        "resp_index": resp_idx,
+                        "task_id": task_idx,
+                        "task_index": task_idx,
+                        "alt_id": alt_idx,
+                        "chosen": 1 if alt_idx == chosen_idx else 0,
+                        "price": price_std,
+                        "brand_0": brand_0,
+                        "brand_1": brand_1,
+                    }
+                )
 
     return pd.DataFrame(rows)
 
@@ -122,9 +123,7 @@ class TestHBEngineBuild:
         assert "z" in var_names
         assert "beta" in det_names
 
-    def test_preprocess_creates_correct_task_count(
-        self, synthetic_choice_data: pd.DataFrame
-    ):
+    def test_preprocess_creates_correct_task_count(self, synthetic_choice_data: pd.DataFrame):
         engine = HBEngine()
         engine._preprocess(
             data=synthetic_choice_data,
@@ -151,6 +150,7 @@ class TestHBEngineFit:
             feature_cols=["price", "brand_0", "brand_1"],
         )
         from aicbc.analysis.engines.hb_engine import HBResult
+
         assert isinstance(result, HBResult)
         assert hasattr(result, "converged")
         assert hasattr(result, "rhat_max")
@@ -220,9 +220,7 @@ class TestHBEngineTrace:
     """Test trace and posterior extraction."""
 
     @pytest.mark.slow
-    def test_trace_has_posterior(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
-    ):
+    def test_trace_has_posterior(self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig):
         engine = HBEngine(config=small_config)
         engine.fit(
             data=synthetic_choice_data,

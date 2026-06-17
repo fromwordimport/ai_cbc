@@ -43,7 +43,9 @@ spec:
             - beat
             - --loglevel=info
             - --scheduler
-            - celery.beat.PersistentScheduler
+            - redbeat.RedBeatScheduler
+            - --redbeat-redis-url
+            - $(REDIS_URL)
             - --schedulefile
             - /tmp/celerybeat-schedule
           envFrom:

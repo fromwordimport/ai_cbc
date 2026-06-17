@@ -14,7 +14,6 @@ from scipy import stats
 from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine
 from aicbc.analysis.engines.mnl_engine import MNLEngine
 
-
 # ---------------------------------------------------------------------------
 # Synthetic data generator
 # ---------------------------------------------------------------------------
@@ -60,10 +59,7 @@ def make_synthetic_data(
         if homogeneous:
             beta = dict(true_mu)
         else:
-            beta = {
-                col: float(rng.normal(true_mu[col], sigma))
-                for col in feature_cols
-            }
+            beta = {col: float(rng.normal(true_mu[col], sigma)) for col in feature_cols}
         true_beta[resp_id] = beta
 
         for task_idx in range(n_tasks):
@@ -96,15 +92,17 @@ def make_synthetic_data(
                 )
 
                 task_utilities.append(utility)
-                task_alts.append({
-                    "resp_id": resp_id,
-                    "task_id": task_idx,
-                    "alt_id": alt_idx,
-                    "brand_0": brand_0,
-                    "brand_1": brand_1,
-                    "price": price_std,
-                    "feature": feature_val,
-                })
+                task_alts.append(
+                    {
+                        "resp_id": resp_id,
+                        "task_id": task_idx,
+                        "alt_id": alt_idx,
+                        "brand_0": brand_0,
+                        "brand_1": brand_1,
+                        "price": price_std,
+                        "feature": feature_val,
+                    }
+                )
 
             chosen_idx = int(np.argmax(task_utilities))
             for i, alt in enumerate(task_alts):
@@ -170,8 +168,7 @@ class TestHBParameterRecovery:
             err = abs(recovered - true_val)
             rel_err = err / (abs(true_val) + 0.5)  # guard against div-by-zero
             assert rel_err < 0.10, (
-                f"{col}: recovered={recovered:.3f}, true={true_val:.3f}, "
-                f"rel_err={rel_err:.3f}"
+                f"{col}: recovered={recovered:.3f}, true={true_val:.3f}, rel_err={rel_err:.3f}"
             )
 
     @pytest.mark.slow
@@ -232,6 +229,5 @@ class TestMNLParameterRecovery:
             err = abs(recovered - true_val)
             rel_err = err / (abs(true_val) + 0.5)
             assert rel_err < 0.15, (
-                f"{col}: recovered={recovered:.3f}, true={true_val:.3f}, "
-                f"rel_err={rel_err:.3f}"
+                f"{col}: recovered={recovered:.3f}, true={true_val:.3f}, rel_err={rel_err:.3f}"
             )

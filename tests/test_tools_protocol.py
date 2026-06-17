@@ -13,20 +13,18 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import pytest
 
+# Import pipeline tools to trigger their registration in the default registry
+import aicbc.tools.pipeline  # noqa: F401
 from aicbc.tools.protocol import (
-    ToolCallError,
     ToolCallRequest,
-    ToolCallResult,
     ToolCallStatus,
     ToolNotFoundError,
     ToolParameter,
     ToolRegistry,
     ToolSpec,
-    ToolTimeoutError,
     ToolValidationError,
     _validate_arguments,
     call_tool,
@@ -34,10 +32,6 @@ from aicbc.tools.protocol import (
     list_registered_tools,
     register_tool,
 )
-
-# Import pipeline tools to trigger their registration in the default registry
-import aicbc.tools.pipeline  # noqa: F401
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -350,7 +344,9 @@ class TestOpenAISchema:
             name="search",
             description="Search documents",
             parameters=[
-                ToolParameter(name="query", type="string", description="Search query", required=True),
+                ToolParameter(
+                    name="query", type="string", description="Search query", required=True
+                ),
                 ToolParameter(
                     name="limit",
                     type="integer",
@@ -508,8 +504,18 @@ class TestPipelineTools:
                 "questionnaire_id": "q-dishwasher-202506",
                 "segment": "精致白领",
                 "responses": [
-                    {"choice_set_id": 1, "chosen_alt_index": 0, "reasoning": "性价比高", "confidence": 0.8},
-                    {"choice_set_id": 2, "chosen_alt_index": 1, "reasoning": "品牌好", "confidence": 0.9},
+                    {
+                        "choice_set_id": 1,
+                        "chosen_alt_index": 0,
+                        "reasoning": "性价比高",
+                        "confidence": 0.8,
+                    },
+                    {
+                        "choice_set_id": 2,
+                        "chosen_alt_index": 1,
+                        "reasoning": "品牌好",
+                        "confidence": 0.9,
+                    },
                 ],
             },
             {
@@ -519,7 +525,12 @@ class TestPipelineTools:
                 "questionnaire_id": "q-dishwasher-202506",
                 "segment": "新手宝妈",
                 "responses": [
-                    {"choice_set_id": 1, "chosen_alt_index": 2, "reasoning": "容量大", "confidence": 0.7},
+                    {
+                        "choice_set_id": 1,
+                        "chosen_alt_index": 2,
+                        "reasoning": "容量大",
+                        "confidence": 0.7,
+                    },
                 ],
             },
         ]
@@ -549,8 +560,18 @@ class TestPipelineTools:
         }
 
         attributes = [
-            {"id": "price", "name": "价格", "type": "price", "levels": [{"value": 2999, "label": "2999"}]},
-            {"id": "brand", "name": "品牌", "type": "categorical", "levels": [{"value": "美的", "label": "美的"}]},
+            {
+                "id": "price",
+                "name": "价格",
+                "type": "price",
+                "levels": [{"value": 2999, "label": "2999"}],
+            },
+            {
+                "id": "brand",
+                "name": "品牌",
+                "type": "categorical",
+                "levels": [{"value": "美的", "label": "美的"}],
+            },
         ]
 
         result = call_tool(

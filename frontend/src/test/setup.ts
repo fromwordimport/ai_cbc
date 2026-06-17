@@ -16,7 +16,8 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 vi.mock('echarts-for-react', () => ({
-  default: function ReactECharts({ option: _option }: { option?: Record<string, unknown> }) {
+  default: function ReactECharts({ option }: { option?: Record<string, unknown> }) {
+    void option
     return null
   },
 }))

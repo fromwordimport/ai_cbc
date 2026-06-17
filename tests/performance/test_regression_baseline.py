@@ -23,7 +23,6 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # KPI Thresholds (performance gates)
 # ---------------------------------------------------------------------------
@@ -169,9 +168,7 @@ def _load_distribution_csv() -> dict[str, dict[str, float]] | None:
             if not name or name == "Aggregated":
                 continue
             dist[name] = {
-                k: float(v)
-                for k, v in row.items()
-                if k not in ("Name", "# Requests") and v
+                k: float(v) for k, v in row.items() if k not in ("Name", "# Requests") and v
             }
     return dist
 
@@ -214,9 +211,7 @@ def load_tier() -> str:
 class TestPerformanceRegression:
     """Assert that API response times and error rates stay within baseline gates."""
 
-    @pytest.mark.parametrize(
-        "gate", PERFORMANCE_GATES, ids=lambda g: g.endpoint
-    )
+    @pytest.mark.parametrize("gate", PERFORMANCE_GATES, ids=lambda g: g.endpoint)
     def test_response_time_percentiles(
         self,
         locust_stats: dict[str, dict[str, Any]],
@@ -225,26 +220,19 @@ class TestPerformanceRegression:
         """P50, P95, and P99 must be below the defined thresholds."""
         stats = locust_stats.get(gate.endpoint)
         if stats is None:
-            pytest.skip(
-                f"No data for endpoint '{gate.endpoint}' in stats CSV"
-            )
+            pytest.skip(f"No data for endpoint '{gate.endpoint}' in stats CSV")
 
         assert stats["p50_ms"] <= gate.p50_ms, (
-            f"{gate.endpoint} P50 {stats['p50_ms']:.1f}ms exceeds "
-            f"threshold {gate.p50_ms}ms"
+            f"{gate.endpoint} P50 {stats['p50_ms']:.1f}ms exceeds threshold {gate.p50_ms}ms"
         )
         assert stats["p95_ms"] <= gate.p95_ms, (
-            f"{gate.endpoint} P95 {stats['p95_ms']:.1f}ms exceeds "
-            f"threshold {gate.p95_ms}ms"
+            f"{gate.endpoint} P95 {stats['p95_ms']:.1f}ms exceeds threshold {gate.p95_ms}ms"
         )
         assert stats["p99_ms"] <= gate.p99_ms, (
-            f"{gate.endpoint} P99 {stats['p99_ms']:.1f}ms exceeds "
-            f"threshold {gate.p99_ms}ms"
+            f"{gate.endpoint} P99 {stats['p99_ms']:.1f}ms exceeds threshold {gate.p99_ms}ms"
         )
 
-    @pytest.mark.parametrize(
-        "gate", PERFORMANCE_GATES, ids=lambda g: g.endpoint
-    )
+    @pytest.mark.parametrize("gate", PERFORMANCE_GATES, ids=lambda g: g.endpoint)
     def test_error_rate(
         self,
         locust_stats: dict[str, dict[str, Any]],
@@ -253,9 +241,7 @@ class TestPerformanceRegression:
         """Error rate must be below the defined threshold (default 0.1%)."""
         stats = locust_stats.get(gate.endpoint)
         if stats is None:
-            pytest.skip(
-                f"No data for endpoint '{gate.endpoint}' in stats CSV"
-            )
+            pytest.skip(f"No data for endpoint '{gate.endpoint}' in stats CSV")
 
         total = stats["requests"] + stats["failures"]
         if total == 0:
@@ -263,8 +249,7 @@ class TestPerformanceRegression:
 
         error_rate = stats["failures"] / total
         assert error_rate <= gate.max_error_rate, (
-            f"{gate.endpoint} error rate {error_rate:.4f} exceeds "
-            f"threshold {gate.max_error_rate}"
+            f"{gate.endpoint} error rate {error_rate:.4f} exceeds threshold {gate.max_error_rate}"
         )
 
     @pytest.mark.parametrize(
@@ -280,18 +265,13 @@ class TestPerformanceRegression:
         """RPS must meet the minimum throughput gate."""
         stats = locust_stats.get(gate.endpoint)
         if stats is None:
-            pytest.skip(
-                f"No data for endpoint '{gate.endpoint}' in stats CSV"
-            )
+            pytest.skip(f"No data for endpoint '{gate.endpoint}' in stats CSV")
 
         assert stats["rps"] >= gate.min_rps, (
-            f"{gate.endpoint} RPS {stats['rps']:.2f} below "
-            f"minimum {gate.min_rps}"
+            f"{gate.endpoint} RPS {stats['rps']:.2f} below minimum {gate.min_rps}"
         )
 
-    def test_overall_error_rate(
-        self, locust_stats: dict[str, dict[str, Any]]
-    ) -> None:
+    def test_overall_error_rate(self, locust_stats: dict[str, dict[str, Any]]) -> None:
         """Aggregated error rate across all endpoints must be < 0.1%."""
         total_requests = sum(s["requests"] for s in locust_stats.values())
         total_failures = sum(s["failures"] for s in locust_stats.values())
@@ -303,9 +283,7 @@ class TestPerformanceRegression:
             f"Overall error rate {overall_error_rate:.4f} exceeds 0.1%"
         )
 
-    def test_no_unexpected_endpoints(
-        self, locust_stats: dict[str, dict[str, Any]]
-    ) -> None:
+    def test_no_unexpected_endpoints(self, locust_stats: dict[str, dict[str, Any]]) -> None:
         """Warn if endpoints appear in stats that are not covered by gates."""
         gated = {g.endpoint for g in PERFORMANCE_GATES}
         unexpected = set(locust_stats.keys()) - gated
@@ -333,19 +311,12 @@ class TestLoadScenarioAdherence:
 
         total_requests = sum(s["requests"] for s in locust_stats.values())
         assert total_requests >= min_requests, (
-            f"Total requests {total_requests} below minimum {min_requests} "
-            f"for tier '{load_tier}'"
+            f"Total requests {total_requests} below minimum {min_requests} for tier '{load_tier}'"
         )
 
-    def test_all_gated_endpoints_present(
-        self, locust_stats: dict[str, dict[str, Any]]
-    ) -> None:
+    def test_all_gated_endpoints_present(self, locust_stats: dict[str, dict[str, Any]]) -> None:
         """Every gate should have at least some data (may be skipped if endpoint not hit)."""
-        missing = [
-            g.endpoint
-            for g in PERFORMANCE_GATES
-            if g.endpoint not in locust_stats
-        ]
+        missing = [g.endpoint for g in PERFORMANCE_GATES if g.endpoint not in locust_stats]
         if missing:
             pytest.warns(
                 UserWarning,

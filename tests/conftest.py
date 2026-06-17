@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator, Generator
+from contextlib import suppress
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,8 +22,8 @@ from aicbc.core.models.persona import (
     PersonaProfile,
     TensionCombination,
 )
-from aicbc.core.store import PersonaStore, reset_stores
-from aicbc.cost.tracker import reset_cost_tracker
+from aicbc.core.store import PersonaStore, areset_stores
+from aicbc.cost.tracker import _REDIS_KEY, reset_cost_tracker
 from aicbc.llm.client import LLMResponse, Provider
 
 # ---------------------------------------------------------------------------
@@ -31,25 +33,43 @@ from aicbc.llm.client import LLMResponse, Provider
 _COST_STATE_FILE = Path("./data/cost_state.json")
 
 
+def _delete_cost_state_file() -> None:
+    """Delete the on-disk cost state file, ignoring errors."""
+    try:
+        if _COST_STATE_FILE.exists():
+            _COST_STATE_FILE.unlink()
+    except Exception:
+        pass
+
+
+def _delete_cost_state_redis() -> None:
+    """Delete the Redis cost state key, ignoring errors."""
+    try:
+        from aicbc.config.settings import get_settings
+
+        settings = get_settings()
+        if settings.cost_tracker.backend == "redis":
+            import redis
+
+            r = redis.Redis.from_url(settings.database.redis_url, decode_responses=True)
+            r.delete(_REDIS_KEY)
+    except Exception:
+        pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _clean_cost_state_on_disk() -> Generator[None, None, None]:
-    """Delete persisted cost state file before any tests run.
+    """Delete persisted cost state before any tests run.
 
     This prevents stale cost data from previous test runs from leaking into
     CostTracker instances that call _load_state() in __init__.
     """
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    _delete_cost_state_file()
+    _delete_cost_state_redis()
     yield
     # Clean up after session as well
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    _delete_cost_state_file()
+    _delete_cost_state_redis()
 
 
 # ---------------------------------------------------------------------------
@@ -69,22 +89,25 @@ def _lazy_reset_dependencies() -> None:
     global _reset_dependencies_fn
     if _reset_dependencies_fn is None:
         from aicbc.api.dependencies import reset_dependencies as fn
+
         _reset_dependencies_fn = fn
     _reset_dependencies_fn()
 
 
-def _lazy_reset_analysis_store() -> None:
+async def _lazy_areset_analysis_store() -> None:
     global _reset_analysis_store_fn
     if _reset_analysis_store_fn is None:
-        from aicbc.analysis.store import reset_analysis_store as fn
+        from aicbc.analysis.store import areset_analysis_store as fn
+
         _reset_analysis_store_fn = fn
-    _reset_analysis_store_fn()
+    await _reset_analysis_store_fn()
 
 
 def _lazy_clear_app_overrides() -> None:
     global _app_obj
     if _app_obj is None:
         from aicbc.main import app as _app
+
         _app_obj = _app
     _app_obj.dependency_overrides.clear()
 
@@ -93,13 +116,36 @@ def _lazy_reset_rate_limits() -> None:
     global _reset_rate_limits_fn
     if _reset_rate_limits_fn is None:
         from aicbc.api.middleware.rate_limit import reset_rate_limits as fn
+
         _reset_rate_limits_fn = fn
     _reset_rate_limits_fn()
 
 
+async def _reset_all() -> None:
+    """Reset all global singletons and persisted state, suppressing errors."""
+    with suppress(Exception):
+        _lazy_reset_dependencies()
+    with suppress(Exception):
+        get_settings.cache_clear()
+    with suppress(Exception):
+        await areset_stores()
+    with suppress(Exception):
+        await _lazy_areset_analysis_store()
+    with suppress(Exception):
+        reset_cost_tracker()
+    with suppress(Exception):
+        _lazy_clear_app_overrides()
+    with suppress(Exception):
+        _lazy_reset_rate_limits()
+    with suppress(Exception):
+        _delete_cost_state_file()
+    with suppress(Exception):
+        _delete_cost_state_redis()
+
+
 @pytest.fixture(autouse=True)
-def _clean_global_state() -> Generator[None, None, None]:
-    """Reset all module-level global singletons before each test.
+async def _clean_global_state() -> AsyncGenerator[None, None]:
+    """Reset all module-level global singletons before and after each test.
 
     Prevents state leakage between test files caused by:
     - store.py:  _store, _questionnaire_store, _response_store singletons
@@ -110,74 +156,10 @@ def _clean_global_state() -> Generator[None, None, None]:
     Heavy imports (aicbc.main, aicbc.analysis.store, etc.) are resolved lazily
     once and cached so the fixture body is cheap on subsequent calls.
     """
-    try:
-        _lazy_reset_dependencies()
-    except Exception:
-        pass
-    try:
-        reset_stores()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_analysis_store()
-    except Exception:
-        pass
-    try:
-        reset_cost_tracker()
-    except Exception:
-        pass
-    try:
-        _lazy_clear_app_overrides()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_rate_limits()
-    except Exception:
-        pass
-    try:
-        get_settings.cache_clear()
-    except Exception:
-        pass
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    await _reset_all()
     yield
-    # Post-test safety-net cleanup
-    try:
-        get_settings.cache_clear()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_dependencies()
-    except Exception:
-        pass
-    try:
-        reset_stores()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_analysis_store()
-    except Exception:
-        pass
-    try:
-        reset_cost_tracker()
-    except Exception:
-        pass
-    try:
-        _lazy_clear_app_overrides()
-    except Exception:
-        pass
-    try:
-        _lazy_reset_rate_limits()
-    except Exception:
-        pass
-    try:
-        if _COST_STATE_FILE.exists():
-            _COST_STATE_FILE.unlink()
-    except Exception:
-        pass
+    await _reset_all()
+
 
 # ---------------------------------------------------------------------------
 # Settings
@@ -195,7 +177,9 @@ def test_settings() -> Settings:
 # ---------------------------------------------------------------------------
 
 
-def _mock_llm_response(content: dict[str, Any] | str, model: str = "claude-sonnet-4-6") -> LLMResponse:
+def _mock_llm_response(
+    content: dict[str, Any] | str, model: str = "claude-sonnet-4-6"
+) -> LLMResponse:
     text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
     return LLMResponse(
         content=text,
@@ -215,15 +199,15 @@ def mock_llm_client() -> MagicMock:
     """Return a mock LLMClient with layer response factory."""
     client = MagicMock()
 
-    _CITIES = ["一线城市", "新一线城市", "二线城市", "三线城市", "四线城市"]
-    _INCOMES = ["15-30万元", "8-15万元", "30-50万元", "15-30万元", "8-15万元"]
+    cities = ["一线城市", "新一线城市", "二线城市", "三线城市", "四线城市"]
+    incomes = ["15-30万元", "8-15万元", "30-50万元", "15-30万元", "8-15万元"]
 
     def _default_layer1(idx: int = 0) -> dict[str, Any]:
         return {
             "age": f"{28 + idx}岁",
             "gender": "女",
-            "city": _CITIES[idx % len(_CITIES)],
-            "income": _INCOMES[idx % len(_INCOMES)],
+            "city": cities[idx % len(cities)],
+            "income": incomes[idx % len(incomes)],
             "occupation": "互联网产品经理",
             "education": "本科",
             "marital_status": "已婚无孩",

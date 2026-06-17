@@ -10,7 +10,6 @@ Validates the HB model engine across:
 from __future__ import annotations
 
 import time
-from typing import ClassVar
 
 import numpy as np
 import pandas as pd
@@ -22,19 +21,31 @@ from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 
 
 def _default_attributes(n_attrs: int = 5) -> list[Attribute]:
-    names = ["brand", "capacity", "installation", "features", "energy", "noise",
-             "material", "warranty", "display", "connectivity", "design", "color"][:n_attrs]
+    names = [
+        "brand",
+        "capacity",
+        "installation",
+        "features",
+        "energy",
+        "noise",
+        "material",
+        "warranty",
+        "display",
+        "connectivity",
+        "design",
+        "color",
+    ][:n_attrs]
     attrs = []
     for name in names:
-        levels = [
-            AttributeLevel(value=f"{name}_{i}", label=f"{name}_{i}") for i in range(3)
-        ]
-        attrs.append(Attribute(
-            id=name,
-            name=name,
-            type=AttributeType.CATEGORICAL,
-            levels=levels,
-        ))
+        levels = [AttributeLevel(value=f"{name}_{i}", label=f"{name}_{i}") for i in range(3)]
+        attrs.append(
+            Attribute(
+                id=name,
+                name=name,
+                type=AttributeType.CATEGORICAL,
+                levels=levels,
+            )
+        )
     return attrs
 
 
@@ -70,15 +81,12 @@ def _synthetic_hb_long(
     else:
         mu = rng.normal(0, 0.5, size=n_feat)
 
-    if homogeneous:
-        sigma_vec = np.full(n_feat, 0.01)
-    else:
-        sigma_vec = rng.uniform(0.2, 1.0, size=n_feat)
+    sigma_vec = np.full(n_feat, 0.01) if homogeneous else rng.uniform(0.2, 1.0, size=n_feat)
 
     person_betas: dict[str, dict[str, float]] = {}
     for pid in range(n_respondents):
         beta = rng.normal(mu, sigma_vec)
-        person_betas[f"p{pid}"] = {c: float(b) for c, b in zip(feat_cols, beta)}
+        person_betas[f"p{pid}"] = {c: float(b) for c, b in zip(feat_cols, beta, strict=False)}
 
     rows: list[dict] = []
     for pid in range(n_respondents):
@@ -86,20 +94,23 @@ def _synthetic_hb_long(
             task_id_val = pid * n_tasks + task
             for alt in range(n_alts):
                 x = rng.normal(0, 1, size=n_feat)
-                u = float(np.dot(x, [person_betas[f"p{pid}"][c] for c in feat_cols])
-                          + rng.gumbel(0, 1))
-                rows.append({
-                    "resp_id": f"p{pid}",
-                    "task_id": task_id_val,
-                    "alt_id": alt,
-                    "chosen": False,
-                    "utility": u,
-                    **{c: float(v) for c, v in zip(feat_cols, x)},
-                })
+                u = float(
+                    np.dot(x, [person_betas[f"p{pid}"][c] for c in feat_cols]) + rng.gumbel(0, 1)
+                )
+                rows.append(
+                    {
+                        "resp_id": f"p{pid}",
+                        "task_id": task_id_val,
+                        "alt_id": alt,
+                        "chosen": False,
+                        "utility": u,
+                        **{c: float(v) for c, v in zip(feat_cols, x, strict=False)},
+                    }
+                )
 
     df = pd.DataFrame(rows)
 
-    for (respondent, task), idx in df.groupby(["resp_id", "task_id"]).groups.items():
+    for (_respondent, _task), idx in df.groupby(["resp_id", "task_id"]).groups.items():
         best = df.loc[idx, "utility"].idxmax()
         df.loc[best, "chosen"] = True
 
@@ -109,7 +120,7 @@ def _synthetic_hb_long(
         drop_tasks = rng.choice(task_ids, size=n_drop, replace=False)
         df = df[~df["task_id"].isin(drop_tasks)]
 
-    pop_mu_dict = {c: float(v) for c, v in zip(feat_cols, mu)}
+    pop_mu_dict = {c: float(v) for c, v in zip(feat_cols, mu, strict=False)}
     return df, pop_mu_dict, person_betas
 
 
@@ -134,8 +145,9 @@ class TestParameterRecovery:
         for key in feat_cols:
             estimated = result.population_mu[key]
             true_val = true_mu[key]
-            assert abs(estimated - true_val) < 1.5, \
+            assert abs(estimated - true_val) < 1.5, (
                 f"{key}: est={estimated:.3f} true={true_val:.3f} (diff={abs(estimated - true_val):.3f})"
+            )
 
     def test_population_mu_recovery_n200(self):
         df, true_mu, _ = _synthetic_hb_long(n_respondents=200, n_attrs=4)
@@ -149,8 +161,9 @@ class TestParameterRecovery:
         for key in feat_cols:
             estimated = result.population_mu[key]
             true_val = true_mu[key]
-            assert abs(estimated - true_val) < 1.0, \
+            assert abs(estimated - true_val) < 1.0, (
                 f"{key}: est={estimated:.3f} true={true_val:.3f}"
+            )
 
     def test_individual_ranking_correlation(self):
         df, _, true_betas = _synthetic_hb_long(n_respondents=30, n_attrs=4, homogeneous=False)
@@ -290,8 +303,10 @@ def timing_report():
     yield records
     print("\n--- HB Performance Benchmark Summary ---")
     for r in records:
-        print(f"  N={r['n']:>4}  attrs={r['n_attrs']}  time={r['time_s']:>6.1f}s  "
-              f"rhat={r['rhat']:.3f}  ess={r['ess']}  converged={r['converged']}")
+        print(
+            f"  N={r['n']:>4}  attrs={r['n_attrs']}  time={r['time_s']:>6.1f}s  "
+            f"rhat={r['rhat']:.3f}  ess={r['ess']}  converged={r['converged']}"
+        )
 
 
 @pytest.mark.slow
@@ -308,11 +323,16 @@ class TestPerformanceBenchmarks:
         result = engine.fit(df, feat_cols)
         elapsed = time.perf_counter() - t0
 
-        timing_report.append({
-            "n": 50, "n_attrs": 4, "time_s": elapsed,
-            "rhat": result.rhat_max, "ess": result.ess_bulk_min,
-            "converged": result.converged,
-        })
+        timing_report.append(
+            {
+                "n": 50,
+                "n_attrs": 4,
+                "time_s": elapsed,
+                "rhat": result.rhat_max,
+                "ess": result.ess_bulk_min,
+                "converged": result.converged,
+            }
+        )
         assert elapsed < 600, f"HB fit took {elapsed:.1f}s, probable infinite loop or hang"
 
 
@@ -331,7 +351,9 @@ class TestMNLvsHBConsistency:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        hb_config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
+        hb_config = HBConfig(
+            n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42
+        )
         hb_engine = HBEngine(hb_config)
         hb_result = hb_engine.fit(df, feat_cols)
 
@@ -346,8 +368,9 @@ class TestMNLvsHBConsistency:
                 sign_agreements += 1
 
         agreement_rate = sign_agreements / len(feat_cols)
-        assert agreement_rate >= 0.5, \
+        assert agreement_rate >= 0.5, (
             f"MNL-HB sign agreement rate {agreement_rate:.1%}, expected >= 50%"
+        )
 
 
 # ---------------------------------------------------------------------------

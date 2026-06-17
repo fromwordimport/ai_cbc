@@ -154,7 +154,9 @@ class PersonaPipeline:
         self.schema_validator = SchemaValidator()
         self.logic_validator = LogicValidator()
 
-    def generate_and_validate(self, persona_id: str, seed: SeedConfig | None = None) -> dict[str, Any]:
+    def generate_and_validate(
+        self, persona_id: str, seed: SeedConfig | None = None
+    ) -> dict[str, Any]:
         """Run full pipeline and return results."""
         seed = seed or self.seed_gen.generate_seed()
         profile = self.profile_gen.generate(persona_id, seed)

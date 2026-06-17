@@ -220,7 +220,10 @@ def test_layer2_behavior_valid() -> None:
     """Layer2Behavior must accept valid data."""
     layer = Layer2Behavior(
         price_sensitivity="比价工具用户（慢慢买/什么值得买）",
-        purchase_channels=["货架电商（淘宝/天猫/京东/拼多多）", "内容电商（抖音/快手/小红书/视频号）"],
+        purchase_channels=[
+            "货架电商（淘宝/天猫/京东/拼多多）",
+            "内容电商（抖音/快手/小红书/视频号）",
+        ],
         decision_style="果断独立",
         brand_loyalty="2-3个品牌间选择",
         information_source=["小红书", "知乎"],
