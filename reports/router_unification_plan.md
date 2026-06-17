@@ -40,7 +40,7 @@ ModelRouter (独立于以上链路，自行维护)
 | 位置 | 模型数 | 示例值 (claude-sonnet-4-6) | 备注 |
 |------|--------|---------------------------|------|
 | `LLMClient._COST_PER_1K` (L38) | 6 | (3.0, 15.0) /M tokens | 含 gpt-4-turbo、claude-opus-4-6 |
-| `ModelRouter.DEFAULT_MODELS` (L97) | 5 | (0.003, 0.015) /1k tokens | 含 claude-opus-4-8 |
+| `ModelRouter.DEFAULT_MODELS` (L97) | 5 | (0.003, 0.015) /1k tokens | 含 claude-sonnet-4-6 |
 
 差异：Router 写 `claude-opus-4-8`，Client 写 `claude-opus-4-6` 和 `gpt-4-turbo`。数值一致（仅单位不同 `/M` vs `/1k`），但任何价格调整需改两处。
 
@@ -160,12 +160,12 @@ class ModelPricing:
 
 MODEL_REGISTRY: dict[str, ModelPricing] = {
     # Anthropic
-    "claude-opus-4-8": ModelPricing(
+    "claude-sonnet-4-6": ModelPricing(
         provider="anthropic",
-        input_cost_per_1k=0.015,
-        output_cost_per_1k=0.075,
+        input_cost_per_1k=0.003,
+        output_cost_per_1k=0.015,
         max_tokens=200_000,
-        quality_tier="highest",
+        quality_tier="high",
     ),
     "claude-sonnet-4-6": ModelPricing(
         provider="anthropic",

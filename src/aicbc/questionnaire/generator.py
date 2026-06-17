@@ -174,10 +174,7 @@ class QuestionnaireGenerator:
         # Must use `is not None` — seed=0 is a valid value but falsy.
         effective_seed = seed if seed is not None else study.design_parameters.seed
 
-        if study.design_parameters.algorithm in (
-            DesignAlgorithm.BALANCED,
-            DesignAlgorithm.ORTHOGONAL,
-        ):
+        if study.design_parameters.algorithm == DesignAlgorithm.BALANCED:
             questionnaire = generate_balanced_questionnaire(
                 study_id=study.study_id,
                 attributes=study.attributes,

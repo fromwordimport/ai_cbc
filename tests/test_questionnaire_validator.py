@@ -9,6 +9,7 @@ from aicbc.questionnaire.models import (
     AttributeType,
     CBCQuestionnaire,
     ChoiceSet,
+    Condition,
     DesignParameters,
     ProhibitedPair,
 )
@@ -317,7 +318,7 @@ class TestValidateProhibitedPairs:
                 ],
             ),
         ])
-        pairs = [ProhibitedPair(attribute_id="brand", level_value="C")]
+        pairs = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="C")])]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert violations == []
 
@@ -331,7 +332,7 @@ class TestValidateProhibitedPairs:
                 ],
             ),
         ])
-        pairs = [ProhibitedPair(attribute_id="brand", level_value="A")]
+        pairs = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="A")])]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert len(violations) == 1
         assert "brand=A" in violations[0]
@@ -347,8 +348,8 @@ class TestValidateProhibitedPairs:
             ),
         ])
         pairs = [
-            ProhibitedPair(attribute_id="brand", level_value="A"),
-            ProhibitedPair(attribute_id="brand", level_value="B"),
+            ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="A")]),
+            ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="B")]),
         ]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert len(violations) == 2
@@ -368,7 +369,7 @@ class TestValidateProhibitedPairs:
                 ],
             ),
         ], n_choice_sets=2, n_alternatives=1)
-        pairs = [ProhibitedPair(attribute_id="brand", level_value="A")]
+        pairs = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="A")])]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert len(violations) == 2
 

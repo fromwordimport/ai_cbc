@@ -6,6 +6,7 @@ local development and tests.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 from datetime import UTC, datetime
@@ -35,7 +36,7 @@ def _use_memory_store() -> bool:
     return False
 
 
-def _get_mongo_stores():
+def _get_mongo_stores() -> Any:
     from aicbc.core import store_mongo
 
     return store_mongo
@@ -327,6 +328,10 @@ class MemoryAnalysisStore:
             self._segment_comparison.clear()
             self._latent_class.clear()
 
+    async def aclear(self) -> None:
+        """Async-compatible clear (delegates to sync implementation)."""
+        self.clear()
+
     def delete_analysis(self, analysis_id: str) -> bool:
         """Delete a job, its result, and all derivative artefacts."""
         with self._lock:
@@ -377,8 +382,32 @@ def get_analysis_store() -> AnalysisStore:
 
 
 def reset_analysis_store() -> None:
-    """Reset the global AnalysisStore singleton."""
+    """Reset the global AnalysisStore singleton.
+
+    When called from an async context, callers should use
+    :func:`areset_analysis_store` instead.  This sync wrapper dispatches to
+    ``aclear()`` for Mongo-backed stores and ``clear()`` for memory stores,
+    using ``asyncio.run`` only when no event loop is running.
+    """
     global _analysis_store
     _analysis_store = None
-    get_analysis_store().clear()
+    try:
+        asyncio.get_running_loop()
+        # Called from an async context — caller should use areset_analysis_store().
+        get_analysis_store().clear()
+    except RuntimeError:
+        # No event loop running — safe to use asyncio.run for Mongo stores.
+        asyncio.run(areset_analysis_store())
+    _analysis_store = None
+
+
+async def areset_analysis_store() -> None:
+    """Async version of :func:`reset_analysis_store`.
+
+    Awaits the store's ``aclear()`` so Mongo-backed stores are cleaned
+    without blocking the event loop.
+    """
+    global _analysis_store
+    _analysis_store = None
+    await get_analysis_store().aclear()
     _analysis_store = None

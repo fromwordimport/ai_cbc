@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 
 const messageError = vi.fn()
 
@@ -26,6 +27,11 @@ vi.mock('axios', () => ({
   default: {
     create: vi.fn(() => mockInstance),
     defaults: {},
+    AxiosHeaders: class AxiosHeaders {
+      private _headers: Record<string, string> = {}
+      set(name: string, value: string) { this._headers[name] = value }
+      get(name: string) { return this._headers[name] }
+    },
   },
 }))
 
@@ -341,8 +347,10 @@ describe('API service wrappers', () => {
 
   describe('interceptors', () => {
     it('request interceptor injects X-API-Key header', () => {
-      const config = { headers: {} }
-      expect(api.injectApiKey(config)).toEqual({ headers: { 'X-API-Key': 'dev-key-change-in-prod' } })
+      const headers = new axios.AxiosHeaders()
+      const config = { headers } as InternalAxiosRequestConfig
+      const result = api.injectApiKey(config)
+      expect(result.headers.get('X-API-Key')).toBe('dev-key-change-in-prod')
     })
 
     it('handleError handles 401', async () => {

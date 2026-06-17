@@ -55,9 +55,11 @@ The split CI/CD workflows in `../.github/workflows/ci.yml`, `../.github/workflow
 
 ## Secret Management
 
-`secret.yaml` is a **template** and is **not** included in the base `kustomization.yaml` resources list. It contains base64-encoded placeholder values that are intentionally invalid. Applying it directly would cause service startup failures.
+`secret.yaml` is a **template only** and is **not** included in the base `kustomization.yaml` resources list. It contains base64-encoded placeholder values that are intentionally invalid. Applying it directly would cause service startup failures.
 
 Deployments that reference the secret via `secretKeyRef` expect the secret to be created separately **before** the overlay is applied. The base kustomization no longer applies `secret.yaml`, so CI/CD and manual deploys must ensure the real secret exists in the target namespace first.
+
+See also the ESO example: [`base/external-secret.yaml.example`](base/external-secret.yaml.example).
 
 ### Recommended approaches (in order of preference)
 
@@ -73,6 +75,7 @@ Deployments that reference the secret via `secretKeyRef` expect the secret to be
 
 2. **External Secrets Operator (ESO)** — sync from AWS Secrets Manager, Azure Key Vault, or HashiCorp Vault:
    - See: https://external-secrets.io/latest/
+   - Example manifest: `base/external-secret.yaml.example` (copy, customize remoteRef keys, and apply separately — it is **not** included in `kustomization.yaml` resources).
 
 3. **CI/CD variable injection** — replace placeholders during deployment:
    ```bash

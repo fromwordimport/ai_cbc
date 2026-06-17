@@ -78,7 +78,7 @@ class TestCreateCBCStudy:
             research_goal="价格敏感度研究",
             n_choice_sets=8,
             n_alternatives=2,
-            algorithm="orthogonal",
+            algorithm="balanced",
             target_segments=["精致白领", "Z世代租客"],
         )
 
@@ -86,7 +86,7 @@ class TestCreateCBCStudy:
         study = result.data
         assert study["design_parameters"]["n_choice_sets"] == 8
         assert study["design_parameters"]["n_alternatives"] == 2
-        assert study["design_parameters"]["algorithm"] == "orthogonal"
+        assert study["design_parameters"]["algorithm"] == "balanced"
         assert study["target_segments"] == ["精致白领", "Z世代租客"]
 
 
