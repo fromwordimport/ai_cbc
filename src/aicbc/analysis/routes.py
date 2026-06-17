@@ -13,14 +13,6 @@ from datetime import UTC, datetime
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from aicbc.analysis.cbc_visualizer import (
-    build_dashboard_option,
-    build_importance_chart_option,
-    build_importance_pie_option,
-    build_market_share_option,
-    build_utility_distribution_option,
-    build_wtp_chart_option,
-)
 from aicbc.analysis.models import (
     AnalysisJobStatus,
     AnalysisResultResponse,
@@ -38,13 +30,7 @@ from aicbc.analysis.models import (
     SegmentComparisonResponse,
     WTPResponse,
 )
-from aicbc.analysis.nl_scenario_parser import parse_nl_scenario
-from aicbc.analysis.preprocessing import validate_dataset
-from aicbc.analysis.report_builder import build_report
-from aicbc.analysis.results.segment_comparison import compare_segments as seg_compare
-from aicbc.analysis.simulation.market_simulator import MarketSimulator
 from aicbc.analysis.store import AnalysisStore, get_analysis_store
-from aicbc.analysis.tasks import run_analysis_task, run_latent_class_task
 from aicbc.core.store import get_questionnaire_store, get_response_store
 from aicbc.questionnaire.models import Attribute
 from aicbc.questionnaire.response_models import CBCRawDataset
@@ -119,6 +105,9 @@ async def analyze_study(
     """
     log = logger.bind(study_id=study_id, model_type=request.model_type)
     log.info("analysis_requested")
+
+    from aicbc.analysis.preprocessing import validate_dataset
+    from aicbc.analysis.tasks import run_analysis_task, run_latent_class_task
 
     # ── Validate data synchronously (fast, errors returned immediately) ──
     attributes = await _get_study_attributes(study_id)
@@ -290,6 +279,7 @@ async def list_analyses(
 @router.delete(
     "/studies/{study_id}/analysis/{analysis_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Delete an analysis job and its results",
 )
 async def delete_analysis(
@@ -404,8 +394,11 @@ async def simulate_market(
     # Get study attributes
     attributes = await _get_study_attributes(study_id)
 
-    # Build utilities DataFrame with empty-guard
     import pandas as pd
+
+    from aicbc.analysis.simulation.market_simulator import MarketSimulator
+
+    # Build utilities DataFrame with empty-guard
 
     if not result.individual_utilities:
         raise HTTPException(
@@ -528,6 +521,8 @@ async def compare_segments(
         )
 
     # Run comparison
+    from aicbc.analysis.results.segment_comparison import compare_segments as seg_compare
+
     comparison = seg_compare(
         util_aligned,
         segment_aligned,
@@ -590,6 +585,7 @@ async def parse_scenario(
 ) -> ProductScenario:
     """Convert free-text (e.g. '华为 2999 元嵌入式 13 套') into a ProductScenario."""
     attributes = await _get_study_attributes(study_id)
+    from aicbc.analysis.nl_scenario_parser import parse_nl_scenario
     return parse_nl_scenario(request.text, attributes)
 
 
@@ -615,6 +611,8 @@ async def download_report(
     importance = await analysis_store.aget_importance(analysis_id)
     wtp = await analysis_store.aget_wtp(analysis_id)
     market_sim = await analysis_store.aget_latest_market_sim(analysis_id)
+
+    from aicbc.analysis.report_builder import build_report
 
     content = build_report(
         analysis_result=result,
@@ -651,6 +649,15 @@ async def get_visualization(
             detail=f"Analysis result '{analysis_id}' not found",
         )
     await _verify_study_ownership(study_id, analysis_id, analysis_store)
+
+    from aicbc.analysis.cbc_visualizer import (
+        build_dashboard_option,
+        build_importance_chart_option,
+        build_importance_pie_option,
+        build_market_share_option,
+        build_utility_distribution_option,
+        build_wtp_chart_option,
+    )
 
     if chart == "importance_bar":
         importance = await analysis_store.aget_importance(analysis_id)
@@ -706,6 +713,8 @@ async def run_latent_class(
     """
     # Validate study exists (the Celery worker validates the dataset).
     await _get_study_attributes(study_id)
+
+    from aicbc.analysis.tasks import run_latent_class_task
 
     analysis_id = f"lc-{study_id}-{uuid.uuid4().hex[:8]}"
     job = AnalysisJobStatus(
