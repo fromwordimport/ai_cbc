@@ -7,7 +7,6 @@ WORKDIR /app
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -15,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Include [analysis] extras because Celery worker needs pandas/numpy/pymc.
 COPY pyproject.toml ./
 COPY src/ ./src/
+ENV UV_NO_CACHE=1
 RUN pip install --no-cache-dir uv && \
     uv pip install --system --no-cache -e ".[analysis]"
 
