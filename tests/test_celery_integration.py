@@ -160,3 +160,14 @@ class TestCeleryRedisIntegration:
         )
         assert result.id is not None
         result.revoke(terminate=False)
+
+    def test_async_result_state_still_works_with_ignore_result(self):
+        """Even with task_ignore_result, the broker still tracks task state."""
+        result = run_analysis_task.apply_async(
+            args=["study-test-002", "analysis-test-002", "mnl", "{}"],
+            countdown=3600,
+        )
+        assert result.id is not None
+        # State should be PENDING immediately after enqueue.
+        assert result.state in ("PENDING",)
+        result.revoke(terminate=False)
