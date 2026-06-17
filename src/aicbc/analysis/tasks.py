@@ -33,8 +33,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
-    result_expires=3600,  # Results expire after 1 hour
-    result_extended=True,  # Store task name and args for better traceability
+    result_expires=300,  # Results expire after 5 minutes to reduce Redis memory/commands
+    result_extended=False,  # Do not store task name/args in result backend
+    task_ignore_result=True,  # Most tasks only need state (PENDING/STARTED/SUCCESS), not return value
 )
 
 logger = structlog.get_logger("aicbc.analysis.tasks")

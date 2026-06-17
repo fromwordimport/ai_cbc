@@ -80,6 +80,16 @@ class TestCeleryAppConfig:
         """Prefetch multiplier should be 1 for fair task distribution."""
         assert celery_app.conf.worker_prefetch_multiplier == 1
 
+    def test_result_expires_short(self):
+        assert celery_app.conf.result_expires == 300
+
+    def test_task_ignore_result_enabled(self):
+        task = celery_app.tasks.get("aicbc.analysis.run_analysis_task")
+        assert task.ignore_result is True
+
+    def test_result_extended_disabled(self):
+        assert celery_app.conf.result_extended is False
+
 
 @pytest.mark.skipif(not _redis_available(), reason="Redis not available")
 class TestCeleryRedisIntegration:
