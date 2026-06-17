@@ -92,6 +92,9 @@ class AnalysisJobDocument(Document):
 
     class Settings:
         name = "analysis_jobs"
+        indexes = [
+            IndexModel([("created_at", -1)]),
+        ]
 
 
 class AnalysisResultDocument(Document):
@@ -104,6 +107,9 @@ class AnalysisResultDocument(Document):
 
     class Settings:
         name = "analysis_results"
+        indexes = [
+            IndexModel([("created_at", -1)]),
+        ]
 
 
 class AnalysisDerivativeDocument(Document):
@@ -157,6 +163,9 @@ class AuditLogDocument(Document):
 
     class Settings:
         name = "audit_logs"
+        indexes = [
+            IndexModel([("created_at", -1)]),
+        ]
 
 
 # Convenience list used during Beanie initialization.
