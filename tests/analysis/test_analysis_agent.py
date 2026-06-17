@@ -206,6 +206,7 @@ class TestAnalysisAgentPipeline:
         # Synthetic data has negative price coefficient, so no warning expected
         assert len(price_warnings) == 0
 
+    @pytest.mark.slow
     def test_population_params_structure(self):
         dataset, attributes = _make_synthetic_dataset(n_resp=20, n_tasks=4)
 

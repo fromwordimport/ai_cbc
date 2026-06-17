@@ -704,6 +704,7 @@ class TestDataFormatConsistency:
                 assert "chosen" in alt
                 assert "attributes" in alt
 
+    @pytest.mark.slow
     def test_analysis_result_fields_match_datadict(
         self,
         dishwasher_study: CBCStudy,
@@ -821,6 +822,7 @@ class TestEffectsCodingConsistency:
         np = n_parameters(dishwasher_study.attributes)
         assert np == 17, f"Expected 17 total parameters, got {np}"
 
+    @pytest.mark.slow
     def test_last_level_recovery(
         self, dishwasher_study: CBCStudy, simulated_dataset: CBCRawDataset, tiny_hb_config: HBConfig
     ):
@@ -916,6 +918,7 @@ class TestPersonaIdConsistency:
             f"Stored response persona IDs mismatch: {persona_ids} vs {response_ids}"
         )
 
+    @pytest.mark.slow
     def test_persona_id_in_analysis(
         self,
         persona_profiles: list[PersonaProfile],
@@ -1039,6 +1042,7 @@ class TestErrorPropagation:
         assert not validation["valid"]
         assert any("exactly one" in e.lower() for e in validation["errors"])
 
+    @pytest.mark.slow
     def test_wtp_calculator_rejects_missing_price(
         self, dishwasher_study: CBCStudy, simulated_dataset: CBCRawDataset, tiny_hb_config: HBConfig
     ):
@@ -1227,6 +1231,7 @@ class TestMarketSimulationEdgeCases:
         assert abs(shares["predicted_share"].sum() - 1.0) < 0.01
         assert shares[shares["name"] == "none"]["predicted_share"].values[0] >= 0.0
 
+    @pytest.mark.slow
     def test_sensitivity_analysis(
         self,
         dishwasher_study: CBCStudy,
