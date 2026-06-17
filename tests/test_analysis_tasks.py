@@ -9,9 +9,8 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -129,10 +128,12 @@ def mock_stores():
         started_at=datetime.now(UTC),
     )
 
-    with patch("aicbc.core.store.get_questionnaire_store", return_value=q_store):
-        with patch("aicbc.core.store.get_response_store", return_value=r_store):
-            with patch("aicbc.analysis.store.get_analysis_store", return_value=a_store):
-                yield q_store, r_store, a_store
+    with (
+        patch("aicbc.core.store.get_questionnaire_store", return_value=q_store),
+        patch("aicbc.core.store.get_response_store", return_value=r_store),
+        patch("aicbc.analysis.store.get_analysis_store", return_value=a_store),
+    ):
+        yield q_store, r_store, a_store
 
 
 @pytest.fixture
@@ -147,10 +148,12 @@ def mock_preprocessing():
         "brand_0": [1.0, -1.0, 1.0, -1.0],
     })
 
-    with patch("aicbc.analysis.preprocessing.validate_dataset", return_value={"valid": True, "errors": []}):
-        with patch("aicbc.analysis.preprocessing.to_long_format", return_value=df_long):
-            with patch("aicbc.analysis.preprocessing.get_feature_columns", return_value=["price", "brand_0"]):
-                yield
+    with (
+        patch("aicbc.analysis.preprocessing.validate_dataset", return_value={"valid": True, "errors": []}),
+        patch("aicbc.analysis.preprocessing.to_long_format", return_value=df_long),
+        patch("aicbc.analysis.preprocessing.get_feature_columns", return_value=["price", "brand_0"]),
+    ):
+        yield
 
 
 @pytest.fixture
@@ -170,9 +173,11 @@ def mock_importance():
         "q75": [0.58, 0.48],
     }, index=["price", "brand_0"])
 
-    with patch("aicbc.analysis.results.importance.compute_importance", return_value=importance_df):
-        with patch("aicbc.analysis.results.importance.aggregate_importance", return_value=importance_agg):
-            yield
+    with (
+        patch("aicbc.analysis.results.importance.compute_importance", return_value=importance_df),
+        patch("aicbc.analysis.results.importance.aggregate_importance", return_value=importance_agg),
+    ):
+        yield
 
 
 @pytest.fixture
@@ -301,11 +306,43 @@ class TestRunAnalysisTask:
 
     def test_validation_failure_raises(self, mock_stores, mock_preprocessing):
         _, _, a_store = mock_stores
-        with patch("aicbc.analysis.preprocessing.validate_dataset", return_value={"valid": False, "errors": ["bad data"]}):
-            with pytest.raises(ValueError, match="Dataset validation failed"):
-                run_analysis_task("study-001", "analysis-001", "hb", json.dumps({}))
+        with (
+            patch("aicbc.analysis.preprocessing.validate_dataset", return_value={"valid": False, "errors": ["bad data"]}),
+            pytest.raises(ValueError, match="Dataset validation failed"),
+        ):
+            run_analysis_task("study-001", "analysis-001", "hb", json.dumps({}))
 
         a_store.update_job_status.assert_any_call("analysis-001", "FAILED", progress=0.0)
+
+    @patch("aicbc.analysis.engines.hb_engine.HBEngine")
+    @patch("aicbc.analysis.engines.hb_engine.HBConfig")
+    @patch("aicbc.core.models.db_documents.DeadLetterDocument")
+    def test_dead_letter_saved_on_failure(
+        self,
+        mock_doc_cls,
+        mock_hb_config_cls,
+        mock_hb_engine_cls,
+        mock_stores,
+        mock_preprocessing,
+    ):
+        mock_hb_engine_cls.return_value.fit.side_effect = RuntimeError("boom")
+        mock_doc_cls.return_value.insert = AsyncMock()
+
+        with pytest.raises(RuntimeError):
+            run_analysis_task(
+                "study-001",
+                "analysis-001",
+                "hb",
+                json.dumps({}),
+            )
+
+        mock_doc_cls.assert_called_once()
+        _, kwargs = mock_doc_cls.call_args
+        assert kwargs["task_name"] == "aicbc.analysis.run_analysis_task"
+        assert kwargs["analysis_id"] == "analysis-001"
+        assert kwargs["study_id"] == "study-001"
+        assert "RuntimeError: boom" in kwargs["exception"]
+        mock_doc_cls.return_value.insert.assert_awaited_once()
 
 
 class TestRunLatentClassTask:

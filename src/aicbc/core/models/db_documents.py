@@ -168,6 +168,23 @@ class AuditLogDocument(Document):
         ]
 
 
+class DeadLetterDocument(Document):
+    """Persisted record of failed Celery tasks for later inspection."""
+
+    task_name: str
+    analysis_id: str | None = None
+    study_id: str | None = None
+    exception: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    class Settings:
+        name = "dead_letters"
+        indexes = [
+            IndexModel([("created_at", -1)]),
+            IndexModel([("task_name", 1)]),
+        ]
+
+
 # Convenience list used during Beanie initialization.
 ALL_DOCUMENT_MODELS: list[type[Document]] = [
     PersonaDocument,
@@ -180,4 +197,5 @@ ALL_DOCUMENT_MODELS: list[type[Document]] = [
     AnalysisDerivativeDocument,
     SettingsDocument,
     AuditLogDocument,
+    DeadLetterDocument,
 ]
