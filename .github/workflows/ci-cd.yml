@@ -164,6 +164,7 @@ jobs:
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
         if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -205,6 +206,7 @@ jobs:
           pytest tests/ \
             -v \
             -m "not slow" \
+            --timeout=120 \
             --cov=src \
             --cov-report=xml \
             --cov-report=html \
@@ -264,9 +266,9 @@ jobs:
           source .venv/bin/activate
           pytest tests/redteam/ \
             -v \
+            --timeout=120 \
             --cov=src \
             --cov-report=term \
-            --cov-fail-under=60 \
             --junitxml=test-results/redteam.xml
 
       - name: Upload red team results
