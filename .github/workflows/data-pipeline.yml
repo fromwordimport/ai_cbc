@@ -1,0 +1,114 @@
+# AI_CBC Data Pipeline Validation
+# Maintainer: 小数 (Data/Modeling Scientist) / 小端 (Backend Engineer)
+# Version: 0.1
+# Skeleton workflow for validating analytics/data pipelines and triggering
+# exports/backfills. Currently performs endpoint liveness checks only.
+
+name: Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 4 1 * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - verify
+          - export
+          - backfill
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      start_date:
+        description: 'Backfill/export start date (YYYY-MM-DD, optional)'
+        required: false
+        type: string
+      end_date:
+        description: 'Backfill/export end date (YYYY-MM-DD, optional)'
+        required: false
+        type: string
+
+concurrency:
+  group: data-pipeline-${{ github.event.inputs.environment || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target host
+        id: host
+        run: |
+          ENV="${{ github.event.inputs.environment || 'staging' }}"
+          if [ "$ENV" = "production" ]; then
+            echo "host=${{ secrets.PROD_API_HOST }}" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.STAGING_API_HOST }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check /metrics endpoint
+        run: |
+          HOST="${{ steps.host.outputs.host }}"
+          if [ -z "$HOST" ]; then
+            echo "No API host configured for environment ${{ github.event.inputs.environment || 'staging' }}. Skipping."
+            exit 0
+          fi
+          curl -sf "${HOST}/metrics" > /dev/null || echo "/metrics not reachable"
+
+      - name: Check /cost-status endpoint (liveness only)
+        run: |
+          HOST="${{ steps.host.outputs.host }}"
+          if [ -z "$HOST" ]; then
+            exit 0
+          fi
+          # Endpoint liveness check only; the cost circuit breaker is deprecated
+          # and must not block deployment or data pipeline execution.
+          curl -sf "${HOST}/cost-status" > /dev/null || echo "/cost-status not reachable"
+
+      - name: Record verification result
+        if: always()
+        run: |
+          mkdir -p reports
+          cat > reports/data-pipeline-verify-${{ github.run_id }}.json <<EOF
+          {
+            "action": "${{ github.event.inputs.action || 'scheduled-verify' }}",
+            "environment": "${{ github.event.inputs.environment || 'staging' }}",
+            "run_id": "${{ github.run_id }}",
+            "requested_by": "${{ github.actor }}"
+          }
+          EOF
+
+      - name: Upload verification record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-pipeline-verify-${{ github.run_id }}
+          path: reports/data-pipeline-verify-${{ github.run_id }}.json
+          retention-days: 30
+
+      # ------------------------------------------------------------------------
+      # Future integration points (enable once data warehouse / ETL exists):
+      # ------------------------------------------------------------------------
+      # - name: Export responses to data warehouse
+      #   run: |
+      #     python scripts/export_responses.py \
+      #       --start ${{ github.event.inputs.start_date }} \
+      #       --end ${{ github.event.inputs.end_date }} \
+      #       --dest ${{ secrets.DATA_WAREHOUSE_URL }}
+      #
+      # - name: Backfill analysis results
+      #   run: |
+      #     python scripts/backfill_analysis.py \
+      #       --start ${{ github.event.inputs.start_date }} \
+      #       --end ${{ github.event.inputs.end_date }}
+      # ------------------------------------------------------------------------

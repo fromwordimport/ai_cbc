@@ -1,0 +1,88 @@
+# AI_CBC Feature Flag Management
+# Maintainer: 小P (PM) / 小前 (Frontend Engineer)
+# Version: 0.1
+# Skeleton workflow for managing feature flags without redeploying the app.
+# Currently logs the request only; wire up to a real Feature Flag Service later.
+
+name: Feature Switch
+
+on:
+  workflow_dispatch:
+    inputs:
+      flag_name:
+        description: 'Feature flag key to update'
+        required: true
+        type: string
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - enable
+          - disable
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: feature-switch-${{ github.event.inputs.environment }}-${{ github.event.inputs.flag_name }}
+  cancel-in-progress: false
+
+jobs:
+  update-flag:
+    runs-on: ubuntu-22.04
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate inputs
+        run: |
+          echo "Flag: ${{ github.event.inputs.flag_name }}"
+          echo "Action: ${{ github.event.inputs.action }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+
+      - name: Record flag change request
+        run: |
+          mkdir -p reports
+          cat > reports/feature-flag-change-${{ github.run_id }}.json <<EOF
+          {
+            "flag": "${{ github.event.inputs.flag_name }}",
+            "action": "${{ github.event.inputs.action }}",
+            "environment": "${{ github.event.inputs.environment }}",
+            "requested_by": "${{ github.actor }}",
+            "timestamp": "${{ github.event.repository.updated_at }}"
+          }
+          EOF
+          cat reports/feature-flag-change-${{ github.run_id }}.json
+
+      - name: Upload change record
+        uses: actions/upload-artifact@v4
+        with:
+          name: feature-flag-change-${{ github.run_id }}
+          path: reports/feature-flag-change-${{ github.run_id }}.json
+          retention-days: 90
+
+      # ------------------------------------------------------------------------
+      # Future integration points (enable once a Feature Flag Service exists):
+      # ------------------------------------------------------------------------
+      # - name: Update flag via Feature Flag Service API
+      #   run: |
+      #     curl -X PUT "${{ secrets.FLAG_SERVICE_URL }}/flags/${{ github.event.inputs.flag_name }}" \
+      #       -H "Authorization: Bearer ${{ secrets.FLAG_SERVICE_TOKEN }}" \
+      #       -H "Content-Type: application/json" \
+      #       -d '{"state":"${{ github.event.inputs.action == 'enable' && 'on' || 'off' }}"}'
+      #
+      # - name: Patch ConfigMap for environment-specific flags
+      #   run: |
+      #     kubectl patch configmap aicbc-feature-flags \
+      #       --namespace=aicbc-${{ github.event.inputs.environment }} \
+      #       --patch '{"data":{"${{ github.event.inputs.flag_name }}":"${{ github.event.inputs.action == 'enable' && 'true' || 'false' }}"}}'
+      # ------------------------------------------------------------------------
+
+      - name: Notify completion
+        run: |
+          echo "Feature flag change recorded. No active flag service is configured yet."

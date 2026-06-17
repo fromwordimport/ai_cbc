@@ -52,3 +52,18 @@ kubectl.exe
 kubectl
 kustomize
 *.exe
+
+# Claude / local tooling
+.claude/
+
+# Generated audit/reports
+bandit-report.json
+pip-audit.json
+pytest-output*.txt
+
+# Temporary artifact directories
+.tmp-pip-audit/
+*.tmp-pip-audit/
+
+# Root package-lock (frontend has its own)
+/package-lock.json

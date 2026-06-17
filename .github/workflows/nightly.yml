@@ -1,0 +1,172 @@
+# AI_CBC Nightly Pipeline
+# Maintainer: 小测 (QA Engineer) / 小速 (Performance Engineer)
+# Version: 1.0
+# Runs the full test matrix (including slow tests), complete red-team tests,
+# and an optional performance baseline against staging.
+
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================================================
+  # Full test suite (including slow tests)
+  # ==========================================================================
+  full-test:
+    runs-on: ubuntu-22.04
+    env:
+      DEBUG: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+
+      - name: Install dependencies
+        run: |
+          uv venv --clear
+          uv pip install -e ".[dev,analysis]"
+
+      - name: Run full test suite
+        run: |
+          source .venv/bin/activate
+          pytest tests/ \
+            -v \
+            --timeout=300 \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=html \
+            --junitxml=test-results/full.xml
+
+      - name: Upload full test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-test-results
+          path: |
+            test-results/
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+  # ==========================================================================
+  # Complete red-team tests
+  # ==========================================================================
+  redteam-full:
+    runs-on: ubuntu-22.04
+    needs: full-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+
+      - name: Install dependencies
+        run: |
+          uv venv --clear
+          uv pip install -e ".[dev,analysis]"
+
+      - name: Run complete red-team tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/redteam/ \
+            -v \
+            --timeout=300 \
+            --cov=src \
+            --cov-report=xml \
+            --junitxml=test-results/redteam-full.xml
+
+      - name: Upload red-team results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redteam-full-results
+          path: |
+            test-results/
+            coverage.xml
+          retention-days: 30
+
+  # ==========================================================================
+  # Performance baseline (best-effort against staging)
+  # ==========================================================================
+  performance:
+    runs-on: ubuntu-22.04
+    needs: full-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv venv --clear
+          uv pip install locust
+
+      - name: Run Locust performance baseline
+        continue-on-error: true
+        run: |
+          source .venv/bin/activate
+          # Best-effort performance baseline against staging health endpoint.
+          # Replace with real API scenarios once staging endpoints are stable.
+          locust -f scripts/locust_baseline.py \
+            --host http://staging.aicbc.example.com \
+            --run-time 2m \
+            --users 10 \
+            --spawn-rate 2 \
+            --headless \
+            --html reports/locust-report.html \
+            --csv reports/locust \
+            || echo "Performance baseline skipped (staging not reachable)."
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-baseline
+          path: reports/locust*
+          retention-days: 30

@@ -9,7 +9,10 @@ kind: Kustomization
 resources:
   - serviceaccount.yaml
   - configmap.yaml
-  - secret.yaml
+  # secret.yaml is intentionally excluded: it contains base64 placeholder
+  # values and must be managed externally (Sealed Secrets, ESO, or CI
+  # injection). The overlay expects the real secret to exist in the target
+  # namespace before apply.
   - redis.yaml
   - statefulset.yaml
   - deployment.yaml

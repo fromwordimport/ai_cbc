@@ -84,7 +84,7 @@ Standard interfaces (full schemas in [`docs/数据字典.md`](docs/数据字典.
 - Python environment and package management must use `uv`.
 - Node.js 20+ for the frontend.
 - Copy `.env.example` to `.env` and set LLM keys.
-- CI/CD enforces conventional commits (`feat(scope): ...`), branch naming, ruff/mypy/bandit, pytest coverage ≥ 60%, and frontend build/test. See `.github/workflows/ci-cd.yml`.
+- CI/CD enforces conventional commits (`feat(scope): ...`), branch naming, ruff/mypy/bandit, pytest coverage ≥ 60%, and frontend build/test. See `.github/workflows/ci.yml`, `.github/workflows/cd-staging.yml`, and `.github/workflows/cd-production.yml`.
 
 ## Team Roles
 

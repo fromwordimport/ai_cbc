@@ -1,0 +1,124 @@
+# AI_CBC Staging CD Pipeline
+# Maintainer: 小维 (DevOps/MLOps Engineer)
+# Version: 1.0
+# Builds and pushes the container image, then deploys to the staging cluster.
+# Triggered automatically after the CI workflow succeeds on master.
+
+name: CD Staging
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+
+concurrency:
+  group: cd-staging-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ==========================================================================
+  # Build and push image to GHCR
+  # ==========================================================================
+  build-push:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:master
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================================================
+  # Deploy to staging cluster
+  # ==========================================================================
+  deploy-staging:
+    runs-on: ubuntu-22.04
+    needs: build-push
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for staging kubeconfig secret
+        id: check-kubeconfig
+        run: |
+          if [ -z "${{ secrets.KUBECONFIG_STAGING }}" ]; then
+            echo "KUBECONFIG_STAGING secret is not configured. Skipping staging deploy."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install kubectl
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.2'
+
+      - name: Install kustomize
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Configure kubeconfig
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Update image tag in staging overlay
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          cd k8s/overlays/staging
+          kustomize edit set image aicbc-api=ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Deploy to staging
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          kubectl apply -k k8s/overlays/staging/
+
+      - name: Wait for rollouts
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          kubectl rollout status deployment/aicbc-api --namespace=aicbc-staging --timeout=300s
+          kubectl rollout status deployment/aicbc-worker --namespace=aicbc-staging --timeout=300s
+          kubectl rollout status deployment/aicbc-beat --namespace=aicbc-staging --timeout=300s
+
+      - name: Smoke test /health
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          kubectl run curl-smoke --rm -i --restart=Never \
+            --namespace=aicbc-staging \
+            --image=curlimages/curl:latest \
+            -- http://aicbc-api.aicbc-staging.svc.cluster.local/health
+
+      - name: Report skip
+        if: steps.check-kubeconfig.outputs.skip == 'true'
+        run: echo "Staging deployment skipped because KUBECONFIG_STAGING is not set."

@@ -13,7 +13,7 @@ This directory contains **Kubernetes manifests** for deploying AI_CBC to product
 | `base/kustomization.yaml` | Kustomize base: resources, common labels, base image reference |
 | `base/configmap.yaml` | Non-sensitive configuration |
 | `base/serviceaccount.yaml` | Dedicated ServiceAccounts for each component (SEC-011) |
-| `base/secret.yaml` | Secret template with base64 placeholders (SEC-006) — see Secret Management below |
+| `base/secret.yaml` | Secret template with base64 placeholders (SEC-006) — kept as a reference but **not** included in the base kustomization resources; see Secret Management below |
 | `base/deployment.yaml` | Main FastAPI API Deployment (3 replicas) |
 | `base/worker-deployment.yaml` | Celery worker Deployment |
 | `base/beat-deployment.yaml` | Celery beat scheduler Deployment |
@@ -51,11 +51,13 @@ kubectl apply -k k8s/overlays/staging
 kubectl apply -k k8s/overlays/prod
 ```
 
-The CI/CD pipeline in `../.github/workflows/ci-cd.yml` updates image tags and deploys to staging automatically.
+The split CI/CD workflows in `../.github/workflows/ci.yml`, `../.github/workflows/cd-staging.yml`, and `../.github/workflows/cd-production.yml` handle quality gates, staging builds, and production deployments respectively.
 
 ## Secret Management
 
-`secret.yaml` is a **template** and must not be applied directly. It contains base64-encoded placeholder values that are intentionally invalid.
+`secret.yaml` is a **template** and is **not** included in the base `kustomization.yaml` resources list. It contains base64-encoded placeholder values that are intentionally invalid. Applying it directly would cause service startup failures.
+
+Deployments that reference the secret via `secretKeyRef` expect the secret to be created separately **before** the overlay is applied. The base kustomization no longer applies `secret.yaml`, so CI/CD and manual deploys must ensure the real secret exists in the target namespace first.
 
 ### Recommended approaches (in order of preference)
 
@@ -87,4 +89,8 @@ The template includes:
 
 - `../docker/CLAUDE.md` — container build assets.
 - `../docker-compose.yml` — local compose stack.
-- `../.github/workflows/ci-cd.yml` — CI/CD pipeline.
+- `../.github/workflows/ci.yml` — continuous integration (quality gates, tests, frontend, K8s validation)
+- `../.github/workflows/cd-staging.yml` — staging build and deployment
+- `../.github/workflows/cd-production.yml` — production deployment (manual approval)
+- `../.github/workflows/security-scan.yml` — scheduled security scans
+- `../.github/workflows/nightly.yml` — scheduled full tests and performance checks
