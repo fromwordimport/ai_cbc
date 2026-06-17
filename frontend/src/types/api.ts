@@ -512,15 +512,28 @@ export interface DashboardSummaryResponse {
 // Settings
 // ---------------------------------------------------------------------------
 
+export interface ProviderConfig {
+  enabled?: boolean
+  api_key_set?: boolean
+  base_url?: string
+  model?: string
+  api_key?: string
+}
+
 export interface LLMSettings {
-  model_provider: string
-  model_name: string
+  provider: string
+  model: string
+  model_provider?: string
+  model_name?: string
   temperature: number
   max_tokens: number
+  base_url?: string
+  api_key?: string
 }
 
 export interface SystemSettings {
   llm: LLMSettings
+  providers?: Record<string, ProviderConfig>
   cost_budget_daily: number
   cost_budget_monthly: number
   pass_threshold: number
@@ -531,10 +544,13 @@ export interface AdminSettings {
   environment: string
   log_level: string
   llm: {
+    provider: string
+    model: string
     temperature: number
     max_tokens: number
     timeout_seconds?: number
   }
+  providers?: Record<string, ProviderConfig>
   available_models?: Record<string, Record<string, string>>
   cost_fuse: {
     single_study_cny?: number

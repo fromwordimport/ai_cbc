@@ -15,6 +15,8 @@ class LLMSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="LLM_")
 
+    provider: str = "anthropic"
+    model: str = ""
     temperature: float = 0.3
     max_tokens: int = 4096
     timeout_seconds: int = 120
@@ -26,6 +28,7 @@ class AnthropicSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ANTHROPIC_")
 
+    enabled: bool = False
     api_key: str = Field(default="", description="Anthropic API key")
     base_url: str = "https://api.anthropic.com"
     model_persona: str = "claude-sonnet-4-6"
@@ -38,9 +41,43 @@ class OpenAISettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="OPENAI_")
 
+    enabled: bool = False
     api_key: str = Field(default="", description="OpenAI API key")
     base_url: str = "https://api.openai.com/v1"
     model: str = "gpt-4o"
+
+
+class DeepSeekSettings(BaseSettings):
+    """DeepSeek API configuration (OpenAI-compatible)."""
+
+    model_config = SettingsConfigDict(env_prefix="DEEPSEEK_")
+
+    enabled: bool = False
+    api_key: str = Field(default="", description="DeepSeek API key")
+    base_url: str = "https://api.deepseek.com/v1"
+    model: str = "deepseek-chat"
+
+
+class QwenSettings(BaseSettings):
+    """Tongyi Qianwen API configuration (OpenAI-compatible)."""
+
+    model_config = SettingsConfigDict(env_prefix="QWEN_")
+
+    enabled: bool = False
+    api_key: str = Field(default="", description="Qwen API key")
+    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: str = "qwen-max"
+
+
+class GLMSettings(BaseSettings):
+    """Zhipu GLM API configuration (OpenAI-compatible)."""
+
+    model_config = SettingsConfigDict(env_prefix="GLM_")
+
+    enabled: bool = False
+    api_key: str = Field(default="", description="GLM API key")
+    base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    model: str = "glm-4"
 
 
 class DatabaseSettings(BaseSettings):
@@ -122,6 +159,9 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
     openai: OpenAISettings = Field(default_factory=OpenAISettings)
+    deepseek: DeepSeekSettings = Field(default_factory=DeepSeekSettings)
+    qwen: QwenSettings = Field(default_factory=QwenSettings)
+    glm: GLMSettings = Field(default_factory=GLMSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     cost_fuse: CostFuseSettings = Field(default_factory=CostFuseSettings)
     study: StudySettings = Field(default_factory=StudySettings)
@@ -180,6 +220,16 @@ class Settings(BaseSettings):
         self.api_key = decrypt_value(self.api_key, self.secret_key)
         self.anthropic.api_key = decrypt_value(self.anthropic.api_key, self.secret_key)
         self.openai.api_key = decrypt_value(self.openai.api_key, self.secret_key)
+        self.deepseek.api_key = decrypt_value(self.deepseek.api_key, self.secret_key)
+        self.qwen.api_key = decrypt_value(self.qwen.api_key, self.secret_key)
+        self.glm.api_key = decrypt_value(self.glm.api_key, self.secret_key)
+
+        # Mark providers as enabled when a non-empty API key is configured.
+        self.anthropic.enabled = bool(self.anthropic.api_key)
+        self.openai.enabled = bool(self.openai.api_key)
+        self.deepseek.enabled = bool(self.deepseek.api_key)
+        self.qwen.enabled = bool(self.qwen.api_key)
+        self.glm.enabled = bool(self.glm.api_key)
 
         if self.is_production:
             log = structlog.get_logger("aicbc.config")

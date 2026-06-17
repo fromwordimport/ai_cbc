@@ -165,4 +165,13 @@ class CostFuse:
         level = self.get_degradation_level(study_id)
         if level == DegradationLevel.DEGRADED:
             return self._settings.degrade_model
-        return model or get_settings().anthropic.model_persona
+        settings = get_settings()
+        if model:
+            return model
+        if settings.llm.model:
+            return settings.llm.model
+        # Fall back to the active provider's default model.
+        from aicbc.llm.client import LLMClient, Provider
+
+        provider = LLMClient._detect_provider("")
+        return LLMClient._default_model_for_provider(provider)

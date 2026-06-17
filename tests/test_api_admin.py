@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from aicbc.config.settings import get_settings
 from aicbc.core.audit import get_audit_logger, reset_audit_logger
+from aicbc.core.security.encryption import is_encrypted
 from aicbc.core.store import get_questionnaire_store
 from aicbc.main import app
 
@@ -32,7 +34,12 @@ class TestAdminSettings:
         data = response.json()
         assert "environment" in data
         assert "llm" in data
+        assert "providers" in data
         assert "cost_fuse" in data
+        # API keys must not be exposed.
+        for cfg in data["providers"].values():
+            assert "api_key" not in cfg
+            assert isinstance(cfg["api_key_set"], bool)
 
     def test_put_admin_settings_allowed(self) -> None:
         response = client.put(
@@ -43,6 +50,34 @@ class TestAdminSettings:
         data = response.json()
         assert data["status"] == "ok"
         assert "temperature" in data["applied"]
+
+    def test_put_admin_settings_updates_provider_and_encrypts_key(self) -> None:
+        response = client.put(
+            "/api/v1/admin/settings",
+            json={
+                "llm_provider": "deepseek",
+                "llm_model": "deepseek-chat",
+                "providers": {
+                    "deepseek": {
+                        "base_url": "https://api.deepseek.com/v1",
+                        "api_key": "sk-deepseek-test",
+                    }
+                },
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["applied"]["llm_provider"] == "deepseek"
+        assert data["applied"]["providers.deepseek"]["api_key"] == "***"
+
+        settings = get_settings()
+        assert settings.llm.provider == "deepseek"
+        assert settings.llm.model == "deepseek-chat"
+        assert settings.deepseek.enabled is True
+        assert settings.deepseek.base_url == "https://api.deepseek.com/v1"
+        assert settings.deepseek.api_key
+        assert is_encrypted(settings.deepseek.api_key)
 
     def test_put_admin_settings_rejects_unknown(self) -> None:
         response = client.put(
@@ -56,10 +91,10 @@ class TestAdminSettings:
 
 
 class TestCostStatus:
-    """Tests for /api/v1/cost-status."""
+    """Tests for /cost-status."""
 
     def test_get_cost_status(self) -> None:
-        response = client.get("/api/v1/cost-status")
+        response = client.get("/cost-status")
         assert response.status_code == 200
         data = response.json()
         assert "fuse_status" in data

@@ -48,16 +48,32 @@ def cost_fuse(cost_tracker):
 def mock_settings():
     """Return a fully-populated mock settings object."""
     settings = MagicMock()
+    settings.llm.provider = "anthropic"
+    settings.llm.model = ""
     settings.llm.temperature = 0.3
     settings.llm.max_tokens = 4096
     settings.llm.timeout_seconds = 120
     settings.llm.max_retries = 3
+    settings.anthropic.enabled = True
     settings.anthropic.api_key = "sk-ant-test"
     settings.anthropic.base_url = "https://api.anthropic.com"
     settings.anthropic.model_persona = "claude-sonnet-4-6"
+    settings.openai.enabled = True
     settings.openai.api_key = "sk-test"
     settings.openai.base_url = "https://api.openai.com/v1"
     settings.openai.model = "gpt-4o"
+    settings.deepseek.enabled = False
+    settings.deepseek.api_key = ""
+    settings.deepseek.base_url = "https://api.deepseek.com/v1"
+    settings.deepseek.model = "deepseek-chat"
+    settings.qwen.enabled = False
+    settings.qwen.api_key = ""
+    settings.qwen.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    settings.qwen.model = "qwen-max"
+    settings.glm.enabled = False
+    settings.glm.api_key = ""
+    settings.glm.base_url = "https://open.bigmodel.cn/api/paas/v4"
+    settings.glm.model = "glm-4"
     settings.cost_fuse = CostFuseSettings(
         single_study_cny=10.0,
         daily_cny=20.0,
@@ -191,10 +207,13 @@ class TestBatchSimulationFuse:
 
         with patch("aicbc.llm.client.get_settings") as mock_get_settings:
             mock_settings = MagicMock()
+            mock_settings.llm.provider = "anthropic"
+            mock_settings.llm.model = ""
             mock_settings.llm.temperature = 0.3
             mock_settings.llm.max_tokens = 4096
             mock_settings.llm.timeout_seconds = 120
             mock_settings.llm.max_retries = 3
+            mock_settings.anthropic.enabled = True
             mock_settings.anthropic.api_key = "sk-ant-test"
             mock_settings.anthropic.base_url = "https://api.anthropic.com"
             mock_settings.anthropic.model_persona = "claude-sonnet-4-6"
@@ -204,7 +223,22 @@ class TestBatchSimulationFuse:
                 weekly_cny=50.0,
                 degrade_model="claude-haiku-4-5",
             )
+            mock_settings.openai.enabled = True
+            mock_settings.openai.api_key = "sk-test"
             mock_settings.openai.base_url = "https://api.openai.com/v1"
+            mock_settings.openai.model = "gpt-4o"
+            mock_settings.deepseek.enabled = False
+            mock_settings.deepseek.api_key = ""
+            mock_settings.deepseek.base_url = "https://api.deepseek.com/v1"
+            mock_settings.deepseek.model = "deepseek-chat"
+            mock_settings.qwen.enabled = False
+            mock_settings.qwen.api_key = ""
+            mock_settings.qwen.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            mock_settings.qwen.model = "qwen-max"
+            mock_settings.glm.enabled = False
+            mock_settings.glm.api_key = ""
+            mock_settings.glm.base_url = "https://open.bigmodel.cn/api/paas/v4"
+            mock_settings.glm.model = "glm-4"
             mock_get_settings.return_value = mock_settings
 
             client = LLMClient(cost_fuse=cost_fuse)

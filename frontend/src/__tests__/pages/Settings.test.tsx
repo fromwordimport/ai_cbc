@@ -27,6 +27,21 @@ vi.mock('antd', async () => {
   }
 })
 
+const mockAdminSettings = {
+  environment: 'test',
+  log_level: 'INFO',
+  llm: { provider: 'anthropic', model: 'claude-sonnet-4-6', temperature: 0.7, max_tokens: 4096 },
+  providers: {
+    anthropic: { enabled: true, api_key_set: true, base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-6' },
+    openai: { enabled: false, api_key_set: false, base_url: 'https://api.openai.com/v1', model: 'gpt-4o' },
+    deepseek: { enabled: false, api_key_set: false, base_url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    qwen: { enabled: false, api_key_set: false, base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-max' },
+    glm: { enabled: false, api_key_set: false, base_url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+  },
+  cost_fuse: { daily_cny: 50, monthly_cny: 1000 },
+  authenticity: { pass_threshold: 9, excellent_threshold: 12 },
+}
+
 describe('Settings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -43,14 +58,7 @@ describe('Settings', () => {
   it('loads backend settings and renders status cards', async () => {
     getCostStatus.mockResolvedValue({ total_cost_cny: 12.5, daily_cost_cny: 3.0, fuse_status: 'NORMAL' })
     getHealthCheck.mockResolvedValue({ status: 'healthy', environment: 'test', version: '0.1.0' })
-    getAdminSettings.mockResolvedValue({
-      environment: 'test',
-      log_level: 'INFO',
-      llm: { temperature: 0.5, max_tokens: 2048 },
-      cost_fuse: { daily_cny: 100, monthly_cny: 2000 },
-      authenticity: { pass_threshold: 8, excellent_threshold: 11 },
-      study_defaults: { n_choice_sets: 12, n_alternatives: 3, sample_size: 300, d_efficiency_target: 0.8 },
-    })
+    getAdminSettings.mockResolvedValue(mockAdminSettings)
 
     renderSettings()
     await waitFor(() => expect(screen.getByText('健康')).toBeInTheDocument())
@@ -71,32 +79,23 @@ describe('Settings', () => {
   it('saves settings to backend and localStorage', async () => {
     getCostStatus.mockResolvedValue({ total_cost_cny: 0, daily_cost_cny: 0, fuse_status: 'NORMAL' })
     getHealthCheck.mockResolvedValue({ status: 'healthy', environment: 'test', version: '0.1.0' })
-    getAdminSettings.mockResolvedValue({
-      environment: 'test',
-      log_level: 'INFO',
-      llm: { temperature: 0.7, max_tokens: 4096 },
-      cost_fuse: { daily_cny: 50, monthly_cny: 1000 },
-      authenticity: { pass_threshold: 9, excellent_threshold: 12 },
-    })
+    getAdminSettings.mockResolvedValue(mockAdminSettings)
     updateAdminSettings.mockResolvedValue({ status: 'ok' })
 
     renderSettings()
     await waitFor(() => expect(screen.getByText('保存设置')).toBeInTheDocument())
     fireEvent.click(screen.getByText('保存设置'))
     await waitFor(() => expect(updateAdminSettings).toHaveBeenCalled())
+    const payload = updateAdminSettings.mock.calls[0][0]
+    expect(payload.llm_provider).toBe('anthropic')
+    expect(payload.providers.anthropic.api_key).toBeUndefined()
     expect(JSON.parse(localStorage.getItem('aicbc_settings') || '{}').pass_threshold).toBe(9)
   })
 
   it('falls back to local storage when backend save fails', async () => {
     getCostStatus.mockResolvedValue({ total_cost_cny: 0, daily_cost_cny: 0, fuse_status: 'NORMAL' })
     getHealthCheck.mockResolvedValue({ status: 'healthy', environment: 'test', version: '0.1.0' })
-    getAdminSettings.mockResolvedValue({
-      environment: 'test',
-      log_level: 'INFO',
-      llm: { temperature: 0.7, max_tokens: 4096 },
-      cost_fuse: { daily_cny: 50, monthly_cny: 1000 },
-      authenticity: { pass_threshold: 9, excellent_threshold: 12 },
-    })
+    getAdminSettings.mockResolvedValue(mockAdminSettings)
     updateAdminSettings.mockRejectedValue(new Error('backend down'))
 
     renderSettings()

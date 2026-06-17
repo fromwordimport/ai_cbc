@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import {
   Card, Row, Col, Typography, Tag, Spin, Alert, Statistic,
   Descriptions, Slider, Select, Button, Divider, message,
-  InputNumber,
+  InputNumber, Input, Collapse,
 } from 'antd'
 import {
   SettingOutlined, CheckCircleOutlined, CloseCircleOutlined,
@@ -10,16 +10,41 @@ import {
   ReloadOutlined, SaveOutlined,
 } from '@ant-design/icons'
 import { getAdminSettings, getCostStatus, getHealthCheck, updateAdminSettings } from '@/services/api'
-import type { AdminSettings, CostStatus, HealthStatus, LLMSettings, SystemSettings } from '@/types/api'
+import type { AdminSettings, CostStatus, HealthStatus, LLMSettings, ProviderConfig, SystemSettings } from '@/types/api'
 
 const { Title } = Typography
 const { Option } = Select
+const { Panel } = Collapse
+
+const PROVIDERS = [
+  { key: 'anthropic', label: 'Anthropic' },
+  { key: 'openai', label: 'OpenAI' },
+  { key: 'deepseek', label: 'DeepSeek' },
+  { key: 'qwen', label: '通义千问' },
+  { key: 'glm', label: '智谱 GLM' },
+]
+
+const DEFAULT_PROVIDER_MODELS: Record<string, string[]> = {
+  anthropic: ['claude-sonnet-4-6', 'claude-haiku-4-5'],
+  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  qwen: ['qwen-max'],
+  glm: ['glm-4'],
+}
 
 const DEFAULT_LLM: LLMSettings = {
-  model_provider: 'deepseek',
-  model_name: 'deepseek-chat',
+  provider: 'anthropic',
+  model: '',
   temperature: 0.7,
   max_tokens: 4096,
+}
+
+const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
+  anthropic: { enabled: false, api_key_set: false, base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-6' },
+  openai: { enabled: false, api_key_set: false, base_url: 'https://api.openai.com/v1', model: 'gpt-4o' },
+  deepseek: { enabled: false, api_key_set: false, base_url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  qwen: { enabled: false, api_key_set: false, base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-max' },
+  glm: { enabled: false, api_key_set: false, base_url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
 }
 
 const DEFAULT_SYSTEM: SystemSettings = {
@@ -45,13 +70,22 @@ function saveToLocal(settings: SystemSettings) {
 }
 
 function mergeBackendSettings(local: SystemSettings, backend: AdminSettings): SystemSettings {
+  const providers: Record<string, ProviderConfig> = { ...DEFAULT_PROVIDERS }
+  if (backend.providers) {
+    for (const [key, cfg] of Object.entries(backend.providers)) {
+      providers[key] = { ...providers[key], ...cfg }
+    }
+  }
   return {
     ...local,
     llm: {
       ...local.llm,
+      provider: backend.llm?.provider ?? local.llm.provider,
+      model: backend.llm?.model ?? local.llm.model,
       temperature: backend.llm?.temperature ?? local.llm.temperature,
       max_tokens: backend.llm?.max_tokens ?? local.llm.max_tokens,
     },
+    providers,
     cost_budget_daily: backend.cost_fuse?.daily_cny ?? local.cost_budget_daily,
     cost_budget_monthly: backend.cost_fuse?.monthly_cny ?? local.cost_budget_monthly,
     pass_threshold: backend.authenticity?.pass_threshold ?? local.pass_threshold,
@@ -68,6 +102,8 @@ const Settings: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [backendAvailable, setBackendAvailable] = useState(true)
+  // Track per-provider API key input values (empty = unchanged, non-empty = update).
+  const [apiKeyInputs, setApiKeyInputs] = useState<Record<string, string>>({})
 
   const fetchStatus = useCallback(async () => {
     setLoading(true)
@@ -106,14 +142,34 @@ const Settings: React.FC = () => {
   const handleSave = async () => {
     setSaving(true)
     try {
+      const providersPayload: Record<string, ProviderConfig> = {}
+      const providers = settings.providers ?? DEFAULT_PROVIDERS
+      for (const { key } of PROVIDERS) {
+        const cfg = providers[key]
+        if (!cfg) continue
+        const update: ProviderConfig = {
+          base_url: cfg.base_url,
+          model: cfg.model,
+        }
+        const inputKey = apiKeyInputs[key]?.trim()
+        if (inputKey !== undefined) {
+          update.api_key = inputKey
+        }
+        providersPayload[key] = update
+      }
+
       const payload: Record<string, unknown> = {
+        llm_provider: settings.llm.provider,
+        llm_model: settings.llm.model,
         temperature: settings.llm.temperature,
         max_tokens: settings.llm.max_tokens,
+        providers: providersPayload,
         pass_threshold: settings.pass_threshold,
         excellent_threshold: settings.excellent_threshold,
       }
       const apiResult = await updateAdminSettings(payload)
       saveToLocal(settings)
+      setApiKeyInputs({})
       if (apiResult.status === 'ok' || apiResult.status === 'partial') {
         message.success('设置已同步到后端和本地')
         if (apiResult.status === 'partial' && apiResult.rejected) {
@@ -138,6 +194,9 @@ const Settings: React.FC = () => {
     FUSE: { color: 'red', label: '熔断' },
     EMERGENCY: { color: 'red', label: '紧急' },
   }
+
+  const providers = settings.providers ?? DEFAULT_PROVIDERS
+  const activeModels = DEFAULT_PROVIDER_MODELS[settings.llm.provider] ?? []
 
   return (
     <div>
@@ -215,26 +274,23 @@ const Settings: React.FC = () => {
 
       <Card title={<><RobotOutlined /> LLM 模型配置</>} style={{ marginTop: 16 }}>
         <Descriptions size="small" bordered column={1} style={{ marginBottom: 16 }}>
-          <Descriptions.Item label="模型提供商">
-            <Select value={settings.llm.model_provider} style={{ width: 200 }}
-              onChange={(v) => setSettings((prev) => ({ ...prev, llm: { ...prev.llm, model_provider: v } }))}>
-              <Option value="deepseek">DeepSeek</Option>
-              <Option value="openai">OpenAI</Option>
-              <Option value="anthropic">Anthropic</Option>
-              <Option value="qwen">通义千问</Option>
-              <Option value="glm">智谱 GLM</Option>
+          <Descriptions.Item label="当前模型提供商">
+            <Select value={settings.llm.provider} style={{ width: 200 }}
+              onChange={(v) => setSettings((prev) => ({
+                ...prev,
+                llm: { ...prev.llm, provider: v, model: DEFAULT_PROVIDER_MODELS[v]?.[0] ?? '' },
+              }))}>
+              {PROVIDERS.map((p) => (
+                <Option key={p.key} value={p.key}>{p.label}</Option>
+              ))}
             </Select>
           </Descriptions.Item>
-          <Descriptions.Item label="模型名称">
-            <Select value={settings.llm.model_name} style={{ width: 300 }}
-              onChange={(v) => setSettings((prev) => ({ ...prev, llm: { ...prev.llm, model_name: v } }))}>
-              <Option value="deepseek-chat">deepseek-chat (V3)</Option>
-              <Option value="deepseek-reasoner">deepseek-reasoner (R1)</Option>
-              <Option value="gpt-4o">GPT-4o</Option>
-              <Option value="gpt-4o-mini">GPT-4o Mini</Option>
-              <Option value="claude-sonnet-4-20250514">Claude Sonnet 4</Option>
-              <Option value="qwen-max">通义千问 Max</Option>
-              <Option value="glm-4">GLM-4</Option>
+          <Descriptions.Item label="当前模型名称">
+            <Select value={settings.llm.model || activeModels[0] || ''} style={{ width: 300 }}
+              onChange={(v) => setSettings((prev) => ({ ...prev, llm: { ...prev.llm, model: v } }))}>
+              {activeModels.map((m) => (
+                <Option key={m} value={m}>{m}</Option>
+              ))}
             </Select>
           </Descriptions.Item>
           <Descriptions.Item label="温度 (Temperature)">
@@ -247,6 +303,50 @@ const Settings: React.FC = () => {
               onChange={(v) => setSettings((prev) => ({ ...prev, llm: { ...prev.llm, max_tokens: v ?? 4096 } }))} />
           </Descriptions.Item>
         </Descriptions>
+
+        <Divider orientation="left">供应商配置（密钥保存在后端并加密）</Divider>
+        <Collapse defaultActiveKey={[settings.llm.provider]}>
+          {PROVIDERS.map((p) => {
+            const cfg = providers[p.key] ?? DEFAULT_PROVIDERS[p.key]
+            const keyInput = apiKeyInputs[p.key]
+            const displayKey = keyInput === undefined
+              ? (cfg.api_key_set ? '*** 已设置 ***' : '')
+              : keyInput
+            return (
+              <Panel header={`${p.label}${cfg.enabled ? '（已启用）' : '（未启用）'}`} key={p.key}>
+                <Descriptions size="small" bordered column={1}>
+                  <Descriptions.Item label="基地址 (Base URL)">
+                    <Input value={cfg.base_url}
+                      onChange={(e) => setSettings((prev) => ({
+                        ...prev,
+                        providers: {
+                          ...providers,
+                          [p.key]: { ...cfg, base_url: e.target.value },
+                        },
+                      }))} />
+                  </Descriptions.Item>
+                  <Descriptions.Item label="默认模型">
+                    <Input value={cfg.model}
+                      onChange={(e) => setSettings((prev) => ({
+                        ...prev,
+                        providers: {
+                          ...providers,
+                          [p.key]: { ...cfg, model: e.target.value },
+                        },
+                      }))} />
+                  </Descriptions.Item>
+                  <Descriptions.Item label="API Key">
+                    <Input.Password
+                      placeholder={cfg.api_key_set ? '已设置，留空保持不变' : '请输入 API Key'}
+                      value={displayKey}
+                      onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                    />
+                  </Descriptions.Item>
+                </Descriptions>
+              </Panel>
+            )
+          })}
+        </Collapse>
 
         <Divider />
 

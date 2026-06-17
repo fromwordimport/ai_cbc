@@ -34,6 +34,9 @@ class Provider(StrEnum):
 
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
+    DEEPSEEK = "deepseek"
+    QWEN = "qwen"
+    GLM = "glm"
 
 
 # Leakage indicators that suggest system prompt content escaped into output
@@ -76,7 +79,7 @@ class LLMResponse:
 
 
 class LLMClient:
-    """Unified LLM client supporting Anthropic and OpenAI with retries and logging."""
+    """Unified LLM client supporting Anthropic and OpenAI-compatible providers."""
 
     def __init__(self, cost_fuse: CostFuse | None = None) -> None:
         """Initialize clients from settings.
@@ -91,7 +94,7 @@ class LLMClient:
             timeout=httpx.Timeout(settings.llm.timeout_seconds),
         )
         self._anthropic: Anthropic | None = None
-        self._openai: OpenAI | None = None
+        self._openai_clients: dict[str, OpenAI] = {}
         self._cost_fuse = cost_fuse or CostFuse()
 
         # LRU response cache (thread-safe)
@@ -100,20 +103,41 @@ class LLMClient:
         self._cache_hits: int = 0
         self._cache_misses: int = 0
 
-        if settings.anthropic.api_key:
+        self._refresh_clients()
+
+    def _refresh_clients(self) -> None:
+        """Rebuild SDK clients from current settings."""
+        settings = get_settings()
+
+        if settings.anthropic.enabled and settings.anthropic.api_key:
             self._anthropic = Anthropic(
                 api_key=settings.anthropic.api_key,
                 base_url=settings.anthropic.base_url,
                 timeout=settings.llm.timeout_seconds,
                 http_client=self._http_client,
             )
-        if settings.openai.api_key:
-            self._openai = OpenAI(
-                api_key=settings.openai.api_key,
-                base_url=settings.openai.base_url,
-                timeout=settings.llm.timeout_seconds,
-                http_client=self._http_client,
-            )
+        else:
+            self._anthropic = None
+
+        self._openai_clients = {}
+        openai_compatible = {
+            Provider.OPENAI: settings.openai,
+            Provider.DEEPSEEK: settings.deepseek,
+            Provider.QWEN: settings.qwen,
+            Provider.GLM: settings.glm,
+        }
+        for provider, cfg in openai_compatible.items():
+            if cfg.enabled and cfg.api_key:
+                self._openai_clients[provider.value] = OpenAI(
+                    api_key=cfg.api_key,
+                    base_url=cfg.base_url,
+                    timeout=settings.llm.timeout_seconds,
+                    http_client=self._http_client,
+                )
+
+    def reconfigure(self) -> None:
+        """Refresh SDK clients after runtime settings changes."""
+        self._refresh_clients()
 
     def _get_client(self, provider: Provider) -> Anthropic | OpenAI:
         """Return the underlying SDK client for a provider."""
@@ -121,22 +145,55 @@ class LLMClient:
             if self._anthropic is None:
                 raise RuntimeError("Anthropic client is not configured. Set ANTHROPIC_API_KEY.")
             return self._anthropic
-        if provider == Provider.OPENAI:
-            if self._openai is None:
-                raise RuntimeError("OpenAI client is not configured. Set OPENAI_API_KEY.")
-            return self._openai
-        raise ValueError(f"Unknown provider: {provider}")
+        if provider.value in self._openai_clients:
+            return self._openai_clients[provider.value]
+        raise RuntimeError(
+            f"{provider.value} client is not configured. Set the corresponding API key."
+        )
 
     @staticmethod
     def _detect_provider(model: str) -> Provider:
-        """Detect provider from model name."""
+        """Detect provider from model name or active settings."""
         model_lower = model.lower()
         if model_lower.startswith("claude-"):
             return Provider.ANTHROPIC
         if model_lower.startswith("gpt-"):
             return Provider.OPENAI
-        # Default to anthropic for unknown models to preserve backward compat.
+        if "deepseek" in model_lower:
+            return Provider.DEEPSEEK
+        if "qwen" in model_lower:
+            return Provider.QWEN
+        if "glm" in model_lower:
+            return Provider.GLM
+
+        # Fall back to the user's explicit provider choice.
+        settings = get_settings()
+        active = settings.llm.provider.lower()
+        if active in {p.value for p in Provider}:
+            return Provider(active)
+        # Preserve backward compatibility for unknown models.
         return Provider.ANTHROPIC
+
+    @staticmethod
+    def _default_model_for_provider(provider: Provider) -> str:
+        """Return the default model for a provider from settings."""
+        settings = get_settings()
+        if provider == Provider.ANTHROPIC:
+            return settings.anthropic.model_persona
+        if provider == Provider.OPENAI:
+            return settings.openai.model
+        if provider == Provider.DEEPSEEK:
+            return settings.deepseek.model
+        if provider == Provider.QWEN:
+            return settings.qwen.model
+        if provider == Provider.GLM:
+            return settings.glm.model
+        return settings.anthropic.model_persona
+
+    @property
+    def _openai(self) -> OpenAI | None:
+        """Backward-compatible accessor for the OpenAI SDK client."""
+        return self._openai_clients.get(Provider.OPENAI.value)
 
     # ------------------------------------------------------------------
     # Response cache (LRU, thread-safe)
@@ -363,7 +420,9 @@ class LLMClient:
             RuntimeError: If the API call fails after all retries.
         """
         settings = get_settings()
-        resolved_model = model or settings.anthropic.model_persona
+        active_provider = self._detect_provider(settings.llm.model or "")
+        active_model = self._default_model_for_provider(active_provider)
+        resolved_model = model or settings.llm.model or active_model
         resolved_temperature = temperature if temperature is not None else settings.llm.temperature
         resolved_max_tokens = max_tokens if max_tokens is not None else settings.llm.max_tokens
         resolved_provider = provider or self._detect_provider(resolved_model)
@@ -481,7 +540,7 @@ class LLMClient:
                     result,
                     study_id=study_id,
                     task_phase="llm_generate",
-                    degraded=(resolved_model != (model or settings.anthropic.model_persona)),
+                    degraded=(resolved_model != (model or active_model)),
                 )
                 # Store in LRU cache
                 self._store_in_cache(cache_key, result)
@@ -537,7 +596,9 @@ class LLMClient:
             RuntimeError: If the API call fails after all retries.
         """
         settings = get_settings()
-        resolved_model = model or settings.anthropic.model_persona
+        active_provider = self._detect_provider(settings.llm.model or "")
+        active_model = self._default_model_for_provider(active_provider)
+        resolved_model = model or settings.llm.model or active_model
         resolved_temperature = temperature if temperature is not None else settings.llm.temperature
         resolved_max_tokens = max_tokens if max_tokens is not None else settings.llm.max_tokens
         resolved_provider = provider or self._detect_provider(resolved_model)
@@ -657,7 +718,7 @@ class LLMClient:
                     result,
                     study_id=study_id,
                     task_phase="llm_generate",
-                    degraded=(resolved_model != (model or settings.anthropic.model_persona)),
+                    degraded=(resolved_model != (model or active_model)),
                 )
                 # Store in LRU cache
                 self._store_in_cache(cache_key, result)

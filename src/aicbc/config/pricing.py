@@ -11,7 +11,10 @@ the change automatically.
 
 from __future__ import annotations
 
+import structlog
 from typing import Literal
+
+logger = structlog.get_logger("aicbc.config.pricing")
 
 # ── per-1K-token prices in USD ──────────────────────────────────────────
 # Format: { model_id: (input_price_per_1k, output_price_per_1k) }
@@ -25,6 +28,11 @@ PRICE_TABLE: dict[str, tuple[float, float]] = {
     "gpt-4o": (5.0, 15.0),
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4-turbo": (10.0, 30.0),
+    # OpenAI-compatible providers (placeholder pricing — update when official)
+    "deepseek-chat": (0.14, 0.28),
+    "deepseek-reasoner": (0.55, 2.19),
+    "qwen-max": (0.50, 1.00),
+    "glm-4": (0.50, 1.00),
 }
 
 # Provider mapping (model_id → provider)
@@ -35,6 +43,10 @@ PROVIDER_MAP: dict[str, str] = {
     "gpt-4o": "openai",
     "gpt-4o-mini": "openai",
     "gpt-4-turbo": "openai",
+    "deepseek-chat": "deepseek",
+    "deepseek-reasoner": "deepseek",
+    "qwen-max": "qwen",
+    "glm-4": "glm",
 }
 
 # Quality tier — used by ModelRouter for degradation decisions
@@ -47,6 +59,10 @@ QUALITY_TIER: dict[str, QualityTier] = {
     "claude-haiku-4-5": "medium",
     "gpt-4o-mini": "medium",
     "gpt-4-turbo": "medium",
+    "deepseek-chat": "high",
+    "deepseek-reasoner": "high",
+    "qwen-max": "high",
+    "glm-4": "high",
 }
 
 # Maximum context window (tokens) — used for routing decisions
@@ -57,6 +73,10 @@ MAX_CONTEXT: dict[str, int] = {
     "gpt-4o": 128_000,
     "gpt-4o-mini": 128_000,
     "gpt-4-turbo": 128_000,
+    "deepseek-chat": 64_000,
+    "deepseek-reasoner": 64_000,
+    "qwen-max": 32_000,
+    "glm-4": 128_000,
 }
 
 # ── convenience helpers ─────────────────────────────────────────────────
@@ -70,8 +90,16 @@ def get_price(model: str) -> tuple[float, float]:
 
 
 def estimate_cost_usd(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    """Estimate USD cost of a single LLM call."""
-    inp, out = get_price(model)
+    """Estimate USD cost of a single LLM call.
+
+    Falls back to 0 for unknown models rather than raising, so custom or
+    newly-added models do not block the pipeline.
+    """
+    try:
+        inp, out = get_price(model)
+    except KeyError:
+        logger.warning("unknown_model_price", model=model, fallback=0.0)
+        return 0.0
     return (prompt_tokens * inp + completion_tokens * out) / 1000.0
 
 

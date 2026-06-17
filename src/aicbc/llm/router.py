@@ -119,6 +119,26 @@ class ModelRouter:
             input_cost_per_1k=0.15, output_cost_per_1k=0.60,
             max_tokens=128_000, quality_tier="medium",
         ),
+        "deepseek-chat": ModelConfig(
+            provider="deepseek",
+            input_cost_per_1k=0.14, output_cost_per_1k=0.28,
+            max_tokens=64_000, quality_tier="high",
+        ),
+        "deepseek-reasoner": ModelConfig(
+            provider="deepseek",
+            input_cost_per_1k=0.55, output_cost_per_1k=2.19,
+            max_tokens=64_000, quality_tier="high",
+        ),
+        "qwen-max": ModelConfig(
+            provider="qwen",
+            input_cost_per_1k=0.50, output_cost_per_1k=1.00,
+            max_tokens=32_000, quality_tier="high",
+        ),
+        "glm-4": ModelConfig(
+            provider="glm",
+            input_cost_per_1k=0.50, output_cost_per_1k=1.00,
+            max_tokens=128_000, quality_tier="high",
+        ),
     }
     # fmt: on
 
@@ -343,7 +363,12 @@ class ModelRouter:
                 )
                 return model
 
-        # Normal routing: use default model
+        # Normal routing: respect user-configured active model when available.
+        settings = get_settings()
+        active_model = settings.llm.model
+        if active_model and active_model in self.models and self.models[active_model].enabled:
+            return active_model
+
         model = rule.default_model
         if model in self.models and self.models[model].enabled:
             return model

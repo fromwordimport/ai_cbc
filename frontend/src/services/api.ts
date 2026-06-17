@@ -71,6 +71,11 @@ const rootApi = axios.create({
 
 export const injectApiKey = (config: any) => {
   config.headers['X-API-Key'] = API_KEY
+  // Admin endpoints require the admin role in production (DEBUG=false).
+  // The backend RBAC middleware accepts X-User-Role for service accounts.
+  if (config.url?.startsWith('/admin')) {
+    config.headers['X-User-Role'] = 'admin'
+  }
   return config
 }
 

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from aicbc.config.settings import Settings
+from aicbc.config.settings import Settings, get_settings
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,
@@ -135,12 +135,20 @@ def _clean_global_state() -> Generator[None, None, None]:
     except Exception:
         pass
     try:
+        get_settings.cache_clear()
+    except Exception:
+        pass
+    try:
         if _COST_STATE_FILE.exists():
             _COST_STATE_FILE.unlink()
     except Exception:
         pass
     yield
     # Post-test safety-net cleanup
+    try:
+        get_settings.cache_clear()
+    except Exception:
+        pass
     try:
         _lazy_reset_dependencies()
     except Exception:

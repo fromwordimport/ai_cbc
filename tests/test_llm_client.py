@@ -18,16 +18,32 @@ from aicbc.llm.client import LLMClient, LLMResponse, Provider, _estimate_cost
 def mock_settings():
     """Return a fully-populated mock settings object."""
     settings = MagicMock()
+    settings.llm.provider = "anthropic"
+    settings.llm.model = ""
     settings.llm.temperature = 0.3
     settings.llm.max_tokens = 4096
     settings.llm.timeout_seconds = 120
     settings.llm.max_retries = 3
+    settings.anthropic.enabled = True
     settings.anthropic.api_key = "sk-ant-test"
     settings.anthropic.base_url = "https://api.anthropic.com"
     settings.anthropic.model_persona = "claude-sonnet-4-6"
+    settings.openai.enabled = True
     settings.openai.api_key = "sk-test"
     settings.openai.base_url = "https://api.openai.com/v1"
     settings.openai.model = "gpt-4o"
+    settings.deepseek.enabled = False
+    settings.deepseek.api_key = ""
+    settings.deepseek.base_url = "https://api.deepseek.com/v1"
+    settings.deepseek.model = "deepseek-chat"
+    settings.qwen.enabled = False
+    settings.qwen.api_key = ""
+    settings.qwen.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    settings.qwen.model = "qwen-max"
+    settings.glm.enabled = False
+    settings.glm.api_key = ""
+    settings.glm.base_url = "https://open.bigmodel.cn/api/paas/v4"
+    settings.glm.model = "glm-4"
     return settings
 
 
@@ -102,7 +118,7 @@ def test_detect_provider_openai():
 
 
 def test_detect_provider_default():
-    """Unknown model names should default to Anthropic."""
+    """Unknown model names should fall back to the active provider."""
     assert LLMClient._detect_provider("some-random-model") == Provider.ANTHROPIC
 
 
@@ -325,7 +341,7 @@ def test_unconfigured_openai(mock_settings):
     with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
         client = LLMClient()
 
-    with pytest.raises(RuntimeError, match="OpenAI client is not configured"):
+    with pytest.raises(RuntimeError, match="openai client is not configured"):
         client.generate(
             messages=[{"role": "user", "content": "Hi"}],
             model="gpt-4o",

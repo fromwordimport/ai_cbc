@@ -10,8 +10,33 @@ from fastapi import APIRouter, Query
 from aicbc.api.schemas import AuditLogListResponse
 from aicbc.config.settings import get_settings
 from aicbc.core.audit import get_audit_logger
+from aicbc.core.security.encryption import encrypt_value, is_encrypted
 
 router = APIRouter()
+
+# Map provider names to their settings attribute and default model field name.
+_PROVIDER_ATTRS: dict[str, tuple[str, str]] = {
+    "anthropic": ("anthropic", "model_persona"),
+    "openai": ("openai", "model"),
+    "deepseek": ("deepseek", "model"),
+    "qwen": ("qwen", "model"),
+    "glm": ("glm", "model"),
+}
+
+
+def _provider_config(provider: str) -> dict[str, Any]:
+    """Return non-sensitive provider configuration for the frontend."""
+    s = get_settings()
+    if provider not in _PROVIDER_ATTRS:
+        return {}
+    attr, default_model_attr = _PROVIDER_ATTRS[provider]
+    cfg = getattr(s, attr)
+    return {
+        "enabled": getattr(cfg, "enabled", False),
+        "api_key_set": bool(getattr(cfg, "api_key", "")),
+        "base_url": getattr(cfg, "base_url", ""),
+        "model": getattr(cfg, default_model_attr, ""),
+    }
 
 
 @router.get("/admin/settings")
@@ -26,10 +51,13 @@ async def admin_get_settings() -> dict[str, Any]:
         "environment": s.environment,
         "log_level": s.log_level,
         "llm": {
+            "provider": s.llm.provider,
+            "model": s.llm.model,
             "temperature": s.llm.temperature,
             "max_tokens": s.llm.max_tokens,
             "timeout_seconds": s.llm.timeout_seconds,
         },
+        "providers": {name: _provider_config(name) for name in _PROVIDER_ATTRS},
         "available_models": {
             "anthropic": {
                 "persona": s.anthropic.model_persona,
@@ -37,6 +65,9 @@ async def admin_get_settings() -> dict[str, Any]:
                 "audit": s.anthropic.model_audit,
             },
             "openai": {"model": s.openai.model},
+            "deepseek": {"model": s.deepseek.model},
+            "qwen": {"model": s.qwen.model},
+            "glm": {"model": s.glm.model},
         },
         "cost_fuse": {
             "single_study_cny": s.cost_fuse.single_study_cny,
@@ -61,7 +92,8 @@ async def admin_update_settings(payload: dict[str, Any]) -> dict[str, Any]:
     """Update select non-sensitive configuration at runtime.
 
     Only a subset of settings can be changed at runtime without restarting.
-    Security-critical settings (API keys, environment) are read-only.
+    Security-critical settings (environment) are read-only. API keys are
+    encrypted with SECRET_KEY before storage and are never returned.
     Changes are applied to the cached Settings singleton immediately but
     revert to .env values on restart.
     """
@@ -78,7 +110,44 @@ async def admin_update_settings(payload: dict[str, Any]) -> dict[str, Any]:
     rejected: dict[str, str] = {}
 
     for key, value in payload.items():
-        if key in allowed_llm and hasattr(s.llm, key):
+        if key == "llm_provider" and isinstance(value, str):
+            s.llm.provider = value
+            applied[key] = value
+        elif key == "llm_model" and isinstance(value, str):
+            s.llm.model = value
+            applied[key] = value
+        elif key == "providers" and isinstance(value, dict):
+            for provider, cfg in value.items():
+                if provider not in _PROVIDER_ATTRS:
+                    rejected[f"providers.{provider}"] = "unknown provider"
+                    continue
+                attr, default_model_attr = _PROVIDER_ATTRS[provider]
+                provider_settings = getattr(s, attr)
+                provider_applied: dict[str, object] = {}
+                if isinstance(cfg, dict):
+                    if "base_url" in cfg and isinstance(cfg["base_url"], str):
+                        provider_settings.base_url = cfg["base_url"]
+                        provider_applied["base_url"] = cfg["base_url"]
+                    if "model" in cfg and isinstance(cfg["model"], str):
+                        setattr(provider_settings, default_model_attr, cfg["model"])
+                        provider_applied["model"] = cfg["model"]
+                    if "api_key" in cfg and isinstance(cfg["api_key"], str):
+                        api_key = cfg["api_key"].strip()
+                        if api_key:
+                            # Re-encrypt only if the value is plaintext.
+                            if not is_encrypted(api_key):
+                                api_key = encrypt_value(api_key, s.secret_key)
+                            provider_settings.api_key = api_key
+                            provider_settings.enabled = True
+                            provider_applied["api_key"] = "***"
+                        elif getattr(provider_settings, "api_key", ""):
+                            # Empty string clears the key.
+                            provider_settings.api_key = ""
+                            provider_settings.enabled = False
+                            provider_applied["api_key"] = ""
+                if provider_applied:
+                    applied[f"providers.{provider}"] = provider_applied
+        elif key in allowed_llm and hasattr(s.llm, key):
             object.__setattr__(s.llm, key, value)
             applied[key] = value
         elif key in allowed_authenticity and hasattr(s.authenticity, key):
@@ -97,6 +166,16 @@ async def admin_update_settings(payload: dict[str, Any]) -> dict[str, Any]:
             "rejected": rejected,
             "note": "Runtime-only changes — restart reverts to .env values",
         }
+
+    # Refresh the singleton LLM client so runtime provider/key changes take effect.
+    try:
+        from aicbc.api.dependencies import get_llm_client
+
+        get_llm_client().reconfigure()
+    except Exception as exc:  # pragma: no cover - dependencies may be unavailable in some contexts
+        logger = get_audit_logger()
+        logger.warning("llm_client_reconfigure_failed", error=str(exc))
+
     return {
         "status": "ok",
         "applied": applied,
