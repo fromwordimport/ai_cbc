@@ -53,11 +53,24 @@ jobs:
           fi
           echo "Commit message OK: $COMMIT_MSG"
 
+      - name: Determine TruffleHog base
+        id: trufflehog-base
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+              echo "base=${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
+            else
+              echo "base=${{ github.event.before }}" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Scan for secrets
         uses: trufflesecurity/trufflehog@v3.88.1
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
+          base: ${{ steps.trufflehog-base.outputs.base }}
           head: HEAD
           extra_args: --only-verified
 
