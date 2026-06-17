@@ -85,6 +85,10 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     domains:
       - aicbc.fromworldimport.com
     envVars:
