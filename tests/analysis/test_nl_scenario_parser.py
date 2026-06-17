@@ -136,7 +136,10 @@ def test_multiple_scenarios(dishwasher_attributes):
 def test_accuracy_threshold(dishwasher_attributes):
     """Check that the parser hits the 80% accuracy target on simple descriptions."""
     cases = [
-        ("华为 2999 元嵌入式 13 套热风烘干", {"brand", "price", "capacity", "installation", "drying"}),
+        (
+            "华为 2999 元嵌入式 13 套热风烘干",
+            {"brand", "price", "capacity", "installation", "drying"},
+        ),
         ("美的 15套", {"brand", "capacity"}),
         ("西门子 3500 独立式", {"brand", "price", "installation"}),
         ("海尔 8套台式", {"brand", "capacity", "installation"}),

@@ -89,12 +89,10 @@ class TestSampleIncomeBracket:
         rng = random.Random(42)
         # Tier-1 should produce higher brackets on average than county.
         tier1_samples = [
-            _sample_income_bracket("一线城市", "中年空巢（子女独立）", rng)
-            for _ in range(200)
+            _sample_income_bracket("一线城市", "中年空巢（子女独立）", rng) for _ in range(200)
         ]
         county_samples = [
-            _sample_income_bracket("县城/乡镇", "中年空巢（子女独立）", rng)
-            for _ in range(200)
+            _sample_income_bracket("县城/乡镇", "中年空巢（子女独立）", rng) for _ in range(200)
         ]
 
         def mean_index(samples: list[str]) -> float:

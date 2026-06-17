@@ -43,9 +43,7 @@ async def _mongo_available() -> bool:
     """Check whether the configured MongoDB is reachable."""
     url = os.environ.get("MONGODB_URL", "mongodb://localhost:27017")
     try:
-        client: AsyncIOMotorClient = AsyncIOMotorClient(
-            url, serverSelectionTimeoutMS=1500
-        )
+        client: AsyncIOMotorClient = AsyncIOMotorClient(url, serverSelectionTimeoutMS=1500)
         await client.admin.command("ping")
         client.close()
         return True
@@ -80,33 +78,42 @@ async def mongo_client():
     # and patch mongomock_motor to properly await Beanie query objects.
     if not await _mongo_available():
         import mongomock
+
         _orig_list_collections = mongomock.database.Database.list_collection_names
+
         def _patched_list_collection_names(self, *args, **kwargs):
             for key in list(kwargs.keys()):
                 if key not in ("session",):
                     kwargs.pop(key, None)
             return _orig_list_collections(self, *args, **kwargs)
+
         mongomock.database.Database.list_collection_names = _patched_list_collection_names
 
         # Patch _run in store_mongo to handle mongomock_motor query objects
         import aicbc.core.store_mongo as _store_mongo_module
+
         _orig_run = _store_mongo_module._run
+
         def _patched_run(awaitable):
             async def _execute():
                 # Handle Beanie query objects by awaiting them
-                if hasattr(awaitable, '__await__'):
+                if hasattr(awaitable, "__await__"):
                     return await awaitable
                 return awaitable
+
             try:
                 import asyncio
+
                 asyncio.get_running_loop()
                 # We're in an async context, just await directly
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(asyncio.run, _execute())
                     return future.result()
             except RuntimeError:
                 return asyncio.run(_execute())
+
         _store_mongo_module._run = _patched_run
 
     await init_beanie(database=db, document_models=ALL_DOCUMENT_MODELS)
@@ -197,7 +204,11 @@ def _build_persona(persona_id: str = "persona-study-test-001-1") -> PersonaProfi
             "stress_response": "先做攻略",
             "social_behavior": "朋友圈分享好物",
         },
-        dishwasher_context={"purchase_constraints": [], "decision_factors": [], "ignored_factors": []},
+        dishwasher_context={
+            "purchase_constraints": [],
+            "decision_factors": [],
+            "ignored_factors": [],
+        },
         language_samples=[
             "我觉得价格合适最重要，同时品质也要有保障，才会考虑购买。",
             "朋友推荐的产品我会优先考虑，但最终还是要自己亲自看看评价。",

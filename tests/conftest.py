@@ -89,6 +89,7 @@ def _lazy_reset_dependencies() -> None:
     global _reset_dependencies_fn
     if _reset_dependencies_fn is None:
         from aicbc.api.dependencies import reset_dependencies as fn
+
         _reset_dependencies_fn = fn
     _reset_dependencies_fn()
 
@@ -97,6 +98,7 @@ async def _lazy_areset_analysis_store() -> None:
     global _reset_analysis_store_fn
     if _reset_analysis_store_fn is None:
         from aicbc.analysis.store import areset_analysis_store as fn
+
         _reset_analysis_store_fn = fn
     await _reset_analysis_store_fn()
 
@@ -105,6 +107,7 @@ def _lazy_clear_app_overrides() -> None:
     global _app_obj
     if _app_obj is None:
         from aicbc.main import app as _app
+
         _app_obj = _app
     _app_obj.dependency_overrides.clear()
 
@@ -113,6 +116,7 @@ def _lazy_reset_rate_limits() -> None:
     global _reset_rate_limits_fn
     if _reset_rate_limits_fn is None:
         from aicbc.api.middleware.rate_limit import reset_rate_limits as fn
+
         _reset_rate_limits_fn = fn
     _reset_rate_limits_fn()
 
@@ -173,7 +177,9 @@ def test_settings() -> Settings:
 # ---------------------------------------------------------------------------
 
 
-def _mock_llm_response(content: dict[str, Any] | str, model: str = "claude-sonnet-4-6") -> LLMResponse:
+def _mock_llm_response(
+    content: dict[str, Any] | str, model: str = "claude-sonnet-4-6"
+) -> LLMResponse:
     text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
     return LLMResponse(
         content=text,
@@ -193,15 +199,15 @@ def mock_llm_client() -> MagicMock:
     """Return a mock LLMClient with layer response factory."""
     client = MagicMock()
 
-    _CITIES = ["一线城市", "新一线城市", "二线城市", "三线城市", "四线城市"]
-    _INCOMES = ["15-30万元", "8-15万元", "30-50万元", "15-30万元", "8-15万元"]
+    cities = ["一线城市", "新一线城市", "二线城市", "三线城市", "四线城市"]
+    incomes = ["15-30万元", "8-15万元", "30-50万元", "15-30万元", "8-15万元"]
 
     def _default_layer1(idx: int = 0) -> dict[str, Any]:
         return {
             "age": f"{28 + idx}岁",
             "gender": "女",
-            "city": _CITIES[idx % len(_CITIES)],
-            "income": _INCOMES[idx % len(_INCOMES)],
+            "city": cities[idx % len(cities)],
+            "income": incomes[idx % len(incomes)],
             "occupation": "互联网产品经理",
             "education": "本科",
             "marital_status": "已婚无孩",

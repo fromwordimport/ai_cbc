@@ -23,9 +23,14 @@ def _make_base_persona(**overrides: Any) -> PersonaProfile:
         "persona_id": "persona-test-001",
         "segment": "测试群体",
         "layer1_demographics": Layer1Demographics(
-            age="28岁", gender="女", city="新一线城市", income="15-30万元",
-            occupation="互联网产品经理", education="本科",
-            marital_status="已婚无孩", living_type="自有住房（89㎡）",
+            age="28岁",
+            gender="女",
+            city="新一线城市",
+            income="15-30万元",
+            occupation="互联网产品经理",
+            education="本科",
+            marital_status="已婚无孩",
+            living_type="自有住房（89㎡）",
         ),
         "layer2_behavior": Layer2Behavior(
             price_sensitivity="中等敏感",
@@ -178,16 +183,21 @@ class TestAuthenticityScorer:
         scorer = AuthenticityScorer()
         persona = _make_base_persona(
             layer1_demographics=Layer1Demographics(
-                age="22岁", gender="女", city="二线", income="3-8万元",
-                occupation="大学生", education="本科",
-                marital_status="未婚", living_type="学校宿舍",
+                age="22岁",
+                gender="女",
+                city="二线",
+                income="3-8万元",
+                occupation="大学生",
+                education="本科",
+                marital_status="未婚",
+                living_type="学校宿舍",
             ),
             layer4_scenarios=Layer4Scenarios(
                 daily_routine="早8点上课，下午图书馆，晚上宿舍追剧",
                 purchase_trigger="同学推荐",
                 stress_response="焦虑时吃零食",
                 social_behavior="宿舍群活跃",
-            )
+            ),
         )
         result = scorer.score(persona)
         dim = next(d for d in result.dimensions if d.name == "时间延续性")
@@ -213,8 +223,11 @@ class TestAuthenticityScorer:
                 "性价比表现优异，转化漏斗设计形成了完整的闭环。",
             ],
             layer4_scenarios=Layer4Scenarios(
-                daily_routine="", purchase_trigger="", stress_response="", social_behavior="",
-            )
+                daily_routine="",
+                purchase_trigger="",
+                stress_response="",
+                social_behavior="",
+            ),
         )
         result = scorer.score(persona)
         assert result.passed is False

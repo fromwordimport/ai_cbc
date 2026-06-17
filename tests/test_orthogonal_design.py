@@ -106,20 +106,26 @@ class TestDistributeToChoiceSets:
     def test_correct_number_of_sets(self) -> None:
         attrs = _make_attrs()
         profiles = _generate_full_factorial(attrs)
-        sets = _distribute_to_choice_sets(profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42)
+        sets = _distribute_to_choice_sets(
+            profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42
+        )
         assert len(sets) == 2
 
     def test_correct_alternatives_per_set(self) -> None:
         attrs = _make_attrs()
         profiles = _generate_full_factorial(attrs)
-        sets = _distribute_to_choice_sets(profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42)
+        sets = _distribute_to_choice_sets(
+            profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42
+        )
         for cs in sets:
             assert len(cs.alternatives) == 2
 
     def test_alternative_indices(self) -> None:
         attrs = _make_attrs()
         profiles = _generate_full_factorial(attrs)
-        sets = _distribute_to_choice_sets(profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42)
+        sets = _distribute_to_choice_sets(
+            profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42
+        )
         for cs in sets:
             indices = [alt.alt_index for alt in cs.alternatives]
             assert indices == [0, 1]
@@ -157,7 +163,9 @@ class TestCheckOrthogonality:
         """Score should always be in [0, 1]."""
         attrs = _make_attrs()
         profiles = _generate_full_factorial(attrs)
-        sets = _distribute_to_choice_sets(profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42)
+        sets = _distribute_to_choice_sets(
+            profiles, num_sets=2, alts_per_set=2, attributes=attrs, seed=42
+        )
         score = _check_orthogonality(sets, attrs)
         assert 0.0 <= score <= 1.0
 
@@ -167,7 +175,9 @@ class TestGenerateOrthogonalQuestionnaire:
 
     def test_basic_generation(self) -> None:
         attrs = _make_attrs()
-        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42)
+        dp = DesignParameters(
+            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42
+        )
         q = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
         )
@@ -178,7 +188,9 @@ class TestGenerateOrthogonalQuestionnaire:
 
     def test_efficiency_reported(self) -> None:
         attrs = _make_attrs()
-        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42)
+        dp = DesignParameters(
+            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42
+        )
         q = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
         )
@@ -189,7 +201,9 @@ class TestGenerateOrthogonalQuestionnaire:
 
     def test_reproducibility(self) -> None:
         attrs = _make_attrs()
-        dp = DesignParameters(n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42)
+        dp = DesignParameters(
+            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42
+        )
         q1 = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
         )
@@ -206,7 +220,9 @@ class TestGenerateOrthogonalQuestionnaire:
         from aicbc.questionnaire.generator import _dishwasher_default_attributes
 
         attrs = _dishwasher_default_attributes()
-        dp = DesignParameters(n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.BALANCED, seed=42)
+        dp = DesignParameters(
+            n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.BALANCED, seed=42
+        )
         q = generate_orthogonal_questionnaire(
             study_id="dw-orth", attributes=attrs, design_parameters=dp, seed=42
         )

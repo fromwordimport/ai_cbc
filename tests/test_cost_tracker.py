@@ -6,14 +6,13 @@ All LLM calls are mocked — no real API requests are made.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from aicbc.config.settings import CostFuseSettings
-from aicbc.cost.fuse import CostFuse, CostFuseError, DegradationLevel
-from aicbc.cost.tracker import CostTracker, CostRecord, FuseStatus
-
+from aicbc.cost.fuse import CostFuse, DegradationLevel
+from aicbc.cost.tracker import CostRecord, CostTracker, FuseStatus
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -90,7 +89,7 @@ class TestCostTrackerRecording:
 
     def test_record_multiple_calls_same_study(self, tracker):
         """Multiple calls to the same study should accumulate."""
-        for i in range(5):
+        for _i in range(5):
             tracker.record(
                 cost_usd=0.01,
                 study_id="study-001",

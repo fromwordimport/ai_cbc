@@ -139,19 +139,26 @@ def mock_stores():
 @pytest.fixture
 def mock_preprocessing():
     """Patch preprocessing helpers."""
-    df_long = pd.DataFrame({
-        "respondent_id": ["r1", "r1", "r2", "r2"],
-        "choice_set_id": [1, 1, 1, 1],
-        "alt_index": [0, 1, 0, 1],
-        "chosen": [1, 0, 1, 0],
-        "price": [-1.0, 1.0, -1.0, 1.0],
-        "brand_0": [1.0, -1.0, 1.0, -1.0],
-    })
+    df_long = pd.DataFrame(
+        {
+            "respondent_id": ["r1", "r1", "r2", "r2"],
+            "choice_set_id": [1, 1, 1, 1],
+            "alt_index": [0, 1, 0, 1],
+            "chosen": [1, 0, 1, 0],
+            "price": [-1.0, 1.0, -1.0, 1.0],
+            "brand_0": [1.0, -1.0, 1.0, -1.0],
+        }
+    )
 
     with (
-        patch("aicbc.analysis.preprocessing.validate_dataset", return_value={"valid": True, "errors": []}),
+        patch(
+            "aicbc.analysis.preprocessing.validate_dataset",
+            return_value={"valid": True, "errors": []},
+        ),
         patch("aicbc.analysis.preprocessing.to_long_format", return_value=df_long),
-        patch("aicbc.analysis.preprocessing.get_feature_columns", return_value=["price", "brand_0"]),
+        patch(
+            "aicbc.analysis.preprocessing.get_feature_columns", return_value=["price", "brand_0"]
+        ),
     ):
         yield
 
@@ -163,19 +170,24 @@ def mock_importance():
         {"price": [0.6, 0.5], "brand_0": [0.4, 0.5]},
         index=["r1", "r2"],
     )
-    importance_agg = pd.DataFrame({
-        "mean": [0.55, 0.45],
-        "std": [0.05, 0.05],
-        "median": [0.55, 0.45],
-        "min": [0.5, 0.4],
-        "max": [0.6, 0.5],
-        "q25": [0.52, 0.42],
-        "q75": [0.58, 0.48],
-    }, index=["price", "brand_0"])
+    importance_agg = pd.DataFrame(
+        {
+            "mean": [0.55, 0.45],
+            "std": [0.05, 0.05],
+            "median": [0.55, 0.45],
+            "min": [0.5, 0.4],
+            "max": [0.6, 0.5],
+            "q25": [0.52, 0.42],
+            "q75": [0.58, 0.48],
+        },
+        index=["price", "brand_0"],
+    )
 
     with (
         patch("aicbc.analysis.results.importance.compute_importance", return_value=importance_df),
-        patch("aicbc.analysis.results.importance.aggregate_importance", return_value=importance_agg),
+        patch(
+            "aicbc.analysis.results.importance.aggregate_importance", return_value=importance_agg
+        ),
     ):
         yield
 
@@ -307,7 +319,10 @@ class TestRunAnalysisTask:
     def test_validation_failure_raises(self, mock_stores, mock_preprocessing):
         _, _, a_store = mock_stores
         with (
-            patch("aicbc.analysis.preprocessing.validate_dataset", return_value={"valid": False, "errors": ["bad data"]}),
+            patch(
+                "aicbc.analysis.preprocessing.validate_dataset",
+                return_value={"valid": False, "errors": ["bad data"]},
+            ),
             pytest.raises(ValueError, match="Dataset validation failed"),
         ):
             run_analysis_task("study-001", "analysis-001", "hb", json.dumps({}))

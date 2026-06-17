@@ -13,8 +13,7 @@ import pytest
 from aicbc.config.settings import CostFuseSettings
 from aicbc.cost.fuse import CostFuse, CostFuseError
 from aicbc.cost.tracker import CostTracker, FuseStatus
-from aicbc.llm.client import LLMClient, LLMResponse, Provider
-
+from aicbc.llm.client import LLMClient, LLMResponse
 
 # ---------------------------------------------------------------------------
 # Fixtures

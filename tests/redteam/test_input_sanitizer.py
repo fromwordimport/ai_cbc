@@ -63,8 +63,8 @@ def _build_safe_persona() -> PersonaProfile:
             tension_combination=TensionCombination(
                 labels=["精打细算", "偶尔犒劳自己"],
                 narrative_explanation="她平时习惯精打细算，把每一笔开支都记录在册，"
-                                    "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
-                                    "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。",
+                "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
+                "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。",
             ),
             secret_motivation="希望通过消费获得社会认同",
             defense_mechanism="合理化——将非必要消费解释为对自己的奖励",
@@ -132,9 +132,7 @@ class TestPromptInjectionDetection:
     def test_injection_in_secret_motivation(self, name: str, payload: str) -> None:
         """Injection in secret_motivation must be flagged by RULE-007."""
         persona = _build_safe_persona()
-        persona.layer3_psychology.secret_motivation = (
-            f"表面上说买洗碗机是为了节省时间。{payload}"
-        )
+        persona.layer3_psychology.secret_motivation = f"表面上说买洗碗机是为了节省时间。{payload}"
 
         logic_validator = LogicValidator()
         result = logic_validator.validate(persona)
@@ -163,9 +161,7 @@ class TestPromptInjectionDetection:
     def test_injection_in_daily_routine(self, name: str, payload: str) -> None:
         """Injection in daily_routine must be flagged by RULE-007."""
         persona = _build_safe_persona()
-        persona.layer4_scenarios.daily_routine = (
-            f"工作日朝九晚六。{payload}。周末居家休息。"
-        )
+        persona.layer4_scenarios.daily_routine = f"工作日朝九晚六。{payload}。周末居家休息。"
 
         logic_validator = LogicValidator()
         result = logic_validator.validate(persona)

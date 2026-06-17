@@ -97,33 +97,23 @@ class TestRBACMiddleware:
         assert response.status_code == 403
 
     def test_researcher_can_create(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/studies", headers={"X-User-Role": "researcher"}
-        )
+        response = client.post("/api/v1/studies", headers={"X-User-Role": "researcher"})
         assert response.status_code == 200
 
     def test_researcher_cannot_delete(self, client: TestClient) -> None:
-        response = client.delete(
-            "/api/v1/studies/s1", headers={"X-User-Role": "researcher"}
-        )
+        response = client.delete("/api/v1/studies/s1", headers={"X-User-Role": "researcher"})
         assert response.status_code == 403
 
     def test_admin_can_delete(self, client: TestClient) -> None:
-        response = client.delete(
-            "/api/v1/studies/s1", headers={"X-User-Role": "admin"}
-        )
+        response = client.delete("/api/v1/studies/s1", headers={"X-User-Role": "admin"})
         assert response.status_code == 200
 
     def test_admin_can_access_admin_endpoints(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/admin/settings", headers={"X-User-Role": "admin"}
-        )
+        response = client.post("/api/v1/admin/settings", headers={"X-User-Role": "admin"})
         assert response.status_code == 200
 
     def test_researcher_cannot_access_admin_endpoints(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/admin/settings", headers={"X-User-Role": "researcher"}
-        )
+        response = client.post("/api/v1/admin/settings", headers={"X-User-Role": "researcher"})
         assert response.status_code == 403
 
     def test_public_paths_are_exempt(self, client: TestClient) -> None:

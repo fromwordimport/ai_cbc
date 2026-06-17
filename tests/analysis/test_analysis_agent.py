@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from aicbc.agents.analysis_agent import AnalysisAgent, AnalysisAgentConfig
 from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 from aicbc.questionnaire.response_models import (
     AlternativeRecord,
-    ChoiceRecord,
     CBCRawDataset,
+    ChoiceRecord,
     DatasetMetadata,
 )
 
@@ -59,7 +58,7 @@ def _make_synthetic_dataset(
         for task_idx in range(n_tasks):
             alts = []
             utilities = []
-            for alt_idx in range(n_alts):
+            for _alt_idx in range(n_alts):
                 price_raw = rng.choice(prices)
                 brand = rng.choice(["A", "B", "C"])
 
@@ -78,10 +77,12 @@ def _make_synthetic_dataset(
                     + rng.normal(0, 0.1)
                 )
                 utilities.append(utility)
-                alts.append({
-                    "price": price_raw,
-                    "brand": brand,
-                })
+                alts.append(
+                    {
+                        "price": price_raw,
+                        "brand": brand,
+                    }
+                )
 
             chosen_idx = int(np.argmax(utilities))
 

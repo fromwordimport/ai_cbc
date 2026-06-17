@@ -21,7 +21,7 @@ from aicbc.analysis.models import (
     WTPComparison,
     WTPResponse,
 )
-from aicbc.analysis.store import get_analysis_store, areset_analysis_store
+from aicbc.analysis.store import areset_analysis_store, get_analysis_store
 from aicbc.config.settings import get_settings
 from aicbc.core.store import get_questionnaire_store
 from aicbc.main import app
@@ -279,17 +279,13 @@ class TestLatentClassEndpoint:
                     "class_0": {"price": -0.001},
                     "class_1": {"price": -0.002},
                 },
-                individual_class_probs={
-                    "p1": {"class_0": 0.9, "class_1": 0.1}
-                },
+                individual_class_probs={"p1": {"class_0": 0.9, "class_1": 0.1}},
                 assigned_class={"p1": "class_0"},
                 processing_time_seconds=60.0,
                 completed_at=datetime.now(UTC),
             ).model_dump(mode="json"),
         )
-        response = client.get(
-            f"/api/v1/studies/{study_id}/analysis/{analysis_id}/latent-class"
-        )
+        response = client.get(f"/api/v1/studies/{study_id}/analysis/{analysis_id}/latent-class")
         assert response.status_code == 200
         data = response.json()
         assert data["analysis_id"] == analysis_id
@@ -317,18 +313,14 @@ class TestLatentClassEndpoint:
                 completed_at=datetime.now(UTC),
             ).model_dump(mode="json"),
         )
-        response = client.get(
-            f"/api/v1/studies/{study_id}/analysis/{analysis_id}/latent-class"
-        )
+        response = client.get(f"/api/v1/studies/{study_id}/analysis/{analysis_id}/latent-class")
         assert response.status_code == 404
 
     def test_post_latent_class_enqueues_job(self, study_id: str) -> None:
         """POST should queue a latent class job without running sampling."""
         mock_result = MagicMock()
         mock_result.id = "fake-celery-id"
-        with patch(
-            "aicbc.analysis.routes.run_latent_class_task"
-        ) as mock_task:
+        with patch("aicbc.analysis.routes.run_latent_class_task") as mock_task:
             mock_task.delay.return_value = mock_result
             response = client.post(
                 f"/api/v1/studies/{study_id}/analysis/latent-class",

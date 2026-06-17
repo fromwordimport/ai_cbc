@@ -22,13 +22,21 @@ def sample_attributes() -> list[Attribute]:
             id="price",
             name="价格",
             type=AttributeType.PRICE,
-            levels=[AttributeLevel(value=2999, label="2999元"), AttributeLevel(value=3999, label="3999元"), AttributeLevel(value=4999, label="4999元")],
+            levels=[
+                AttributeLevel(value=2999, label="2999元"),
+                AttributeLevel(value=3999, label="3999元"),
+                AttributeLevel(value=4999, label="4999元"),
+            ],
         ),
         Attribute(
             id="brand",
             name="品牌",
             type=AttributeType.CATEGORICAL,
-            levels=[AttributeLevel(value="美的", label="美的"), AttributeLevel(value="西门子", label="西门子"), AttributeLevel(value="小米", label="小米")],
+            levels=[
+                AttributeLevel(value="美的", label="美的"),
+                AttributeLevel(value="西门子", label="西门子"),
+                AttributeLevel(value="小米", label="小米"),
+            ],
         ),
     ]
 
@@ -161,11 +169,13 @@ class TestValidateDataset:
                     choice_set_index=0,
                     alternatives=[
                         AlternativeRecord(
-                            alt_index=0, chosen=True,
+                            alt_index=0,
+                            chosen=True,
                             attributes={"price": 2999, "brand": "美的"},
                         ),
                         AlternativeRecord(
-                            alt_index=1, chosen=False,
+                            alt_index=1,
+                            chosen=False,
                             attributes={"price": 3999, "brand": "西门子"},
                         ),
                     ],

@@ -26,7 +26,9 @@ def _override_deps(mock_llm_client: MagicMock, clean_store: PersonaStore) -> Non
     """Override FastAPI dependencies for testing."""
     app.dependency_overrides[get_llm_client] = lambda: mock_llm_client
     app.dependency_overrides[get_seed_generator] = lambda: SeedGenerator(seed=42)
-    app.dependency_overrides[get_profile_generator] = lambda: ProfileGenerator(llm_client=mock_llm_client)
+    app.dependency_overrides[get_profile_generator] = lambda: ProfileGenerator(
+        llm_client=mock_llm_client
+    )
     app.dependency_overrides[get_schema_validator] = SchemaValidator
     app.dependency_overrides[get_logic_validator] = LogicValidator
     app.dependency_overrides[get_store] = lambda: clean_store
@@ -44,7 +46,9 @@ def _clear_overrides() -> None:
 class TestGetPersona:
     """Tests for retrieving a single persona."""
 
-    def test_get_existing_persona(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_get_existing_persona(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """GET an existing persona should return 200 with full details."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -68,7 +72,9 @@ class TestGetPersona:
         finally:
             _clear_overrides()
 
-    def test_get_nonexistent_persona(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_get_nonexistent_persona(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """GET a non-existent persona should return 404."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -139,7 +145,9 @@ class TestListPersonas:
         finally:
             _clear_overrides()
 
-    def test_list_filter_by_study_id(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_list_filter_by_study_id(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """Filter by study_id should narrow results."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -164,7 +172,9 @@ class TestListPersonas:
 class TestValidatePersona:
     """Tests for persona validation endpoint."""
 
-    def test_validate_existing_persona(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_validate_existing_persona(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """Validate a valid persona should return all-pass."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -184,7 +194,9 @@ class TestValidatePersona:
         finally:
             _clear_overrides()
 
-    def test_validate_nonexistent_persona(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_validate_nonexistent_persona(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """Validate a non-existent persona should return 404."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -238,7 +250,9 @@ class TestGetLayer:
         finally:
             _clear_overrides()
 
-    def test_get_invalid_layer_number(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_get_invalid_layer_number(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """GET layer 5 should return 422."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -259,7 +273,9 @@ class TestGetLayer:
 class TestDeletePersona:
     """Tests for persona deletion endpoint."""
 
-    def test_delete_existing_persona(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_delete_existing_persona(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """DELETE an existing persona should return 204."""
         _override_deps(mock_llm_client, clean_store)
 
@@ -275,7 +291,9 @@ class TestDeletePersona:
         finally:
             _clear_overrides()
 
-    def test_delete_nonexistent_persona(self, mock_llm_client: MagicMock, clean_store: PersonaStore) -> None:
+    def test_delete_nonexistent_persona(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
         """DELETE a non-existent persona should return 404."""
         _override_deps(mock_llm_client, clean_store)
 

@@ -79,9 +79,7 @@ class StudyManagementUser(AICBCUser):
             name="POST /studies",
             catch_response=True,
         ) as response:
-            if response.status_code == 201:
-                response.success()
-            elif response.status_code == 409:
+            if response.status_code == 201 or response.status_code == 409:
                 response.success()
             else:
                 response.failure(f"Unexpected status: {response.status_code}")
@@ -106,9 +104,7 @@ class StudyManagementUser(AICBCUser):
             name="POST /studies/{id}/generate",
             catch_response=True,
         ) as response:
-            if response.status_code == 201:
-                response.success()
-            elif response.status_code == 409:
+            if response.status_code == 201 or response.status_code == 409:
                 response.success()
             else:
                 response.failure(f"Unexpected status: {response.status_code}")

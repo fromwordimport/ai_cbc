@@ -53,8 +53,8 @@ def _make_base_persona(
             tension_combination=TensionCombination(
                 labels=["精打细算", "偶尔犒劳自己"],
                 narrative_explanation="她平时习惯精打细算，把每一笔开支都记录在册，"
-                                    "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
-                                    "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。",
+                "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
+                "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。",
             ),
             secret_motivation="希望通过消费获得社会认同",
             defense_mechanism="合理化——将非必要消费解释为对自己的奖励",
@@ -130,9 +130,7 @@ class TestFairnessHardRules:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED"
-        assert any(
-            f.category in ("occupation", "occupation-income") for f in result.findings
-        )
+        assert any(f.category in ("occupation", "occupation-income") for f in result.findings)
 
     def test_rule_fair_006_income_price_sensitivity(self) -> None:
         """Income must not be linearly linked to price sensitivity."""

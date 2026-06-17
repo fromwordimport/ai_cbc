@@ -82,9 +82,7 @@ def sample_study_and_questionnaire(client: TestClient) -> str:
     store = app.dependency_overrides[get_questionnaire_store]()
     study = store.get_study(study_id)
     study.attributes = attrs
-    study.design_parameters = DesignParameters(
-        n_choice_sets=3, n_alternatives=2, seed=42
-    )
+    study.design_parameters = DesignParameters(n_choice_sets=3, n_alternatives=2, seed=42)
     store.save_study(study)
 
     # Generate questionnaire

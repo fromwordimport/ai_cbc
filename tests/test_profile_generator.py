@@ -185,7 +185,9 @@ class TestInitialization:
 class TestNormalGeneration:
     """Tests for the happy-path layer-by-layer generation."""
 
-    def test_generates_complete_profile(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_generates_complete_profile(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """All layers + auxiliary should produce a valid PersonaProfile."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -201,14 +203,19 @@ class TestNormalGeneration:
         assert result.persona_id == "persona-test-001"
         assert result.segment == "初入职场单身-新一线城市"
         assert result.layer1_demographics.age == "26-30岁"
-        assert result.layer2_behavior.decision_style == "口碑党+参数党混合，购买前必看测评和用户真实反馈"
+        assert (
+            result.layer2_behavior.decision_style
+            == "口碑党+参数党混合，购买前必看测评和用户真实反馈"
+        )
         assert result.layer3_psychology.secret_motivation != ""
         assert result.layer4_scenarios.daily_routine != ""
         assert len(result.language_samples) == 3
         assert result.dishwasher_context.purchase_constraints == ["厨房空间小", "租房不便安装"]
         assert result.generation_metadata.cost_cny > 0
 
-    def test_layer_context_passed_sequentially(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_layer_context_passed_sequentially(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """Each layer prompt should include previously generated layer data."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -233,7 +240,9 @@ class TestNormalGeneration:
         layer4_prompt = calls[3].kwargs["messages"][1]["content"]
         assert "躺平" in layer4_prompt or "内卷" in layer4_prompt or "同辈压力" in layer4_prompt
 
-    def test_json_mode_enabled_for_all_calls(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_json_mode_enabled_for_all_calls(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """Every LLM call should request JSON mode."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -257,7 +266,9 @@ class TestNormalGeneration:
 class TestFallbackHandling:
     """Tests for per-layer fallback when LLM or parsing fails."""
 
-    def test_uses_fallback_on_llm_failure(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_uses_fallback_on_llm_failure(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """If LLM raises an exception for a layer, fallback defaults should be used."""
         profile_generator._llm.generate.side_effect = [
             RuntimeError("LLM API error"),  # Layer 1 fails
@@ -274,7 +285,9 @@ class TestFallbackHandling:
         # Other layers should be normal
         assert result.layer2_behavior.decision_style == _layer2_response()["decision_style"]
 
-    def test_uses_fallback_on_json_parse_error(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_uses_fallback_on_json_parse_error(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """If LLM returns invalid JSON, fallback defaults should be used."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -290,7 +303,9 @@ class TestFallbackHandling:
         assert result.layer2_behavior.decision_style == _LAYER_FALLBACKS[2]["decision_style"]
         assert result.layer3_psychology.secret_motivation == _layer3_response()["secret_motivation"]
 
-    def test_uses_fallback_on_missing_fields(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_uses_fallback_on_missing_fields(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """If LLM JSON is missing required fields, fallback should fill them."""
         incomplete_layer1 = {"age": "26-30岁", "gender": "女"}  # Missing most fields
         profile_generator._llm.generate.side_effect = [
@@ -309,7 +324,9 @@ class TestFallbackHandling:
         assert result.layer1_demographics.occupation == _LAYER_FALLBACKS[1]["occupation"]
         assert result.layer1_demographics.education == _LAYER_FALLBACKS[1]["education"]
 
-    def test_generation_continues_after_single_layer_failure(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_generation_continues_after_single_layer_failure(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """A failure in one layer should not abort the entire generation."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -326,7 +343,9 @@ class TestFallbackHandling:
         assert result.layer3_psychology is not None
         assert result.layer4_scenarios is not None
 
-    def test_auxiliary_fallback_on_failure(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_auxiliary_fallback_on_failure(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """If auxiliary generation fails, default language samples and dishwasher context are used."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -364,7 +383,12 @@ class TestPromptConstruction:
         """Prompt should include the JSON schema for the target layer."""
         for layer_num in range(1, 5):
             prompt = profile_generator._build_prompt(layer_num, seed_config, {})
-            assert "age" in prompt or "price_sensitivity" in prompt or "core_values" in prompt or "daily_routine" in prompt
+            assert (
+                "age" in prompt
+                or "price_sensitivity" in prompt
+                or "core_values" in prompt
+                or "daily_routine" in prompt
+            )
 
     def test_prompt_contains_previous_layers(self, profile_generator, seed_config):
         """Prompt for layer N should include layers 1..N-1."""
@@ -392,7 +416,9 @@ class TestPromptConstruction:
 class TestOutputValidation:
     """Tests for validating generated PersonaProfile structure."""
 
-    def test_language_samples_length_validation(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_language_samples_length_validation(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """Language samples must be exactly 3 items and 20-60 chars each."""
         bad_aux = {
             "language_samples": ["短", "也短", "还是短"],
@@ -412,7 +438,9 @@ class TestOutputValidation:
         assert len(result.language_samples) == 3
         assert all(20 <= len(s) <= 60 for s in result.language_samples)
 
-    def test_profile_is_serializable(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_profile_is_serializable(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """Generated profile should be convertible to a dict."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -433,7 +461,9 @@ class TestOutputValidation:
         assert "language_samples" in d
         assert "dishwasher_context" in d
 
-    def test_authenticity_score_default(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_authenticity_score_default(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """Authenticity score should be None until explicitly scored."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -446,7 +476,9 @@ class TestOutputValidation:
         result = profile_generator.generate("persona-test-011", seed_config)
         assert result.authenticity_score is None
 
-    def test_bias_audit_status_default(self, profile_generator, seed_config, mock_llm_response_factory):
+    def test_bias_audit_status_default(
+        self, profile_generator, seed_config, mock_llm_response_factory
+    ):
         """Bias audit status should default to PENDING."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
@@ -498,7 +530,9 @@ class TestEdgeCases:
         assert isinstance(result, PersonaProfile)
         assert result.layer1_demographics.age == _LAYER_FALLBACKS[1]["age"]
         assert result.layer2_behavior.decision_style == _LAYER_FALLBACKS[2]["decision_style"]
-        assert result.layer3_psychology.secret_motivation == _LAYER_FALLBACKS[3]["secret_motivation"]
+        assert (
+            result.layer3_psychology.secret_motivation == _LAYER_FALLBACKS[3]["secret_motivation"]
+        )
         assert result.layer4_scenarios.daily_routine == _LAYER_FALLBACKS[4]["daily_routine"]
         assert len(result.language_samples) == 3
         assert isinstance(result.dishwasher_context, DishwasherContext)

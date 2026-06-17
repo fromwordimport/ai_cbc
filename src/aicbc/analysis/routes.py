@@ -586,6 +586,7 @@ async def parse_scenario(
     """Convert free-text (e.g. '华为 2999 元嵌入式 13 套') into a ProductScenario."""
     attributes = await _get_study_attributes(study_id)
     from aicbc.analysis.nl_scenario_parser import parse_nl_scenario
+
     return parse_nl_scenario(request.text, attributes)
 
 

@@ -1,4 +1,3 @@
-
 from aicbc.core.models.db_documents import (
     AnalysisJobDocument,
     AnalysisResultDocument,

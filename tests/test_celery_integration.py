@@ -16,7 +16,6 @@ from aicbc.analysis.models import AnalysisJobStatus
 from aicbc.analysis.store import get_analysis_store
 from aicbc.analysis.tasks import celery_app, run_analysis_task, run_latent_class_task
 
-
 pytestmark = [
     pytest.mark.slow,
 ]
@@ -27,6 +26,7 @@ def _redis_available() -> bool:
     url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     try:
         import redis
+
         r = redis.from_url(url)
         return r.ping()
     except Exception:  # noqa: BLE001
@@ -47,6 +47,7 @@ class TestCeleryAppConfig:
 
     def test_broker_url_from_settings(self):
         from aicbc.config.settings import get_settings
+
         settings = get_settings()
         assert settings.celery_broker_url.startswith("redis://")
 
