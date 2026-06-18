@@ -24,7 +24,7 @@ from aicbc.questionnaire.models import (
     ChoiceSet,
     DesignParameters,
 )
-from tests.test_cbc_choice_simulator import _make_persona, _make_test_attributes
+from tests.unit.simulation.test_cbc_choice_simulator import _make_persona, _make_test_attributes
 
 
 @dataclass
