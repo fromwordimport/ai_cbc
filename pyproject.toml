@@ -88,7 +88,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v"
 # Coverage is CI-only. To run locally: uv run pytest --cov=src --cov-report=term-missing
-norecursedirs = [".git", ".tox", "dist", "build"]
+norecursedirs = [".git", ".tox", "dist", "build", "tests/performance", "tests/manual"]
 markers = [
     "unit: pure unit tests with no external dependencies",
     "integration: tests requiring DB/Redis/Celery/API",
