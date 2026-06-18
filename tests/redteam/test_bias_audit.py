@@ -924,3 +924,44 @@ class TestRedTeamSummary:
             f"Overall detection rate {detection_rate:.0%} ({detected}/{len(results)}) < 95% target. "
             f"Undetected: {[i for i, r in enumerate(results) if r.status != 'FAILED']}"
         )
+
+
+class TestBiasAuditReport:
+    """Verify batch audit report structure and required fields."""
+
+    def test_bias_audit_report_contains_required_fields(self) -> None:
+        """Run a batch audit and assert the returned report has required fields."""
+        auditor = BiasAuditor()
+        personas = [
+            persona_factory(persona_id="persona-report-001"),
+            persona_factory(
+                persona_id="persona-report-002",
+                gender="女",
+                price_sensitivity="感性消费，冲动购物，情绪化决策",
+            ),
+            persona_factory(
+                persona_id="persona-report-003",
+                city="农村",
+                income="3万元以下",
+                occupation="农民",
+            ),
+        ]
+
+        report = auditor.audit_batch(personas)
+
+        # Required aggregate fields
+        assert "total_audited" in report
+        assert "passed" in report
+        assert "failed" in report
+        assert "pass_rate" in report
+        assert "total_findings" in report
+        assert "findings_by_category" in report
+        assert "high_severity_findings" in report
+        assert "critical_severity_findings" in report
+
+        # Value assertions
+        assert report["total_audited"] == 3
+        assert report["passed"] + report["failed"] == 3
+        assert 0 <= report["pass_rate"] <= 1
+        assert report["total_findings"] >= 0
+        assert isinstance(report["findings_by_category"], dict)

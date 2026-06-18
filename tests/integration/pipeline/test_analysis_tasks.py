@@ -399,3 +399,121 @@ class TestRunLatentClassTask:
             run_latent_class_task("study-001", "analysis-001", json.dumps({}))
 
         a_store.update_job_status.assert_any_call("analysis-001", "FAILED", progress=0.0)
+
+
+class TestAnalysisJobStateMachine:
+    """Verify analysis job status transitions through the state machine."""
+
+    @pytest.fixture
+    def _real_analysis_store(self):
+        """Provide a real MemoryAnalysisStore for state-machine tests."""
+        from aicbc.analysis.store import MemoryAnalysisStore
+        store = MemoryAnalysisStore()
+        store.clear()
+        return store
+
+    def test_analysis_job_status_transitions(self, _real_analysis_store, mock_preprocessing):
+        """Create a job, assert status moves from PENDING → RUNNING → COMPLETED."""
+        from datetime import UTC, datetime
+        from aicbc.analysis.models import AnalysisJobStatus
+        from aicbc.analysis.store import get_analysis_store
+        from aicbc.core.store import get_questionnaire_store, get_response_store
+
+        a_store = _real_analysis_store
+        # Temporarily patch the global singleton so run_analysis_task uses our real store
+        with (
+            patch("aicbc.analysis.store.get_analysis_store", return_value=a_store),
+            patch("aicbc.core.store.get_questionnaire_store") as mock_q_store,
+            patch("aicbc.core.store.get_response_store") as mock_r_store,
+            patch("aicbc.analysis.engines.hb_engine.HBEngine") as mock_hb_engine_cls,
+            patch("aicbc.analysis.engines.hb_engine.HBConfig") as mock_hb_config_cls,
+            patch("aicbc.analysis.results.importance.compute_importance", return_value=pd.DataFrame({"price": [0.6, 0.5]}, index=["r1", "r2"])),
+            patch("aicbc.analysis.results.importance.aggregate_importance", return_value=pd.DataFrame({"mean": [0.55], "std": [0.05], "median": [0.55], "min": [0.5], "max": [0.6], "q25": [0.52], "q75": [0.58]}, index=["price"])),
+            patch("aicbc.analysis.results.wtp.WTPCalculator") as mock_wtp_cls,
+        ):
+            # Set up mock questionnaire/response stores
+            q_store = MagicMock()
+            q_store.get_study.return_value = _make_study()
+            mock_q_store.return_value = q_store
+            r_store = MagicMock()
+            r_store.get_dataset.return_value = _make_dataset()
+            mock_r_store.return_value = r_store
+
+            mock_hb_engine_cls.return_value.fit.return_value = _make_engine_result()
+            mock_wtp_instance = MagicMock()
+            mock_wtp_instance.compute_all_wtp.return_value = {}
+            mock_wtp_instance.price_coefficient_summary.return_value = {
+                "mean": -0.5, "median": -0.5, "std": 0.1, "negative_rate": 1.0, "n_positive_outliers": 0,
+            }
+            mock_wtp_cls.return_value = mock_wtp_instance
+
+            job = AnalysisJobStatus(
+                analysis_id="analysis-sm-001",
+                study_id="study-001",
+                status="QUEUED",
+                model_type="hb",
+                queued_at=datetime.now(UTC),
+                estimated_duration_seconds=60,
+            )
+            a_store.save_job(job)
+            assert a_store.get_job("analysis-sm-001").status == "QUEUED"
+
+            result = run_analysis_task(
+                "study-001",
+                "analysis-sm-001",
+                "hb",
+                json.dumps({"n_draws": 500, "n_tune": 500, "n_chains": 2, "target_accept": 0.9}),
+            )
+
+        assert result["status"] == "COMPLETED"
+        assert result["analysis_id"] == "analysis-sm-001"
+
+        final_job = a_store.get_job("analysis-sm-001")
+        assert final_job.status == "COMPLETED"
+        assert final_job.started_at is not None
+        assert final_job.completed_at is not None
+
+    def test_analysis_job_failed_transition(self, _real_analysis_store, mock_preprocessing):
+        """Create a job, assert status moves from PENDING → RUNNING → FAILED on engine error."""
+        from datetime import UTC, datetime
+        from aicbc.analysis.models import AnalysisJobStatus
+        from aicbc.analysis.store import get_analysis_store
+        from aicbc.core.store import get_questionnaire_store, get_response_store
+
+        a_store = _real_analysis_store
+        with (
+            patch("aicbc.analysis.store.get_analysis_store", return_value=a_store),
+            patch("aicbc.core.store.get_questionnaire_store") as mock_q_store,
+            patch("aicbc.core.store.get_response_store") as mock_r_store,
+            patch("aicbc.analysis.engines.hb_engine.HBEngine") as mock_hb_engine_cls,
+            patch("aicbc.analysis.engines.hb_engine.HBConfig") as mock_hb_config_cls,
+        ):
+            q_store = MagicMock()
+            q_store.get_study.return_value = _make_study()
+            mock_q_store.return_value = q_store
+            r_store = MagicMock()
+            r_store.get_dataset.return_value = _make_dataset()
+            mock_r_store.return_value = r_store
+
+            mock_hb_engine_cls.return_value.fit.side_effect = RuntimeError("engine failure")
+
+            job = AnalysisJobStatus(
+                analysis_id="analysis-sm-fail-001",
+                study_id="study-001",
+                status="QUEUED",
+                model_type="hb",
+                queued_at=datetime.now(UTC),
+                estimated_duration_seconds=60,
+            )
+            a_store.save_job(job)
+
+            with pytest.raises(RuntimeError, match="engine failure"):
+                run_analysis_task(
+                    "study-001",
+                    "analysis-sm-fail-001",
+                    "hb",
+                    json.dumps({}),
+                )
+
+        final_job = a_store.get_job("analysis-sm-fail-001")
+        assert final_job.status == "FAILED"

@@ -450,3 +450,76 @@ class TestPIIRedactionInExports:
             assert "[REDACTED:" in payload
         finally:
             _clear_overrides()
+
+
+class TestDataSubjectRights:
+    """Tests for GDPR/PIPL data subject rights: export and deletion."""
+
+    def test_data_export_returns_persona_data(
+        self,
+        mock_llm_client: MagicMock,
+        clean_store: MemoryPersonaStore,
+    ) -> None:
+        """GET export endpoint returns the persona's own data."""
+        _override_deps(
+            mock_llm_client,
+            clean_store,
+            MemoryQuestionnaireStore(),
+            MemoryResponseStore(),
+            MemoryAnalysisStore(),
+        )
+        try:
+            client.post(
+                "/api/v1/personas/generate",
+                json={"count": 1, "study_id": "dsr-export"},
+                headers={"X-API-Key": "dev-key-change-in-prod", "X-User-Role": "admin"},
+            )
+            persona_id = "persona-dsr-export-001"
+
+            response = client.get(
+                f"/api/v1/personas/{persona_id}/export",
+                headers={"X-API-Key": "dev-key-change-in-prod"},
+            )
+            assert response.status_code == 200
+
+            data = response.json()
+            assert data["persona_id"] == persona_id
+            assert "profile" in data
+            assert data["profile"]["persona_id"] == persona_id
+            assert "generation_metadata" in data
+            assert "audit_trail" in data
+            assert "exported_at" in data
+        finally:
+            _clear_overrides()
+
+    def test_right_to_be_forgotten_deletes_persona(
+        self,
+        mock_llm_client: MagicMock,
+        clean_store: MemoryPersonaStore,
+    ) -> None:
+        """DELETE persona removes persona and returns 204."""
+        _override_deps(
+            mock_llm_client,
+            clean_store,
+            MemoryQuestionnaireStore(),
+            MemoryResponseStore(),
+            MemoryAnalysisStore(),
+        )
+        try:
+            client.post(
+                "/api/v1/personas/generate",
+                json={"count": 1, "study_id": "dsr-delete"},
+                headers={"X-API-Key": "dev-key-change-in-prod", "X-User-Role": "admin"},
+            )
+            persona_id = "persona-dsr-delete-001"
+            assert clean_store.get(persona_id) is not None
+
+            response = client.delete(
+                f"/api/v1/personas/{persona_id}",
+                headers={"X-API-Key": "dev-key-change-in-prod", "X-User-Role": "admin"},
+            )
+            assert response.status_code == 204
+
+            assert clean_store.get(persona_id) is None
+        finally:
+            _clear_overrides()

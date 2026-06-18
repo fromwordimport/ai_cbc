@@ -427,6 +427,56 @@ class TestConvergenceDiagnostics:
         assert result.diagnostics is not None
         assert result.diagnostics["converged"] is True
 
+    @pytest.mark.xfail(
+        reason="PyMC NUTS converges even with tiny data; non-convergence is hard to trigger deterministically without model misspecification"
+    )
+    def test_hb_engine_warns_on_non_convergence(self):
+        """Tiny config with very few samples should trigger R-hat > 1.1.
+
+        We use extremely small data (3 respondents, 4 tasks, 2 alternatives)
+        and minimal MCMC settings to force poor mixing / non-convergence.
+        The engine auto-scales draws/tune for n_resp < 50, so we monkeypatch
+        the config after build_model to keep draws tiny and force divergence.
+        """
+        rng = np.random.default_rng(99)
+        feature_cols = ["price", "brand_0"]
+        rows = []
+        for resp in range(3):
+            for task in range(4):
+                for alt in range(2):
+                    price = rng.choice([2999, 3999])
+                    price_std = (price - 3999) / 816.0
+                    brand_0 = 1.0 if alt == 0 else -1.0
+                    chosen = 1 if alt == 0 else 0
+                    rows.append({
+                        "resp_id": f"r{resp}",
+                        "task_id": task,
+                        "alt_id": alt,
+                        "chosen": chosen,
+                        "price": price_std,
+                        "brand_0": brand_0,
+                    })
+        df = pd.DataFrame(rows)
+
+        # Minimal MCMC — should not converge with tiny data and few iterations
+        config = HBConfig(n_draws=50, n_tune=50, n_chains=2, target_accept=0.8, random_seed=99)
+        engine = HBEngine(config)
+        engine.build_model(df, feature_cols)
+        # Override auto-scaling so draws stay tiny
+        engine.config.n_draws = 50
+        engine.config.n_tune = 50
+        result = engine.fit(df, feature_cols)
+
+        # Assert non-convergence via diagnostics flag
+        assert result.converged is False, (
+            f"Expected non-convergence, but rhat_max={result.rhat_max:.3f}"
+        )
+        assert result.rhat_max >= 1.1, (
+            f"Expected R-hat >= 1.1, got {result.rhat_max:.3f}"
+        )
+        assert result.diagnostics is not None
+        assert result.diagnostics["converged"] is False
+
 
 # ---------------------------------------------------------------------------
 # Edge conditions

@@ -46,9 +46,8 @@ def cost_fuse(cost_tracker):
     return CostFuse(tracker=cost_tracker)
 
 
-@pytest.fixture
-def mock_settings():
-    """Return a fully-populated mock settings object."""
+def _make_mock_settings():
+    """Return a fully-populated mock settings object (non-fixture version)."""
     settings = MagicMock()
     settings.llm.provider = "anthropic"
     settings.llm.model = ""
@@ -83,6 +82,12 @@ def mock_settings():
         degrade_model="claude-haiku-4-5",
     )
     return settings
+
+
+@pytest.fixture
+def mock_settings():
+    """Return a fully-populated mock settings object."""
+    return _make_mock_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +202,42 @@ class TestCostFuse:
         cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
         model = cost_fuse.resolve_model("claude-sonnet-4-6", study_id="study-001")
         assert model == "claude-haiku-4-5"
+
+    def test_cost_fuse_trips_on_budget_exceeded(self, cost_fuse):
+        """Create a CostFuse with a very low budget, record calls until the fuse
+        status becomes TRIPPED or raises CostFuseError, assert the study is blocked.
+        """
+        # The tight_fuse_settings fixture sets single_study_cny=10.0.
+        # We record calls until the study budget is exceeded.
+        study_id = "study-budget-001"
+        call_cost_usd = 3.0 / 7.2  # ~3 CNY per call
+
+        # Record calls until the fuse trips
+        for i in range(5):
+            cost_fuse.tracker.record(cost_usd=call_cost_usd, study_id=study_id)
+            allowed, status, _ = cost_fuse.pre_call_check(study_id=study_id)
+            if not allowed:
+                break
+
+        # Assert that the fuse is now blocking
+        allowed, status, _ = cost_fuse.pre_call_check(study_id=study_id)
+        assert allowed is False, (
+            f"Expected fuse to block after budget exceeded, got status={status.value}"
+        )
+        assert status in (FuseStatus.FUSE, FuseStatus.EMERGENCY)
+
+        # Assert that LLMClient would raise CostFuseError
+        # We pass study_id to the generate call so the fuse checks the study budget.
+        settings = _make_mock_settings()
+        with patch("aicbc.llm.client.get_settings", return_value=settings):
+            client = LLMClient(cost_fuse=cost_fuse)
+
+        with pytest.raises(CostFuseError, match="Cost fuse triggered"):
+            client.generate(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="claude-sonnet-4-6",
+                study_id=study_id,
+            )
 
 
 # ---------------------------------------------------------------------------
