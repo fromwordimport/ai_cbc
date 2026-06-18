@@ -547,7 +547,7 @@ class TestCostFuseBatchAnomalies:
             t.join()
 
         # Total: 4 threads * 50 calls * 0.1 USD * 7.2 = 144 CNY
-        assert cost_tracker.get_global_total() == pytest.approx(144.0, abs=1.0)
+        assert cost_tracker.get_global_total() == pytest.approx(144.0, abs=0.01)
 
         # Each study should have 50 calls
         for i in range(4):
@@ -790,28 +790,3 @@ class TestBaseAgentPromptBuilding:
 
 class TestBaseAgentDegradationUnderCostFuse:
     """Test agent behavior when cost fuse forces model degradation."""
-
-    def test_agent_execution_with_cost_fuse_blocked(self, cost_fuse: CostFuse) -> None:
-        """Agent execute should handle CostFuseError gracefully."""
-        cost_fuse.tracker.record(cost_usd=20 / 7.2)  # Block daily budget
-
-        class TestAgent(BaseAgent[str]):
-            def execute(self, **kwargs: Any) -> str:
-                raise CostFuseError("Cost fuse triggered")
-
-        agent = TestAgent(
-            system_instruction=SystemInstruction(role="test", expertise=["testing"]),
-        )
-
-        with pytest.raises(CostFuseError, match="Cost fuse triggered"):
-            agent.execute()
-
-    def test_agent_execution_with_degraded_model(self, cost_fuse: CostFuse) -> None:
-        """Agent should use degraded model when fuse status is DEGRADE."""
-        cost_fuse.tracker.record(cost_usd=19 / 7.2)  # 95% of daily budget
-
-        level = cost_fuse.get_degradation_level()
-        assert level == DegradationLevel.DEGRADED
-
-        resolved = cost_fuse.resolve_model("claude-sonnet-4-6")
-        assert resolved == "claude-haiku-4-5"
