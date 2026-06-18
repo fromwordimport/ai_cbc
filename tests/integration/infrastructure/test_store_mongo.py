@@ -14,7 +14,6 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow]
 import os
 from datetime import UTC, datetime
 
-import pytest
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from aicbc.analysis.models import (
@@ -37,10 +36,6 @@ from aicbc.core.store_mongo import (
 )
 from aicbc.questionnaire.models import CBCStudy
 from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
-
-pytestmark = [
-    pytest.mark.slow,
-]
 
 
 async def _mongo_available() -> bool:
