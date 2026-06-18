@@ -62,6 +62,12 @@ bandit-report.json
 pip-audit.json
 pytest-output*.txt
 
+# Manual test generated artifacts
+tests/test_report.json
+tests/test_report_interactive.json
+tests/manual/screenshots/*.png
+tests/manual/screenshots/*.jpg
+
 # Temporary artifact directories
 .tmp-pip-audit/
 *.tmp-pip-audit/

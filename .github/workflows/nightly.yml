@@ -54,6 +54,7 @@ jobs:
           source .venv/bin/activate
           pytest tests/ \
             -v \
+            -m "not performance" \
             --timeout=300 \
             --cov=src \
             --cov-report=xml \
@@ -109,8 +110,6 @@ jobs:
           pytest tests/redteam/ \
             -v \
             --timeout=300 \
-            --cov=src \
-            --cov-report=xml \
             --junitxml=test-results/redteam-full.xml
 
       - name: Upload red-team results
@@ -151,17 +150,23 @@ jobs:
         continue-on-error: true
         run: |
           source .venv/bin/activate
-          # Best-effort performance baseline against staging health endpoint.
-          # Replace with real API scenarios once staging endpoints are stable.
           locust -f scripts/locust_baseline.py \
             --host http://staging.aicbc.example.com \
-            --run-time 2m \
-            --users 10 \
-            --spawn-rate 2 \
+            --run-time 5m \
+            --users 20 \
+            --spawn-rate 5 \
             --headless \
             --html reports/locust-report.html \
             --csv reports/locust \
-            || echo "Performance baseline skipped (staging not reachable)."
+            || echo "Locust baseline skipped (staging not reachable)."
+
+      - name: Run pytest performance regression
+        run: |
+          source .venv/bin/activate
+          pytest tests/performance/ \
+            -v \
+            --timeout=300 \
+            --junitxml=test-results/performance.xml
 
       - name: Upload performance report
         if: always()

@@ -9,7 +9,7 @@ name: CI
 
 on:
   push:
-    branches: [master, release/*, hotfix/*, feature/*]
+    branches: [master, release/*, hotfix/*, feature/*, worktree/*, worktree-*]
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -41,7 +41,7 @@ jobs:
           else
             BRANCH="${{ github.ref_name }}"
           fi
-          if [[ ! "$BRANCH" =~ ^(master|release/.*|hotfix/.*|feature/.*)$ ]]; then
+          if [[ ! "$BRANCH" =~ ^(master|release/.*|hotfix/.*|feature/.*|worktree/.*|worktree-.*)$ ]]; then
             echo "Branch naming convention violated: $BRANCH"
             exit 1
           fi
@@ -126,12 +126,11 @@ jobs:
           ruff format --check src/
 
       - name: Type check with mypy
-        # TODO(#51): re-enable hard failure once the ~80 pre-existing strict type
-        # issues are fixed. For now keep the step visible but non-blocking so
-        # the rest of the quality gate (ruff, bandit) is enforced.
+        # TODO(#51): remove continue-on-error once all pre-existing issues are fixed
+        continue-on-error: true
         run: |
           source .venv/bin/activate
-          mypy src/ --ignore-missing-imports || true
+          mypy src/ --ignore-missing-imports
 
       - name: Security scan with bandit
         run: |
@@ -213,8 +212,8 @@ jobs:
           image-ref: 'aicbc-scan:${{ github.sha }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          exit-code: '1'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'  # Don't block on container scan for now
 
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
@@ -224,9 +223,9 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   # ==========================================================================
-  # Stage 3: Unit Tests
+  # Stage 3: Fast Tests
   # ==========================================================================
-  unit-test:
+  fast-test:
     runs-on: ubuntu-22.04
     needs: quality
     env:
@@ -257,18 +256,18 @@ jobs:
           uv venv --clear
           uv pip install -e ".[dev,analysis]"
 
-      - name: Run unit tests
+      - name: Run fast tests
         run: |
           source .venv/bin/activate
           pytest tests/ \
             -v \
-            -m "not slow" \
+            -m "(unit or integration) and not slow and not redteam and not performance" \
             --timeout=120 \
             --cov=src \
             --cov-report=xml \
             --cov-report=html \
             --cov-fail-under=60 \
-            --junitxml=test-results/unit.xml
+            --junitxml=test-results/fast.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -279,7 +278,7 @@ jobs:
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-results
+          name: fast-test-results
           path: |
             test-results/
             coverage.xml
@@ -287,9 +286,9 @@ jobs:
           retention-days: 30
 
   # ==========================================================================
-  # Stage 3b: Red Team Tests
+  # Stage 3b: Fast Red Team Tests
   # ==========================================================================
-  redteam-test:
+  redteam-fast:
     runs-on: ubuntu-22.04
     needs: quality
     steps:
@@ -318,21 +317,20 @@ jobs:
           uv venv --clear
           uv pip install -e ".[dev,analysis]"
 
-      - name: Run red team tests
+      - name: Run fast red team tests
         run: |
           source .venv/bin/activate
           pytest tests/redteam/ \
             -v \
+            -m "security and not slow" \
             --timeout=120 \
-            --cov=src \
-            --cov-report=term \
-            --junitxml=test-results/redteam.xml
+            --junitxml=test-results/redteam-fast.xml
 
       - name: Upload red team results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: redteam-test-results
+          name: redteam-fast-results
           path: |
             test-results/
           retention-days: 30

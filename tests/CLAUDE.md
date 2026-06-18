@@ -10,37 +10,38 @@ This directory contains the **Python test suite** for AI_CBC, using `pytest`.
 
 ```
 tests/
-├── conftest.py              # Global fixtures and autouse cleanup
-├── test_*.py                # Backend unit/integration tests
-├── analysis/                # Analysis subsystem tests
-│   ├── test_analysis_agent.py
-│   ├── test_hb_engine.py
-│   ├── test_mnl_engine.py
-│   ├── test_market_simulator.py
-│   ├── test_preprocessing.py
-│   └── test_synthetic_recovery.py
-└── redteam/                 # Adversarial/security tests
-    └── test_agent_security.py
+├── unit/              # Pure unit tests, no external dependencies
+├── integration/       # Tests requiring DB/Redis/Celery/API
+├── e2e/               # End-to-end full pipeline tests
+├── redteam/           # Security/adversarial tests
+├── performance/       # Load and regression tests
+├── manual/            # Manual acceptance scripts
+└── support/           # Shared factories, datasets, mocks
 ```
 
 ## Running Tests
 
 ```bash
-# Default (excludes slow tests)
-uv run pytest tests/ -v
+# Default fast feedback (CI equivalent)
+uv run pytest -m "(unit or integration) and not slow and not redteam and not performance"
 
-# Single file / single test
-uv run pytest tests/test_profile_generator.py -v
-uv run pytest tests/test_profile_generator.py::test_name -v
+# Unit tests only
+uv run pytest -m unit
 
 # Include slow tests
-uv run pytest tests/ -m slow
+uv run pytest -m "not performance"
 
-# Coverage (CI-style)
-uv run pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=60
+# Full suite
+uv run pytest
 
-# Red-team tests only
-uv run pytest tests/redteam/ -v
+# Red team fast
+uv run pytest tests/redteam/ -m "security and not slow"
+
+# Red team full
+uv run pytest tests/redteam/
+
+# Performance regression
+uv run pytest tests/performance/
 ```
 
 ## Key Conventions
