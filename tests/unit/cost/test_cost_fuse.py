@@ -140,8 +140,8 @@ class TestCostFuse:
 
     def test_pre_call_check_degrade(self, cost_fuse):
         """DEGRADE state should allow call but switch model."""
-        # Push to 95%
-        cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
+        # Push study to 95% of the 10 CNY budget (9.5 CNY)
+        cost_fuse.tracker.record(cost_usd=9.5 / 7.2, study_id="study-001")
         allowed, status, model = cost_fuse.pre_call_check(
             study_id="study-001",
             requested_model="claude-sonnet-4-6",
@@ -152,7 +152,7 @@ class TestCostFuse:
 
     def test_pre_call_check_fuse_blocks(self, cost_fuse):
         """FUSE state should block calls."""
-        cost_fuse.tracker.record(cost_usd=100 / 7.2, study_id="study-001")
+        cost_fuse.tracker.record(cost_usd=10 / 7.2, study_id="study-001")
         allowed, status, model = cost_fuse.pre_call_check(
             study_id="study-001",
             requested_model="claude-sonnet-4-6",
@@ -162,7 +162,7 @@ class TestCostFuse:
 
     def test_pre_call_check_emergency_blocks(self, cost_fuse):
         """EMERGENCY state should block calls."""
-        cost_fuse.tracker.record(cost_usd=120 / 7.2, study_id="study-001")
+        cost_fuse.tracker.record(cost_usd=12 / 7.2, study_id="study-001")
         allowed, status, model = cost_fuse.pre_call_check(
             study_id="study-001",
             requested_model="claude-sonnet-4-6",
@@ -186,10 +186,10 @@ class TestCostFuse:
         """Degradation level should match fuse status."""
         assert cost_fuse.get_degradation_level("study-001") == DegradationLevel.STANDARD
 
-        cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
+        cost_fuse.tracker.record(cost_usd=9.5 / 7.2, study_id="study-001")
         assert cost_fuse.get_degradation_level("study-001") == DegradationLevel.DEGRADED
 
-        cost_fuse.tracker.record(cost_usd=30 / 7.2, study_id="study-001")  # now 125%
+        cost_fuse.tracker.record(cost_usd=3 / 7.2, study_id="study-001")  # now 125%
         assert cost_fuse.get_degradation_level("study-001") == DegradationLevel.EMERGENCY
 
     def test_resolve_model_normal(self, cost_fuse):
@@ -199,7 +199,7 @@ class TestCostFuse:
 
     def test_resolve_model_degraded(self, cost_fuse):
         """Degraded state should return degrade_model."""
-        cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
+        cost_fuse.tracker.record(cost_usd=9.5 / 7.2, study_id="study-001")
         model = cost_fuse.resolve_model("claude-sonnet-4-6", study_id="study-001")
         assert model == "claude-haiku-4-5"
 

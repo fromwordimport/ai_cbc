@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+# Force debug mode for the test suite so that API-key enforcement is skipped and
+# RBAC defaults to admin. Auth/authorization is exercised separately in
+# tests/unit/security and tests/redteam.
+import os
+
+os.environ.setdefault("DEBUG", "true")
+
 import json
 from collections.abc import AsyncGenerator, Generator
 from contextlib import suppress

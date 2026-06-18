@@ -98,10 +98,10 @@ def sample_study_and_questionnaire(client: TestClient) -> str:
 @pytest.fixture
 def sample_persona_in_store(client: TestClient) -> str:
     """Create and store a sample persona, return persona_id."""
-    from tests.test_cbc_choice_simulator import _make_persona
+    from tests.conftest import persona_factory
 
     persona_id = "persona-resp-001"
-    persona = _make_persona()
+    persona = persona_factory()
     persona.persona_id = persona_id
 
     # Get the store through the dependency override
@@ -146,11 +146,11 @@ class TestSimulateResponses:
         study_id = sample_study_and_questionnaire
 
         # Create two personas
-        from tests.test_cbc_choice_simulator import _make_persona
+        from tests.conftest import persona_factory
 
         store = app.dependency_overrides[get_store]()
         for i in range(2):
-            persona = _make_persona(
+            persona = persona_factory(
                 price_sensitivity="低敏感" if i == 0 else "高敏感",
                 brand_loyalty="忠诚" if i == 0 else "尝试新品牌",
             )

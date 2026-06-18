@@ -272,8 +272,8 @@ class TestCostTrackerIsolation:
 
     def test_per_study_isolation(self, tracker):
         """Different studies should have independent cost tracking."""
-        tracker.record(cost_usd=5 / 7.2, study_id="study-A")
-        tracker.record(cost_usd=9.6 / 7.2, study_id="study-B")
+        tracker.record(cost_usd=50 / 7.2, study_id="study-A")
+        tracker.record(cost_usd=96 / 7.2, study_id="study-B")
 
         # study-A at 50% of 100 CNY = NORMAL
         status_a, _ = tracker.check_fuse_status("study-A")
