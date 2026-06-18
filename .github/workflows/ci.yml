@@ -9,7 +9,7 @@ name: CI
 
 on:
   push:
-    branches: [master, release/*, hotfix/*, feature/*]
+    branches: [master, release/*, hotfix/*, feature/*, worktree/*, worktree-*]
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -41,7 +41,7 @@ jobs:
           else
             BRANCH="${{ github.ref_name }}"
           fi
-          if [[ ! "$BRANCH" =~ ^(master|release/.*|hotfix/.*|feature/.*)$ ]]; then
+          if [[ ! "$BRANCH" =~ ^(master|release/.*|hotfix/.*|feature/.*|worktree/.*|worktree-.*)$ ]]; then
             echo "Branch naming convention violated: $BRANCH"
             exit 1
           fi
