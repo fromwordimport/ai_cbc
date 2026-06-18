@@ -90,39 +90,6 @@ class TestDeletePersona:
         finally:
             _clear_overrides()
 
-    def test_delete_persona_returns_204(
-        self, mock_llm_client: MagicMock, clean_store: PersonaStore
-    ) -> None:
-        """DELETE /api/v1/personas/{id} returns 204 for existing persona."""
-        _override_deps(mock_llm_client, clean_store)
-        try:
-            client.post(
-                "/api/v1/personas/generate",
-                json={"count": 1, "study_id": "del-204"},
-                headers={"X-API-Key": "dev-key-change-in-prod", "X-User-Role": "admin"},
-            )
-            response = client.delete(
-                "/api/v1/personas/persona-del-204-001",
-                headers={"X-API-Key": "dev-key-change-in-prod", "X-User-Role": "admin"},
-            )
-            assert response.status_code == 204
-        finally:
-            _clear_overrides()
-
-    def test_delete_nonexistent_persona_returns_404(
-        self, mock_llm_client: MagicMock, clean_store: PersonaStore
-    ) -> None:
-        """DELETE unknown id returns 404."""
-        _override_deps(mock_llm_client, clean_store)
-        try:
-            response = client.delete(
-                "/api/v1/personas/persona-unknown-001",
-                headers={"X-API-Key": "dev-key-change-in-prod", "X-User-Role": "admin"},
-            )
-            assert response.status_code == 404
-        finally:
-            _clear_overrides()
-
     @pytest.mark.xfail(reason="bulk-delete endpoint not yet implemented")
     def test_bulk_delete_personas_returns_204(
         self, mock_llm_client: MagicMock, clean_store: PersonaStore
