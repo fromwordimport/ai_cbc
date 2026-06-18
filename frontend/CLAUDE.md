@@ -33,7 +33,7 @@ npm run preview
 npm run lint        # ESLint
 npm run test        # Vitest once
 npm run test:watch
-npm run test:coverage
+npm run test:coverage    # runs vitest with 60% coverage thresholds
 ```
 
 ## Project Conventions
@@ -55,7 +55,7 @@ npm run test:coverage
 
 - Vitest with `jsdom` environment.
 - `src/test/setup.ts` mocks `window.matchMedia` and `echarts-for-react`.
-- Coverage thresholds are 50% (statements/branches/functions/lines).
+- Coverage thresholds are 60% (statements/branches/functions/lines), configured in `vite.config.ts`.
 
 ## Cross-References
 
