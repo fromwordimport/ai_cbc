@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.core.privacy import (
     detect_pii,
     pii_detection_rate,

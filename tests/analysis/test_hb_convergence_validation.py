@@ -9,6 +9,10 @@ Validates the HB model engine across:
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.slow]
+
 import time
 
 import numpy as np

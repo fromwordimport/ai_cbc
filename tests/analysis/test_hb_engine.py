@@ -10,6 +10,10 @@ Tests cover:
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.slow]
+
 import numpy as np
 import pandas as pd
 import pytest

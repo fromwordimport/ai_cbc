@@ -5,6 +5,10 @@ All LLM calls are mocked — no real API requests are made.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 

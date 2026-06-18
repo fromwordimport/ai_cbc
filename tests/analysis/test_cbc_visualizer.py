@@ -1,5 +1,7 @@
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.analysis.cbc_visualizer import (
     build_dashboard_option,
     build_importance_chart_option,

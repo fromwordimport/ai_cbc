@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from aicbc.questionnaire.design.orthogonal import (
     _check_orthogonality,
     _distribute_to_choice_sets,

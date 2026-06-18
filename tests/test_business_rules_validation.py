@@ -6,6 +6,10 @@ They are fast (no LLM calls, no MCMC sampling) and can run in CI.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 import pandas as pd
 import pytest
 

@@ -4,6 +4,9 @@ from aicbc.core.models.db_documents import (
     AuditLogDocument,
 )
 
+import pytest
+
+pytestmark = pytest.mark.integration
 
 def test_analysis_job_has_created_at_index():
     settings = AnalysisJobDocument.Settings

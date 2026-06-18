@@ -18,6 +18,7 @@ from aicbc.analysis.tasks import celery_app, run_analysis_task, run_latent_class
 
 pytestmark = [
     pytest.mark.slow,
+    pytest.mark.integration,
 ]
 
 

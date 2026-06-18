@@ -2,6 +2,8 @@
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,

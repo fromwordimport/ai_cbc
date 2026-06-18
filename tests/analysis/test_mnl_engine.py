@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 import numpy as np
 import pandas as pd
 import pytest

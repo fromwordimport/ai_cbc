@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from dataclasses import dataclass
 from typing import Any
 

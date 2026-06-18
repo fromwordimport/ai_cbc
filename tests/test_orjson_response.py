@@ -1,5 +1,8 @@
 from fastapi.testclient import TestClient
 
+import pytest
+
+pytestmark = pytest.mark.integration
 
 def test_api_uses_orjson_response():
     from aicbc.main import app

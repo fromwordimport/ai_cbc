@@ -6,6 +6,10 @@ and degrades models automatically.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 from unittest.mock import MagicMock, patch
 
 import pytest

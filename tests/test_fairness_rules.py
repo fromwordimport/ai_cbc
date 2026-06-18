@@ -6,6 +6,10 @@ by BiasAuditor. A persona that violates any rule must receive a FAILED status.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,

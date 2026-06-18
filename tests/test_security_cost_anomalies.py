@@ -13,6 +13,10 @@ All tests use mocking — no real API calls.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.redteam, pytest.mark.slow, pytest.mark.integration]
+
 from typing import Any
 from unittest.mock import MagicMock, patch
 

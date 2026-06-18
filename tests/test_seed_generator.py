@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.core.models.seed_config import SeedConfig, TensionPair
 from aicbc.generators.seed_generator import (
     CITY_TIERS,

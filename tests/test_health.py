@@ -1,5 +1,9 @@
 """Health check endpoint tests."""
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

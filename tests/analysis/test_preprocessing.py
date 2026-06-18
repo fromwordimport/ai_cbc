@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.analysis.preprocessing import get_feature_columns, to_long_format, validate_dataset
 from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 from aicbc.questionnaire.response_models import (

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient

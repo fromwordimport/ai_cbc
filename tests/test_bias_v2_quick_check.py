@@ -1,5 +1,9 @@
 """Quick smoke test for BiasAuditor v2 with 24-pattern library."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,

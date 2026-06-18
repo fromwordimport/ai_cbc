@@ -1,6 +1,10 @@
 """Tests for tag system JSON schemas, Pydantic models, and tag loader."""
 
 import json
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from pathlib import Path
 
 import pytest

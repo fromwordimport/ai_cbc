@@ -12,6 +12,10 @@ All LLM calls are mocked — no real API requests. HB sampling uses tiny config.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.e2e, pytest.mark.slow]
+
 import json
 import uuid
 from datetime import UTC, datetime

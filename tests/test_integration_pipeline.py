@@ -8,6 +8,10 @@ All LLM calls are mocked — no real API requests.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.e2e
+
 import json
 from typing import Any
 from unittest.mock import MagicMock

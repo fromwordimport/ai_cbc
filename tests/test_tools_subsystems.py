@@ -6,6 +6,10 @@ as ToolCalling-compatible tools.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from typing import Any
 
 import pytest

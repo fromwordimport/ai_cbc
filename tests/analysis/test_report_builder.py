@@ -1,5 +1,7 @@
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.analysis.models import (
     AnalysisResultResponse,
     ConvergenceDiagnostics,

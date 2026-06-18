@@ -6,6 +6,10 @@ that HB and MNL engines recover them within tolerance.
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.slow]
+
 import numpy as np
 import pandas as pd
 import pytest

@@ -6,6 +6,10 @@ and runs the BiasAuditor across all of them to produce an aggregate audit report
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,

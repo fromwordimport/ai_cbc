@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import pytest
+
+pytestmark = pytest.mark.integration
+
 from fastapi.testclient import TestClient
 
 from aicbc.core.models.persona import (

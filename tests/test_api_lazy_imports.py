@@ -2,6 +2,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 def test_main_import_does_not_load_analysis_heavy_deps():
     repo_root = Path(__file__).resolve().parents[1]

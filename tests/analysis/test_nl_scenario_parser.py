@@ -1,5 +1,7 @@
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from aicbc.analysis.nl_scenario_parser import parse_nl_scenario
 from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 
