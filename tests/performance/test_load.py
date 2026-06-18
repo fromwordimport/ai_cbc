@@ -18,7 +18,10 @@ import os
 import uuid
 from typing import Any
 
+import pytest
 from locust import HttpUser, between, events, task
+
+pytestmark = [pytest.mark.performance, pytest.mark.slow]
 
 
 @events.init.add_listener
