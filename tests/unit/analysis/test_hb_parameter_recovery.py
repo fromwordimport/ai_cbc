@@ -95,7 +95,7 @@ def _synthetic_hb_long(
     person_betas: dict[str, dict[str, float]] = {}
     for pid in range(n_respondents):
         beta = rng.normal(mu, sigma_vec)
-        person_betas[f"p{pid}"] = {c: float(b) for c, b in zip(feat_cols, beta, strict=False)}
+        person_betas[f"p{pid}"] = {c: float(b) for c, b in zip(feat_cols, beta)}
 
     rows: list[dict] = []
     for pid in range(n_respondents):
@@ -113,7 +113,7 @@ def _synthetic_hb_long(
                         "alt_id": alt,
                         "chosen": False,
                         "utility": u,
-                        **{c: float(v) for c, v in zip(feat_cols, x, strict=False)},
+                        **{c: float(v) for c, v in zip(feat_cols, x)},
                     }
                 )
 
@@ -129,7 +129,7 @@ def _synthetic_hb_long(
         drop_tasks = rng.choice(task_ids, size=n_drop, replace=False)
         df = df[~df["task_id"].isin(drop_tasks)]
 
-    pop_mu_dict = {c: float(v) for c, v in zip(feat_cols, mu, strict=False)}
+    pop_mu_dict = {c: float(v) for c, v in zip(feat_cols, mu)}
     return df, pop_mu_dict, person_betas
 
 
@@ -325,7 +325,7 @@ class TestParameterRecovery:
             ev = np.mean([result.individual_utilities.get(pid, {}).get(c, 0) for c in feat_cols])
             est_ranks[pid] = int(np.sign(ev))
 
-        tau, _ = _kendall_tau(list(true_ranks.values()), list(est_ranks.values()))
+        tau, _ = stats.kendalltau(list(true_ranks.values()), list(est_ranks.values()))
         assert tau > 0.2, f"Kendall tau={tau:.3f} too low"
 
     def test_population_mu_recovery_synthetic(self, synthetic_hb_data, tiny_hb_config):
@@ -543,8 +543,8 @@ class TestMNLvsHBConsistency:
                 sign_agreements += 1
 
         agreement_rate = sign_agreements / len(feat_cols)
-        assert agreement_rate >= 0.5, (
-            f"MNL-HB sign agreement rate {agreement_rate:.1%}, expected >= 50%"
+        assert agreement_rate >= 0.75, (
+            f"MNL-HB sign agreement rate {agreement_rate:.1%}, expected >= 75%"
         )
 
 
@@ -579,21 +579,3 @@ class TestMNLParameterRecovery:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _kendall_tau(a: list, b: list) -> tuple[float, int]:
-    n = len(a)
-    concordant = 0
-    discordant = 0
-    for i in range(n):
-        for j in range(i + 1, n):
-            da = a[i] - a[j]
-            db = b[i] - b[j]
-            if da * db > 0:
-                concordant += 1
-            elif da * db < 0:
-                discordant += 1
-    total = concordant + discordant
-    if total == 0:
-        return 0.0, 0
-    return (concordant - discordant) / total, total
