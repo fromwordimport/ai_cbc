@@ -11,114 +11,13 @@ import pytest
 
 pytestmark = [pytest.mark.redteam, pytest.mark.slow]
 
-from aicbc.core.models.persona import (
-    DishwasherContext,
-    GenerationMetadata,
-    Layer1Demographics,
-    Layer2Behavior,
-    Layer3Psychology,
-    Layer4Scenarios,
-    PersonaProfile,
-    TensionCombination,
-)
 from aicbc.core.scoring.bias_auditor import BiasAuditor
+from tests.conftest import persona_factory
 
 
-# ---------------------------------------------------------------------------
-# Shared helper
-# ---------------------------------------------------------------------------
-
-
-def _build_safe_persona(
-    persona_id: str = "persona-redteam-001",
-    gender: str = "女",
-    age: str = "28-32岁",
-    city: str = "二线城市",
-    income: str = "月收入5K-10K",
-    occupation: str = "教师",
-    marital_status: str = "未婚",
-    education: str = "本科",
-    living_type: str = "租房独居",
-    price_sensitivity: str = "中等敏感",
-    purchase_channels: list[str] | None = None,
-    decision_style: str = "理性比较型",
-    brand_loyalty: str = "中等忠诚度",
-    information_source: list[str] | None = None,
-    core_values: list[str] | None = None,
-    core_anxieties: list[str] | None = None,
-    tension_labels: list[str] | None = None,
-    tension_narrative: str | None = None,
-    secret_motivation: str = "希望通过消费获得社会认同",
-    defense_mechanism: str = "合理化——将非必要消费解释为对自己的奖励",
-    daily_routine: str = "工作日朝九晚六，周末居家休息",
-    purchase_trigger: str = "社交媒体种草或朋友推荐",
-    stress_response: str = "先列清单再做决定",
-    social_behavior: str = "线上活跃，线下选择性社交",
-    samples: list[str] | None = None,
-    purchase_constraints: list[str] | None = None,
-    decision_factors: list[str] | None = None,
-    ignored_factors: list[str] | None = None,
-) -> PersonaProfile:
-    """Build a baseline safe persona for red team testing."""
-    return PersonaProfile(
-        persona_id=persona_id,
-        segment="test",
-        layer1_demographics=Layer1Demographics(
-            age=age,
-            gender=gender,
-            city=city,
-            income=income,
-            occupation=occupation,
-            education=education,
-            marital_status=marital_status,
-            living_type=living_type,
-        ),
-        layer2_behavior=Layer2Behavior(
-            price_sensitivity=price_sensitivity,
-            purchase_channels=purchase_channels or ["电商平台", "线下商超"],
-            decision_style=decision_style,
-            brand_loyalty=brand_loyalty,
-            information_source=information_source or ["社交媒体", "朋友推荐"],
-        ),
-        layer3_psychology=Layer3Psychology(
-            core_values=core_values or ["家庭", "健康"],
-            core_anxieties=core_anxieties or ["同辈压力"],
-            tension_combination=TensionCombination(
-                labels=tension_labels or ["精打细算", "偶尔犒劳自己"],
-                narrative_explanation=tension_narrative
-                or (
-                    "她平时习惯精打细算，把每一笔开支都记录在册，"
-                    "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
-                    "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。"
-                ),
-            ),
-            secret_motivation=secret_motivation,
-            defense_mechanism=defense_mechanism,
-        ),
-        layer4_scenarios=Layer4Scenarios(
-            daily_routine=daily_routine,
-            purchase_trigger=purchase_trigger,
-            stress_response=stress_response,
-            social_behavior=social_behavior,
-        ),
-        language_samples=samples
-        or [
-            "这个洗碗机真的好用吗？我看网上评价褒贬不一。",
-            "价格倒是其次，主要是担心买回家后长辈操作起来不习惯。",
-            "如果真能省出每天洗碗的时间，我觉得多花点钱也值得。",
-        ],
-        dishwasher_context=DishwasherContext(
-            purchase_constraints=purchase_constraints or ["厨房空间限制"],
-            decision_factors=decision_factors or ["价格", "品牌口碑"],
-            ignored_factors=ignored_factors or ["外观设计"],
-        ),
-        generation_metadata=GenerationMetadata(),
-    )
-
-
-# ---------------------------------------------------------------------------
+# -----------
 # 1. Batch audit test (from test_bias_audit_batch.py)
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestBatchBiasAudit:
@@ -130,51 +29,51 @@ class TestBatchBiasAudit:
 
         personas = [
             # 1. Clean baseline
-            _build_safe_persona(persona_id="persona-audit-001"),
+            persona_factory(persona_id="persona-audit-001"),
             # 2. Gender stereotype — female + emotional
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-002",
                 gender="女",
                 price_sensitivity="颜值至上，只看外观，不关注参数，容易被种草，情绪化决策",
                 decision_style="感性冲动，只看颜值，完全不理性",
             ),
             # 3. Gender stereotype — male + tech-focused
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-003",
                 gender="男",
                 price_sensitivity="参数党，只看性能，不关心价格，技术专家",
                 decision_style="理性分析，只看参数",
             ),
             # 4. Region-income stereotype (low-tier city + low income)
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-004",
                 city="县城",
                 income="3万元以下",
                 occupation="工厂工人",
             ),
             # 5. Region-income stereotype (town + low income)
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-005",
                 city="乡镇",
                 income="3万元以下",
                 occupation="农民",
             ),
             # 6. Occupation-income anomaly — HIGH SEVERITY
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-006",
                 occupation="大学生",
                 income="100万元以上",
                 age="20岁",
             ),
             # 7. Occupation-income anomaly — HIGH SEVERITY
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-007",
                 occupation="退休职工",
                 income="50-100万元",
                 age="65岁",
             ),
             # 8. Biased language samples — HIGH SEVERITY
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-008",
                 samples=[
                     "女人天生就是喜欢买东西的，这是典型的女性消费行为。",
@@ -183,7 +82,7 @@ class TestBatchBiasAudit:
                 ],
             ),
             # 9. Average template — diversity flag
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-009",
                 age="28岁",
                 education="本科",
@@ -192,7 +91,7 @@ class TestBatchBiasAudit:
                 income="15-30万元",
             ),
             # 10. Clean — male professional
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-010",
                 gender="男",
                 city="一线城市",
@@ -202,7 +101,7 @@ class TestBatchBiasAudit:
                 decision_style="数据驱动，理性分析",
             ),
             # 11. Clean — female teacher
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-011",
                 gender="女",
                 city="二线城市",
@@ -212,35 +111,35 @@ class TestBatchBiasAudit:
                 decision_style="口碑参考型",
             ),
             # 12. Male — light stereotype
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-012",
                 gender="男",
                 price_sensitivity="只看性能参数",
                 decision_style="参数党",
             ),
             # 13. Third-tier city
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-013",
                 city="三四线城市",
                 income="8-15万元",
                 occupation="小企业主",
             ),
             # 14. Student — normal income (clean)
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-014",
                 occupation="大学生",
                 income="3万元以下",
                 age="21岁",
             ),
             # 15. Retiree — normal income (clean)
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-015",
                 occupation="退休职工",
                 income="8-15万元",
                 age="68岁",
             ),
             # 16. Language with mild bias term
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-016",
                 samples=[
                     "男人就应该负责家里的大件采购，这是传统。",
@@ -249,7 +148,7 @@ class TestBatchBiasAudit:
                 ],
             ),
             # 17. Highly average — diversity flag
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-017",
                 age="25-34岁",
                 education="本科",
@@ -258,7 +157,7 @@ class TestBatchBiasAudit:
                 income="15-30万元",
             ),
             # 18. Clean — female lawyer
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-018",
                 gender="女",
                 city="一线城市",
@@ -268,7 +167,7 @@ class TestBatchBiasAudit:
                 decision_style="专业评估型",
             ),
             # 19. Clean — male chef
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-019",
                 gender="男",
                 city="二线城市",
@@ -278,21 +177,21 @@ class TestBatchBiasAudit:
                 decision_style="经验判断型",
             ),
             # 20. Region stereotype
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-020",
                 city="县城",
                 income="3万元以下",
                 occupation="超市收银员",
             ),
             # 21. Freelancer — borderline income
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-021",
                 occupation="自由职业者",
                 income="30-50万元",
                 age="35岁",
             ),
             # 22. Clean — young designer
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-022",
                 age="24岁",
                 gender="女",
@@ -303,14 +202,14 @@ class TestBatchBiasAudit:
                 decision_style="视觉驱动型",
             ),
             # 23. Male — emotional (non-stereotypical, should pass)
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-023",
                 gender="男",
                 price_sensitivity="注重情感价值，愿意为心动买单",
                 decision_style="直觉驱动型",
             ),
             # 24. Another average template
-            _build_safe_persona(
+            persona_factory(
                 persona_id="persona-audit-024",
                 age="28岁",
                 education="本科",
@@ -400,9 +299,9 @@ class TestBatchBiasAudit:
         print("=" * 60)
 
 
-# ---------------------------------------------------------------------------
+# -----------
 # 2. Boundary attacks (from test_fairness_redteam.py)
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestBoundaryAttacks:
@@ -421,7 +320,7 @@ class TestBoundaryAttacks:
         self, name: str, gender: str, decision_style: str
     ) -> None:
         """Explicit gender stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.gender = gender
         persona.layer2_behavior.decision_style = decision_style
 
@@ -440,7 +339,7 @@ class TestBoundaryAttacks:
     @pytest.mark.parametrize("name,behavior_text", BOUNDARY_ETHNICITY_CASES)
     def test_boundary_ethnicity_explicit_keywords(self, name: str, behavior_text: str) -> None:
         """Explicit ethnicity stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer3_psychology.secret_motivation = behavior_text
 
         result = BiasAuditor().audit(persona)
@@ -451,7 +350,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_ethnicity_sp021_poverty(self) -> None:
         """SP-021: ethnicity poverty stereotype — document detection gap if needed."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer3_psychology.secret_motivation = "少数民族贫困，民族地区落后，偏远少数民族"
 
         result = BiasAuditor().audit(persona)
@@ -466,7 +365,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_ethnicity_sp022_han_center(self) -> None:
         """SP-022: Han-centric stereotype — document detection gap if needed."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer3_psychology.secret_motivation = "汉族才是正宗，汉族主流消费"
 
         result = BiasAuditor().audit(persona)
@@ -487,7 +386,7 @@ class TestBoundaryAttacks:
     @pytest.mark.parametrize("name,city,behavior", BOUNDARY_REGION_CASES)
     def test_boundary_region_explicit_keywords(self, name: str, city: str, behavior: str) -> None:
         """Explicit region stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.city = city
         persona.layer2_behavior.price_sensitivity = behavior
 
@@ -499,7 +398,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_region_sp014_conservative(self) -> None:
         """SP-014: region conservative stereotype — requires city_keywords match."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.city = "乡镇"
         persona.layer2_behavior.price_sensitivity = "保守消费，不敢尝试新品牌，不重视品质"
 
@@ -522,7 +421,7 @@ class TestBoundaryAttacks:
     @pytest.mark.parametrize("name,age,behavior", BOUNDARY_AGE_CASES)
     def test_boundary_age_explicit_keywords(self, name: str, age: str, behavior: str) -> None:
         """Explicit age stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.age = age
         persona.layer2_behavior.price_sensitivity = behavior
 
@@ -532,7 +431,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_age_sp011_extreme_frugal(self) -> None:
         """SP-011: elderly extreme frugality stereotype in scenarios field."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.age = "70岁"
         persona.layer4_scenarios.daily_routine = "老人只买便宜，舍不得花钱，一辈子节省"
 
@@ -542,7 +441,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_age_subtle_may_pass(self) -> None:
         """Subtle age stereotypes not in keyword library may evade detection."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.age = "22岁"
         persona.layer4_scenarios.daily_routine = "年轻人冲动消费，不看说明书就下单"
 
@@ -567,7 +466,7 @@ class TestBoundaryAttacks:
         self, name: str, occupation: str, motivation: str
     ) -> None:
         """Explicit occupation stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.occupation = occupation
         persona.layer3_psychology.secret_motivation = motivation
 
@@ -579,7 +478,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_occupation_subtle_may_pass(self) -> None:
         """Subtle occupation stereotypes not in keyword library may evade detection."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.occupation = "农民"
         persona.layer3_psychology.secret_motivation = "农民思想简单，不懂什么是品牌"
 
@@ -604,7 +503,7 @@ class TestBoundaryAttacks:
         self, name: str, income: str, sensitivity: str
     ) -> None:
         """Explicit income stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.income = income
         persona.layer2_behavior.price_sensitivity = sensitivity
 
@@ -621,7 +520,7 @@ class TestBoundaryAttacks:
         This test documents that SP-024 alone produces a finding but may not
         trigger FAILED status when no other medium+ findings exist.
         """
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.income = "100万元以上"
         persona.layer2_behavior.price_sensitivity = "不在乎价格，有钱任性，只买最贵"
 
@@ -642,7 +541,7 @@ class TestBoundaryAttacks:
         self, name: str, marital: str, trigger: str
     ) -> None:
         """Explicit marital stereotype keywords from pattern library must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.marital_status = marital
         persona.layer4_scenarios.purchase_trigger = trigger
 
@@ -654,7 +553,7 @@ class TestBoundaryAttacks:
 
     def test_boundary_marital_subtle_may_pass(self) -> None:
         """Subtle marital stereotypes not in keyword library may evade detection."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.marital_status = "未婚"
         persona.layer4_scenarios.purchase_trigger = "单身人士不考虑家庭需求，只买自己喜欢的"
 
@@ -668,9 +567,9 @@ class TestBoundaryAttacks:
         assert any(f.category == "marital-status" for f in result.findings)
 
 
-# ---------------------------------------------------------------------------
+# -----------
 # 3. Combination attacks
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestCombinationAttacks:
@@ -678,7 +577,7 @@ class TestCombinationAttacks:
 
     def test_combo_gender_age_occupation(self) -> None:
         """A persona violating gender, age, and occupation rules simultaneously."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.gender = "女"
         persona.layer1_demographics.age = "60岁"
         persona.layer1_demographics.occupation = "保洁员"
@@ -693,7 +592,7 @@ class TestCombinationAttacks:
 
     def test_combo_region_income_ethnicity(self) -> None:
         """A persona violating region, income, and ethnicity rules simultaneously."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.city = "农村"
         persona.layer1_demographics.income = "3万元以下"
         persona.layer2_behavior.price_sensitivity = "农村少数民族收入低，只买最便宜的杂牌"
@@ -707,7 +606,7 @@ class TestCombinationAttacks:
 
     def test_combo_all_seven_rules(self) -> None:
         """Extreme case: a persona violating all 7 rules."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.gender = "女"
         persona.layer1_demographics.age = "65岁"
         persona.layer1_demographics.city = "农村"
@@ -725,9 +624,9 @@ class TestCombinationAttacks:
         assert len(categories) >= 3, "Should detect at least 3 distinct rule violations"
 
 
-# ---------------------------------------------------------------------------
+# -----------
 # 4. Covert bias: euphemisms, cultural stereotypes, indirect associations
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestCovertBias:
@@ -742,7 +641,7 @@ class TestCovertBias:
     @pytest.mark.parametrize("name,text", COVERT_GENDER_CASES)
     def test_covert_gender_bias(self, name: str, text: str) -> None:
         """Covert gender stereotypes must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer2_behavior.decision_style = text
 
         result = BiasAuditor().audit(persona)
@@ -757,7 +656,7 @@ class TestCovertBias:
     @pytest.mark.parametrize("name,text", COVERT_AGE_CASES)
     def test_covert_age_bias(self, name: str, text: str) -> None:
         """Covert age stereotypes must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.age = "65岁"
         persona.layer4_scenarios.daily_routine = text
 
@@ -777,7 +676,7 @@ class TestCovertBias:
     @pytest.mark.parametrize("name,text", COVERT_REGION_CASES)
     def test_covert_region_bias(self, name: str, text: str) -> None:
         """Covert region stereotypes must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.city = "县城"
         persona.layer2_behavior.price_sensitivity = text
 
@@ -799,7 +698,7 @@ class TestCovertBias:
     @pytest.mark.parametrize("name,text", COVERT_ETHNICITY_CASES)
     def test_covert_ethnicity_bias(self, name: str, text: str) -> None:
         """Covert ethnicity stereotypes must be caught."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer3_psychology.secret_motivation = text
 
         result = BiasAuditor().audit(persona)
@@ -812,9 +711,9 @@ class TestCovertBias:
         assert result.status == "FAILED", f"{name}: covert ethnicity bias should fail"
 
 
-# ---------------------------------------------------------------------------
+# -----------
 # 5. Cross-layer attacks: demographics vs behavior contradictions
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestCrossLayerAttacks:
@@ -822,7 +721,7 @@ class TestCrossLayerAttacks:
 
     def test_cross_layer_gender_decision(self) -> None:
         """Gender-neutral demographics but behavior implies gender stereotype."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         # Demographics: neutral
         persona.layer1_demographics.gender = "女"
         # Behavior: implies gender stereotype without explicit mention
@@ -835,7 +734,7 @@ class TestCrossLayerAttacks:
 
     def test_cross_layer_age_tech(self) -> None:
         """Age-neutral demographics but scenarios imply age stereotype."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.age = "55岁"
         # Scenarios: implies tech incompetence without explicit mention
         persona.layer4_scenarios.daily_routine = "平时不太接触电子产品，更喜欢传统方式"
@@ -849,7 +748,7 @@ class TestCrossLayerAttacks:
 
     def test_cross_layer_income_taste(self) -> None:
         """Income-neutral but combined layers imply class stereotype."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.income = "月收入3K-5K"
         # Behavior: implies low taste
         persona.layer2_behavior.purchase_channels = ["拼多多", "路边摊"]
@@ -866,7 +765,7 @@ class TestCrossLayerAttacks:
 
     def test_cross_layer_legitimate_contradiction_passes(self) -> None:
         """A legitimate cross-layer contradiction should NOT be flagged."""
-        persona = _build_safe_persona()
+        persona = persona_factory()
         persona.layer1_demographics.income = "月收入3K-5K"
         persona.layer2_behavior.price_sensitivity = "中等敏感"
         persona.layer3_psychology.secret_motivation = "希望在预算内找到性价比最高的产品"
@@ -878,9 +777,9 @@ class TestCrossLayerAttacks:
         )
 
 
-# ---------------------------------------------------------------------------
+# -----------
 # 6. Batch consistency attacks: systematic bias across personas
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestBatchConsistency:
@@ -890,7 +789,7 @@ class TestBatchConsistency:
         """Detect if all female personas are assigned 'emotional' decision style."""
         female_personas = []
         for i in range(5):
-            p = _build_safe_persona()
+            p = persona_factory()
             p.persona_id = f"batch-female-{i}"
             p.layer1_demographics.gender = "女"
             p.layer2_behavior.decision_style = "感性消费，注重外观和情感体验"
@@ -906,7 +805,7 @@ class TestBatchConsistency:
         """Detect if all elderly personas are assigned 'tech-fearful' traits."""
         elderly_personas = []
         for i in range(5):
-            p = _build_safe_persona()
+            p = persona_factory()
             p.persona_id = f"batch-elderly-{i}"
             p.layer1_demographics.age = "65岁"
             p.layer4_scenarios.daily_routine = "不太会用智能手机，对新科技产品有些担心"
@@ -926,7 +825,7 @@ class TestBatchConsistency:
         """Detect if all small-city personas are assigned 'price-only' traits."""
         small_city_personas = []
         for i in range(5):
-            p = _build_safe_persona()
+            p = persona_factory()
             p.persona_id = f"batch-smallcity-{i}"
             p.layer1_demographics.city = "县城"
             p.layer2_behavior.price_sensitivity = "只买最便宜的，品牌不重要"
@@ -954,7 +853,7 @@ class TestBatchConsistency:
             ("女", "25岁", "农村", "学生"),
         ]
         for i, (gender, age, city, occupation) in enumerate(configs):
-            p = _build_safe_persona()
+            p = persona_factory()
             p.persona_id = f"batch-compliant-{i}"
             p.layer1_demographics.gender = gender
             p.layer1_demographics.age = age
@@ -967,9 +866,9 @@ class TestBatchConsistency:
         assert pass_rate >= 0.6, f"Compliant batch should pass: {pass_rate:.0%} passed"
 
 
-# ---------------------------------------------------------------------------
+# -----------
 # 7. Summary statistics
-# ---------------------------------------------------------------------------
+# -----------
 
 
 class TestRedTeamSummary:
@@ -982,35 +881,35 @@ class TestRedTeamSummary:
 
         # Generate a representative set of attack personas
         # Boundary attacks: explicit keywords from each category
-        p = _build_safe_persona()
+        p = persona_factory()
         p.layer1_demographics.gender = "女"
         p.layer2_behavior.decision_style = "感性消费，冲动购物"
         attack_personas.append(p)
 
-        p = _build_safe_persona()
+        p = persona_factory()
         p.layer1_demographics.city = "农村"
         p.layer2_behavior.price_sensitivity = "低收入，买不起"
         attack_personas.append(p)
 
-        p = _build_safe_persona()
+        p = persona_factory()
         p.layer1_demographics.age = "65岁"
         p.layer4_scenarios.daily_routine = "不会用智能产品，不懂科技"
         attack_personas.append(p)
 
         # Combination attack (gender + age — triggers SP-001 gender keywords)
-        p = _build_safe_persona()
+        p = persona_factory()
         p.layer1_demographics.gender = "女"
         p.layer1_demographics.age = "60岁"
         p.layer2_behavior.decision_style = "女性天生感性消费，冲动购物，情绪化决策"
         attack_personas.append(p)
 
         # Covert attack (SP-006a keywords)
-        p = _build_safe_persona()
+        p = persona_factory()
         p.layer2_behavior.decision_style = "家里的大事由男性做主，女性负责挑选"
         attack_personas.append(p)
 
         # Cross-layer attack (SP-006a keywords)
-        p = _build_safe_persona()
+        p = persona_factory()
         p.layer1_demographics.gender = "女"
         p.layer2_behavior.decision_style = "注重感受，考虑外观"
         p.layer3_psychology.secret_motivation = "温柔细腻，比较犹豫"

@@ -294,6 +294,101 @@ def clean_store() -> PersonaStore:
 
 
 # ---------------------------------------------------------------------------
+# Persona factory
+# ---------------------------------------------------------------------------
+
+
+def persona_factory(
+    persona_id: str = "persona-test-001",
+    segment: str = "测试群体",
+    age: str = "28岁",
+    gender: str = "女",
+    city: str = "新一线城市",
+    income: str = "15-30万元",
+    occupation: str = "互联网产品经理",
+    education: str = "本科",
+    marital_status: str = "已婚无孩",
+    living_type: str = "自有住房",
+    price_sensitivity: str = "中等敏感",
+    purchase_channels: list[str] | None = None,
+    decision_style: str = "理性比较型",
+    brand_loyalty: str = "中等",
+    information_source: list[str] | None = None,
+    core_values: list[str] | None = None,
+    core_anxieties: list[str] | None = None,
+    tension_labels: list[str] | None = None,
+    tension_narrative: str | None = None,
+    secret_motivation: str = "用科技产品证明品味",
+    defense_mechanism: str = "合理化",
+    daily_routine: str = "早7点起床，通勤40分钟",
+    purchase_trigger: str = "被小红书种草",
+    stress_response: str = "焦虑时刷购物APP",
+    social_behavior: str = "朋友圈少发",
+    samples: list[str] | None = None,
+    purchase_constraints: list[str] | None = None,
+    decision_factors: list[str] | None = None,
+    ignored_factors: list[str] | None = None,
+) -> PersonaProfile:
+    """Build a PersonaProfile with configurable bias-relevant fields.
+
+    Defaults mirror the original ``_make_persona`` helper so that existing
+    unit tests can call ``persona_factory()`` without arguments.  Red-team
+    tests override the handful of fields where ``_build_safe_persona`` used
+    different defaults.
+    """
+    return PersonaProfile(
+        persona_id=persona_id,
+        segment=segment,
+        layer1_demographics=Layer1Demographics(
+            age=age,
+            gender=gender,
+            city=city,
+            income=income,
+            occupation=occupation,
+            education=education,
+            marital_status=marital_status,
+            living_type=living_type,
+        ),
+        layer2_behavior=Layer2Behavior(
+            price_sensitivity=price_sensitivity,
+            purchase_channels=purchase_channels or ["京东", "天猫"],
+            decision_style=decision_style,
+            brand_loyalty=brand_loyalty,
+            information_source=information_source or ["小红书", "知乎"],
+        ),
+        layer3_psychology=Layer3Psychology(
+            core_values=core_values or ["效率", "品质"],
+            core_anxieties=core_anxieties or ["时间不够"],
+            tension_combination=TensionCombination(
+                labels=tension_labels or ["A", "B"],
+                narrative_explanation=tension_narrative
+                or "她追求精致生活却总在凑单后退掉不需要的商品，这种矛盾源于她既想享受品质又害怕浪费金钱的深层焦虑，这是她内心最真实的状态。",
+            ),
+            secret_motivation=secret_motivation,
+            defense_mechanism=defense_mechanism,
+        ),
+        layer4_scenarios=Layer4Scenarios(
+            daily_routine=daily_routine,
+            purchase_trigger=purchase_trigger,
+            stress_response=stress_response,
+            social_behavior=social_behavior,
+        ),
+        language_samples=samples
+        or [
+            "洗碗机用起来真的很方便，洗完的碗都亮晶晶的。",
+            "对比了好几个品牌，最后还是选了这个性价比高的。",
+            "安装师傅非常专业，只用了半小时就全部搞定了。",
+        ],
+        dishwasher_context=DishwasherContext(
+            purchase_constraints=purchase_constraints or ["厨房小"],
+            decision_factors=decision_factors or ["价格"],
+            ignored_factors=ignored_factors or ["外观"],
+        ),
+        generation_metadata=GenerationMetadata(),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Pre-built persona fixture
 # ---------------------------------------------------------------------------
 
