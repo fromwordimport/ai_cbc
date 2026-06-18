@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.slow]
+pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
 from aicbc.analysis.engines.latent_class_engine import (
     LatentClassConfig,

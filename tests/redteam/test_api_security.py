@@ -15,7 +15,7 @@ from aicbc.main import app
 
 client = TestClient(app)
 
-pytestmark = [pytest.mark.security, pytest.mark.integration]
+pytestmark = [pytest.mark.security, pytest.mark.unit]
 
 
 # ---------------------------------------------------------------------------
