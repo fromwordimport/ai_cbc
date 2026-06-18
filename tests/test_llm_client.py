@@ -267,11 +267,14 @@ def test_generate_success_after_retry(client):
 
     mock_response = _build_anthropic_response("Recovered", 4, 4)
 
-    with patch.object(
-        client._anthropic.messages,
-        "create",
-        side_effect=[AnthropicAPIError("Boom", request=MagicMock(), body=None), mock_response],
-    ), patch("aicbc.llm.client.time.sleep") as mock_sleep:
+    with (
+        patch.object(
+            client._anthropic.messages,
+            "create",
+            side_effect=[AnthropicAPIError("Boom", request=MagicMock(), body=None), mock_response],
+        ),
+        patch("aicbc.llm.client.time.sleep") as mock_sleep,
+    ):
         result = client.generate(
             messages=[{"role": "user", "content": "Hi"}],
             model="claude-sonnet-4-6",
@@ -306,9 +309,7 @@ def test_generate_json_raises_on_bad_json(client):
     mock_response = _build_openai_response("not json", 5, 5)
 
     with (
-        patch.object(
-            client._openai.chat.completions, "create", return_value=mock_response
-        ),
+        patch.object(client._openai.chat.completions, "create", return_value=mock_response),
         pytest.raises(RuntimeError, match="Failed to parse LLM response as JSON"),
     ):
         client.generate_json(

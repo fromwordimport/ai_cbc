@@ -6,8 +6,6 @@ and runs the BiasAuditor across all of them to produce an aggregate audit report
 
 from __future__ import annotations
 
-import pytest
-
 from aicbc.core.models.persona import (
     DishwasherContext,
     GenerationMetadata,
@@ -18,8 +16,7 @@ from aicbc.core.models.persona import (
     PersonaProfile,
     TensionCombination,
 )
-from aicbc.core.scoring.bias_auditor import BiasAuditor, BiasAuditResult
-
+from aicbc.core.scoring.bias_auditor import BiasAuditor
 
 # ---------------------------------------------------------------------------
 # Helper: persona builder
@@ -79,7 +76,8 @@ def _make_persona(
             stress_response="焦虑时刷购物APP",
             social_behavior="朋友圈少发",
         ),
-        language_samples=samples or [
+        language_samples=samples
+        or [
             "洗碗机用起来真的很方便，洗完的碗都亮晶晶的。",
             "对比了好几个品牌，最后还是选了这个性价比高的。",
             "安装师傅非常专业，只用了半小时就全部搞定了。",
@@ -108,7 +106,6 @@ class TestBatchBiasAudit:
         personas = [
             # 1. Clean baseline
             _make_persona(persona_id="persona-audit-001"),
-
             # 2. Gender stereotype — female + emotional
             _make_persona(
                 persona_id="persona-audit-002",
@@ -116,7 +113,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="颜值至上，只看外观，不关注参数，容易被种草，情绪化决策",
                 decision_style="感性冲动，只看颜值，完全不理性",
             ),
-
             # 3. Gender stereotype — male + tech-focused
             _make_persona(
                 persona_id="persona-audit-003",
@@ -124,7 +120,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="参数党，只看性能，不关心价格，技术专家",
                 decision_style="理性分析，只看参数",
             ),
-
             # 4. Region-income stereotype (low-tier city + low income)
             _make_persona(
                 persona_id="persona-audit-004",
@@ -132,7 +127,6 @@ class TestBatchBiasAudit:
                 income="3万元以下",
                 occupation="工厂工人",
             ),
-
             # 5. Region-income stereotype (town + low income)
             _make_persona(
                 persona_id="persona-audit-005",
@@ -140,7 +134,6 @@ class TestBatchBiasAudit:
                 income="3万元以下",
                 occupation="农民",
             ),
-
             # 6. Occupation-income anomaly — HIGH SEVERITY
             _make_persona(
                 persona_id="persona-audit-006",
@@ -148,7 +141,6 @@ class TestBatchBiasAudit:
                 income="100万元以上",
                 age="20岁",
             ),
-
             # 7. Occupation-income anomaly — HIGH SEVERITY
             _make_persona(
                 persona_id="persona-audit-007",
@@ -156,7 +148,6 @@ class TestBatchBiasAudit:
                 income="50-100万元",
                 age="65岁",
             ),
-
             # 8. Biased language samples — HIGH SEVERITY
             _make_persona(
                 persona_id="persona-audit-008",
@@ -166,7 +157,6 @@ class TestBatchBiasAudit:
                     "穷人思维就是只关注价格，根本看不到长远价值。",
                 ],
             ),
-
             # 9. Average template — diversity flag
             _make_persona(
                 persona_id="persona-audit-009",
@@ -176,7 +166,6 @@ class TestBatchBiasAudit:
                 city="新一线城市",
                 income="15-30万元",
             ),
-
             # 10. Clean — male professional
             _make_persona(
                 persona_id="persona-audit-010",
@@ -187,7 +176,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="对品质敏感，不为价格妥协",
                 decision_style="数据驱动，理性分析",
             ),
-
             # 11. Clean — female teacher
             _make_persona(
                 persona_id="persona-audit-011",
@@ -198,7 +186,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="比较理性，注重性价比",
                 decision_style="口碑参考型",
             ),
-
             # 12. Male — light stereotype
             _make_persona(
                 persona_id="persona-audit-012",
@@ -206,7 +193,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="只看性能参数",
                 decision_style="参数党",
             ),
-
             # 13. Third-tier city
             _make_persona(
                 persona_id="persona-audit-013",
@@ -214,7 +200,6 @@ class TestBatchBiasAudit:
                 income="8-15万元",
                 occupation="小企业主",
             ),
-
             # 14. Student — normal income (clean)
             _make_persona(
                 persona_id="persona-audit-014",
@@ -222,7 +207,6 @@ class TestBatchBiasAudit:
                 income="3万元以下",
                 age="21岁",
             ),
-
             # 15. Retiree — normal income (clean)
             _make_persona(
                 persona_id="persona-audit-015",
@@ -230,7 +214,6 @@ class TestBatchBiasAudit:
                 income="8-15万元",
                 age="68岁",
             ),
-
             # 16. Language with mild bias term
             _make_persona(
                 persona_id="persona-audit-016",
@@ -240,7 +223,6 @@ class TestBatchBiasAudit:
                     "安装师傅非常专业，只用了半小时就全部搞定了。",
                 ],
             ),
-
             # 17. Highly average — diversity flag
             _make_persona(
                 persona_id="persona-audit-017",
@@ -250,7 +232,6 @@ class TestBatchBiasAudit:
                 city="一线城市",
                 income="15-30万元",
             ),
-
             # 18. Clean — female lawyer
             _make_persona(
                 persona_id="persona-audit-018",
@@ -261,7 +242,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="愿意为品质支付溢价",
                 decision_style="专业评估型",
             ),
-
             # 19. Clean — male chef
             _make_persona(
                 persona_id="persona-audit-019",
@@ -272,7 +252,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="实用主义，关注耐用性",
                 decision_style="经验判断型",
             ),
-
             # 20. Region stereotype
             _make_persona(
                 persona_id="persona-audit-020",
@@ -280,7 +259,6 @@ class TestBatchBiasAudit:
                 income="3万元以下",
                 occupation="超市收银员",
             ),
-
             # 21. Freelancer — borderline income
             _make_persona(
                 persona_id="persona-audit-021",
@@ -288,7 +266,6 @@ class TestBatchBiasAudit:
                 income="30-50万元",
                 age="35岁",
             ),
-
             # 22. Clean — young designer
             _make_persona(
                 persona_id="persona-audit-022",
@@ -300,7 +277,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="设计感优先，价格其次",
                 decision_style="视觉驱动型",
             ),
-
             # 23. Male — emotional (non-stereotypical, should pass)
             _make_persona(
                 persona_id="persona-audit-023",
@@ -308,7 +284,6 @@ class TestBatchBiasAudit:
                 price_sensitivity="注重情感价值，愿意为心动买单",
                 decision_style="直觉驱动型",
             ),
-
             # 24. Another average template
             _make_persona(
                 persona_id="persona-audit-024",
@@ -332,7 +307,9 @@ class TestBatchBiasAudit:
 
         # --- Category breakdown checks ---
         categories = result["findings_by_category"]
-        assert "gender" in categories or result["total_findings"] == 0  # May or may not have gender flags
+        assert (
+            "gender" in categories or result["total_findings"] == 0
+        )  # May or may not have gender flags
         assert "occupation-income" in categories  # Must have occupation-income findings
         assert "language" in categories  # Must have language findings
         assert "region" in categories  # Must have region findings
@@ -380,7 +357,9 @@ class TestBatchBiasAudit:
                     f"{demo.occupation} | {demo.income}"
                 )
                 for f in r.findings:
-                    flag = "!!!" if f.severity == "high" else ("!!" if f.severity == "medium" else "!")
+                    flag = (
+                        "!!!" if f.severity == "high" else ("!!" if f.severity == "medium" else "!")
+                    )
                     print(f"  {flag} [{f.rule_id}] ({f.severity}) {f.description}")
 
         print("\n" + "=" * 60)

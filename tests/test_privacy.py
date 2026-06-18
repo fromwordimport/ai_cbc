@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from aicbc.core.privacy import (
-    PIIMatch,
     detect_pii,
     pii_detection_rate,
     redact_dict,

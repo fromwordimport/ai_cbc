@@ -27,9 +27,14 @@ def _make_test_persona(persona_id: str = "persona-simtest-001") -> PersonaProfil
         persona_id=persona_id,
         segment="精致白领-新一线城市",
         layer1_demographics=Layer1Demographics(
-            age="28岁", gender="女", city="新一线城市", income="15-30万元",
-            occupation="互联网产品经理", education="本科",
-            marital_status="已婚无孩", living_type="自有住房（89㎡）",
+            age="28岁",
+            gender="女",
+            city="新一线城市",
+            income="15-30万元",
+            occupation="互联网产品经理",
+            education="本科",
+            marital_status="已婚无孩",
+            living_type="自有住房（89㎡）",
         ),
         layer2_behavior=Layer2Behavior(
             price_sensitivity="中等敏感",
@@ -88,6 +93,7 @@ class TestConverseEndpoint:
         # Mock LLM to avoid real API calls
         def _mock_converse(*args, **kwargs):
             from aicbc.core.simulation.behavior_simulator import ConversationTurn
+
             return ConversationTurn(
                 turn_number=1,
                 researcher_question="测试问题",
@@ -132,6 +138,7 @@ class TestInterviewEndpoint:
 
         def _mock_interview(*args, **kwargs):
             from aicbc.core.simulation.behavior_simulator import ConversationTurn
+
             return [
                 ConversationTurn(
                     turn_number=1,
@@ -175,6 +182,7 @@ class TestPurchaseDecisionEndpoint:
 
         def _mock_purchase(*args, **kwargs):
             from aicbc.core.simulation.behavior_simulator import DecisionTrace
+
             return DecisionTrace(
                 persona_id="persona-simtest-001",
                 product_name="洗碗机X1",

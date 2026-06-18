@@ -11,29 +11,28 @@ from aicbc.analysis.engines.latent_class_engine import (
 def _make_synthetic_data(n_resp: int = 30, n_tasks: int = 6, n_alts: int = 3) -> pd.DataFrame:
     """Create a tiny synthetic CBC dataset with two latent classes."""
     rng = np.random.default_rng(42)
-    feature_cols = ["price", "brand_1", "brand_2"]
     rows = []
     for resp in range(n_resp):
         # Two latent classes: class A prefers low price, class B prefers brand_2
         class_a = resp < n_resp // 2
         for task in range(n_tasks):
             # Generate random alternatives
-            Xs = []
-            for alt in range(n_alts):
+            xs = []
+            for _alt in range(n_alts):
                 price = rng.choice([2000, 3000, 4000])
                 brand_1 = 1 if rng.random() < 0.3 else 0
                 brand_2 = 1 if rng.random() < 0.3 else 0
-                Xs.append([price, brand_1, brand_2])
-            Xs = np.array(Xs)
+                xs.append([price, brand_1, brand_2])
+            xs = np.array(xs)
             # True utilities
             utilities = (
-                -0.001 * Xs[:, 0]
-                + (0.0 if class_a else 0.5) * Xs[:, 1]
-                + (0.0 if class_a else 1.0) * Xs[:, 2]
+                -0.001 * xs[:, 0]
+                + (0.0 if class_a else 0.5) * xs[:, 1]
+                + (0.0 if class_a else 1.0) * xs[:, 2]
             )
             utilities += rng.normal(0, 0.2, size=n_alts)
             chosen = int(np.argmax(utilities))
-            for alt, x in enumerate(Xs):
+            for alt, x in enumerate(xs):
                 rows.append(
                     {
                         "resp_id": f"resp_{resp}",
@@ -66,9 +65,7 @@ def test_latent_class_model_builds(synthetic_data):
 
 @pytest.mark.slow
 def test_latent_class_model_fits(synthetic_data):
-    engine = LatentClassEngine(
-        LatentClassConfig(n_classes=2, n_draws=200, n_tune=200, n_chains=2)
-    )
+    engine = LatentClassEngine(LatentClassConfig(n_classes=2, n_draws=200, n_tune=200, n_chains=2))
     result = engine.fit(
         synthetic_data,
         feature_cols=["price", "brand_1", "brand_2"],
@@ -86,9 +83,7 @@ def test_latent_class_model_fits(synthetic_data):
 @pytest.mark.slow
 def test_latent_class_recovers_two_segments(synthetic_data):
     """Smoke test: LCM should assign respondents to two classes roughly 50/50."""
-    engine = LatentClassEngine(
-        LatentClassConfig(n_classes=2, n_draws=300, n_tune=300, n_chains=2)
-    )
+    engine = LatentClassEngine(LatentClassConfig(n_classes=2, n_draws=300, n_tune=300, n_chains=2))
     result = engine.fit(
         synthetic_data,
         feature_cols=["price", "brand_1", "brand_2"],

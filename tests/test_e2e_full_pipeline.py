@@ -26,14 +26,7 @@ from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine, HBResult
 from aicbc.analysis.models import (
     AnalysisResultResponse,
     ConvergenceDiagnostics,
-    ImportanceStats,
-    MarketSimRequest,
-    MarketSimResponse,
     PopulationParams,
-    ScenarioShare,
-    WTPAttribute,
-    WTPComparison,
-    WTPResponse,
 )
 from aicbc.analysis.preprocessing import get_feature_columns, to_long_format, validate_dataset
 from aicbc.analysis.results.importance import aggregate_importance, compute_importance
@@ -42,7 +35,6 @@ from aicbc.analysis.simulation.market_simulator import MarketSimulator
 from aicbc.analysis.store import AnalysisStore
 from aicbc.core.models.persona import (
     DishwasherContext,
-    GenerationMetadata,
     Layer1Demographics,
     Layer2Behavior,
     Layer3Psychology,
@@ -55,8 +47,6 @@ from aicbc.core.store import (
     PersonaStore,
     ResponseStore,
     get_questionnaire_store,
-    get_response_store,
-    get_store,
 )
 from aicbc.core.validators import LogicValidator, SchemaValidator
 from aicbc.generators.profile_generator import ProfileGenerator
@@ -65,29 +55,22 @@ from aicbc.llm.client import LLMResponse, Provider
 from aicbc.questionnaire.design.effects_coding import encode_profile, n_parameters
 from aicbc.questionnaire.generator import QuestionnaireGenerator
 from aicbc.questionnaire.models import (
-    Attribute,
-    AttributeLevel,
     AttributeType,
     CBCQuestionnaire,
     CBCStudy,
-    DesignParameters,
     StudyStatus,
 )
 from aicbc.questionnaire.response_models import (
     CBCRawDataset,
     DatasetMetadata,
-    PersonaResponse,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers: mock LLM responses for persona generation
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _mock_response(
-    content: dict[str, Any] | str, model: str = "claude-sonnet-4-6"
-) -> LLMResponse:
+def _mock_response(content: dict[str, Any] | str, model: str = "claude-sonnet-4-6") -> LLMResponse:
     text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
     return LLMResponse(
         content=text,
@@ -250,9 +233,7 @@ def dishwasher_study(study_id: str, questionnaire_store) -> CBCStudy:
 
 
 @pytest.fixture
-def dishwasher_questionnaire(
-    dishwasher_study: CBCStudy, questionnaire_store
-) -> CBCQuestionnaire:
+def dishwasher_questionnaire(dishwasher_study: CBCStudy, questionnaire_store) -> CBCQuestionnaire:
     """Generate a questionnaire for the dishwasher study."""
     generator = QuestionnaireGenerator()
     questionnaire = generator.generate_questionnaire(dishwasher_study, seed=42)
@@ -367,11 +348,21 @@ class TestFullPipelineE2E:
         """Step 1: Study creation should produce a valid CBCStudy."""
         assert dishwasher_study.study_id is not None
         assert dishwasher_study.product_category == "洗碗机"
-        assert len(dishwasher_study.attributes) == 7  # price, capacity, install, features, brand, energy, spray_arm, drying
+        assert (
+            len(dishwasher_study.attributes) == 7
+        )  # price, capacity, install, features, brand, energy, spray_arm, drying
         assert dishwasher_study.status == StudyStatus.INIT
         # Verify all expected attributes
         attr_ids = {a.id for a in dishwasher_study.attributes}
-        assert attr_ids == {"price", "capacity", "installation", "spray_arm", "brand", "energy", "drying"}
+        assert attr_ids == {
+            "price",
+            "capacity",
+            "installation",
+            "spray_arm",
+            "brand",
+            "energy",
+            "drying",
+        }
 
     def test_questionnaire_generation_produces_valid_questionnaire(
         self, dishwasher_questionnaire: CBCQuestionnaire, dishwasher_study: CBCStudy
@@ -510,8 +501,24 @@ class TestFullPipelineE2E:
         # ── Step 6: Market simulation ──
         market_sim = MarketSimulator(util_df, attributes)
         scenarios = [
-            {"name": "入门款", "price": str(2999), "capacity": "6套", "installation": "台式", "features": "基础", "brand": "美的", "energy": "二级"},
-            {"name": "旗舰款", "price": str(5999), "capacity": "13套", "installation": "嵌入式", "features": "全能", "brand": "西门子", "energy": "超一级"},
+            {
+                "name": "入门款",
+                "price": str(2999),
+                "capacity": "6套",
+                "installation": "台式",
+                "features": "基础",
+                "brand": "美的",
+                "energy": "二级",
+            },
+            {
+                "name": "旗舰款",
+                "price": str(5999),
+                "capacity": "13套",
+                "installation": "嵌入式",
+                "features": "全能",
+                "brand": "西门子",
+                "energy": "超一级",
+            },
         ]
         shares_df = market_sim.simulate_share(scenarios, rule="logit", include_none=True)
 
@@ -536,7 +543,6 @@ class TestFullPipelineE2E:
         attributes = dishwasher_study.attributes
 
         # ── Stores should contain all data ──
-        from aicbc.core.store import get_questionnaire_store
         q_store = get_questionnaire_store()
         stored_study = q_store.get_study(study_id)
         assert stored_study is not None
@@ -575,8 +581,7 @@ class TestFullPipelineE2E:
         importance_df = compute_importance(util_df, attributes)
         importance_agg = aggregate_importance(importance_df)
         importance_dict = {
-            attr_id: float(row["mean"])
-            for attr_id, row in importance_agg.iterrows()
+            attr_id: float(row["mean"]) for attr_id, row in importance_agg.iterrows()
         }
 
         wtp_data = {}
@@ -629,47 +634,68 @@ class TestFullPipelineE2E:
 class TestDataFormatConsistency:
     """Verify data format compliance with docs/数据字典.md across subsystems."""
 
-    def test_persona_profile_fields_match_datadict(
-        self, persona_profiles: list[PersonaProfile]
-    ):
+    def test_persona_profile_fields_match_datadict(self, persona_profiles: list[PersonaProfile]):
         """PersonaProfile should have all fields defined in 数据字典 section 二."""
         for p in persona_profiles:
             d = p.to_dict()
             required_fields = [
-                "persona_id", "segment",
-                "layer1_demographics", "layer2_behavior",
-                "layer3_psychology", "layer4_scenarios",
-                "language_samples", "dishwasher_context",
-                "authenticity_score", "bias_audit_status",
-                "generation_metadata", "created_at",
+                "persona_id",
+                "segment",
+                "layer1_demographics",
+                "layer2_behavior",
+                "layer3_psychology",
+                "layer4_scenarios",
+                "language_samples",
+                "dishwasher_context",
+                "authenticity_score",
+                "bias_audit_status",
+                "generation_metadata",
+                "created_at",
             ]
             for field in required_fields:
                 assert field in d, f"Missing field '{field}' in persona {p.persona_id}"
 
             # Layer1 sub-fields (section 2.1)
             l1 = d["layer1_demographics"]
-            for f in ["age", "gender", "city", "income", "occupation", "education",
-                       "marital_status", "living_type"]:
+            for f in [
+                "age",
+                "gender",
+                "city",
+                "income",
+                "occupation",
+                "education",
+                "marital_status",
+                "living_type",
+            ]:
                 assert f in l1, f"Missing layer1 field '{f}'"
 
             # Layer2 sub-fields (section 2.2)
             l2 = d["layer2_behavior"]
-            for f in ["price_sensitivity", "purchase_channels", "decision_style",
-                       "brand_loyalty", "information_source"]:
+            for f in [
+                "price_sensitivity",
+                "purchase_channels",
+                "decision_style",
+                "brand_loyalty",
+                "information_source",
+            ]:
                 assert f in l2, f"Missing layer2 field '{f}'"
 
             # Layer3 sub-fields (section 2.3)
             l3 = d["layer3_psychology"]
-            for f in ["core_values", "core_anxieties", "tension_combination",
-                       "secret_motivation", "defense_mechanism"]:
+            for f in [
+                "core_values",
+                "core_anxieties",
+                "tension_combination",
+                "secret_motivation",
+                "defense_mechanism",
+            ]:
                 assert f in l3, f"Missing layer3 field '{f}'"
             assert "narrative_explanation" in l3["tension_combination"]
             assert len(l3["tension_combination"]["narrative_explanation"]) >= 50
 
             # Layer4 sub-fields (section 2.4)
             l4 = d["layer4_scenarios"]
-            for f in ["daily_routine", "purchase_trigger", "stress_response",
-                       "social_behavior"]:
+            for f in ["daily_routine", "purchase_trigger", "stress_response", "social_behavior"]:
                 assert f in l4, f"Missing layer4 field '{f}'"
 
             # DishwasherContext (section 2.5)
@@ -677,9 +703,7 @@ class TestDataFormatConsistency:
             for f in ["purchase_constraints", "decision_factors", "ignored_factors"]:
                 assert f in dc, f"Missing dishwasher_context field '{f}'"
 
-    def test_cbc_dataset_fields_match_datadict(
-        self, simulated_dataset: CBCRawDataset
-    ):
+    def test_cbc_dataset_fields_match_datadict(self, simulated_dataset: CBCRawDataset):
         """CBCRawDataset should match 数据字典 section 五."""
         d = simulated_dataset.to_dict()
 
@@ -693,9 +717,15 @@ class TestDataFormatConsistency:
         assert "choice_records" in d
         assert len(d["choice_records"]) > 0
         for record in d["choice_records"]:
-            for f in ["respondent_id", "respondent_index", "segment",
-                       "choice_set_id", "choice_set_index", "alternatives",
-                       "none_chosen"]:
+            for f in [
+                "respondent_id",
+                "respondent_index",
+                "segment",
+                "choice_set_id",
+                "choice_set_index",
+                "alternatives",
+                "none_chosen",
+            ]:
                 assert f in record, f"Missing choice_record field '{f}'"
 
             # Alternatives (section 5.3)
@@ -742,16 +772,23 @@ class TestDataFormatConsistency:
                 sigma=hb_result.population_sigma,
             ),
             individual_utilities=hb_result.individual_utilities,
-            importance={attr_id: float(row["mean"])
-                         for attr_id, row in aggregate_importance(importance_df).iterrows()},
+            importance={
+                attr_id: float(row["mean"])
+                for attr_id, row in aggregate_importance(importance_df).iterrows()
+            },
             wtp={},
             processing_time_seconds=1.0,
         )
 
         d = result.model_dump(mode="json")
         for f in [
-            "analysis_id", "study_id", "model_type", "convergence",
-            "individual_utilities", "importance", "wtp",
+            "analysis_id",
+            "study_id",
+            "model_type",
+            "convergence",
+            "individual_utilities",
+            "importance",
+            "wtp",
         ]:
             assert f in d, f"Missing AnalysisResult field '{f}'"
 
@@ -778,8 +815,14 @@ class TestDataFormatConsistency:
 
         for resp in responses:
             d = resp.model_dump(mode="json")
-            for f in ["response_id", "study_id", "persona_id",
-                       "questionnaire_id", "responses", "completion_status"]:
+            for f in [
+                "response_id",
+                "study_id",
+                "persona_id",
+                "questionnaire_id",
+                "responses",
+                "completion_status",
+            ]:
                 assert f in d, f"Missing PersonaResponse field '{f}'"
 
             assert resp.completion_status in ("COMPLETED", "PARTIAL", "FAILED")
@@ -794,21 +837,29 @@ class TestDataFormatConsistency:
 class TestEffectsCodingConsistency:
     """Verify effects coding naming conventions match docs/数据字典.md Section 10."""
 
-    def test_naming_convention_matches_datadict(
-        self, dishwasher_study: CBCStudy
-    ):
+    def test_naming_convention_matches_datadict(self, dishwasher_study: CBCStudy):
         """Column names follow {attribute_id}_{level_index} convention."""
         feature_cols = get_feature_columns(dishwasher_study.attributes)
 
         # Section 10.1 from 数据字典 (matches default 7-attribute dishwasher set)
         expected = {
-            "price",           # continuous, 1 parameter
-            "capacity_0", "capacity_1", "capacity_2",       # 4 levels → 3 params
-            "installation_0", "installation_1", "installation_2", # 4 levels → 3 params
-            "spray_arm_0", "spray_arm_1",       # 3 levels → 2 params
-            "brand_0", "brand_1", "brand_2",   # 4 levels → 3 params
-            "energy_0", "energy_1",          # 3 levels → 2 params
-            "drying_0", "drying_1", "drying_2", # 4 levels → 3 params
+            "price",  # continuous, 1 parameter
+            "capacity_0",
+            "capacity_1",
+            "capacity_2",  # 4 levels → 3 params
+            "installation_0",
+            "installation_1",
+            "installation_2",  # 4 levels → 3 params
+            "spray_arm_0",
+            "spray_arm_1",  # 3 levels → 2 params
+            "brand_0",
+            "brand_1",
+            "brand_2",  # 4 levels → 3 params
+            "energy_0",
+            "energy_1",  # 3 levels → 2 params
+            "drying_0",
+            "drying_1",
+            "drying_2",  # 4 levels → 3 params
         }
         actual = set(feature_cols)
         assert actual == expected, (
@@ -849,9 +900,8 @@ class TestEffectsCodingConsistency:
                 if col in hb_result.population_mu:
                     params.append(hb_result.population_mu[col])
 
-            # The last level should be -(sum of first n-1)
-            last_implied = -sum(params)
-            # Just verify the parameters exist and are finite
+            # The last level should be -(sum of first n-1), so we only need the
+            # first n-1 parameters to be finite.
             assert all(np.isfinite(p) for p in params), f"Non-finite params for {attr.id}"
 
     def test_encode_profile_roundtrip(
@@ -874,12 +924,8 @@ class TestEffectsCodingConsistency:
         df_long = to_long_format(simulated_dataset, attributes)
 
         # Every choice record should have a corresponding row
-        expected_rows = sum(
-            len(record.alternatives) for record in simulated_dataset.choice_records
-        )
-        assert len(df_long) == expected_rows, (
-            f"Got {len(df_long)} rows, expected {expected_rows}"
-        )
+        expected_rows = sum(len(record.alternatives) for record in simulated_dataset.choice_records)
+        assert len(df_long) == expected_rows, f"Got {len(df_long)} rows, expected {expected_rows}"
 
         # Exactly one chosen per task per respondent
         choice_counts = df_long.groupby(["resp_id", "task_id"])["chosen"].sum()
@@ -974,9 +1020,8 @@ class TestErrorPropagation:
         """Simulation should skip personas not found in store."""
         simulator = CBCChoiceSimulator(attributes=dishwasher_study.attributes)
 
-        # Only save some personas
-        existing_ids = set()
-        for record, _ in [
+        # Only save some personas (empty list means no personas available)
+        for _record, _ in [
             simulator.simulate(
                 persona=p,
                 questionnaire=dishwasher_questionnaire,
@@ -1076,8 +1121,13 @@ class TestErrorPropagation:
             persona_id=f"persona-{study_id}-001",
             segment="精致白领",
             layer1_demographics=Layer1Demographics(
-                age="30岁", gender="女", city="一线城市", income="20K-30K",
-                occupation="产品经理", education="本科", marital_status="单身",
+                age="30岁",
+                gender="女",
+                city="一线城市",
+                income="20K-30K",
+                occupation="产品经理",
+                education="本科",
+                marital_status="单身",
                 living_type="公寓",
             ),
             layer2_behavior=Layer2Behavior(
@@ -1092,7 +1142,8 @@ class TestErrorPropagation:
                 core_anxieties=["时间不够"],
                 tension_combination=TensionCombination(
                     labels=["追求品质", "理性消费"],
-                    narrative_explanation="她追求品质生活但预算有限，这种矛盾源于她刚进入职场的过渡期。" * 2,
+                    narrative_explanation="她追求品质生活但预算有限，这种矛盾源于她刚进入职场的过渡期。"
+                    * 2,
                 ),
                 secret_motivation="证明自己能独立生活",
                 defense_mechanism="合理化",
@@ -1140,22 +1191,16 @@ class TestSchemaValidationPipeline:
         schema_validator = SchemaValidator()
         for p in persona_profiles:
             result = schema_validator.validate(p)
-            assert result.passed, (
-                f"Schema validation failed for {p.persona_id}: {result.errors}"
-            )
+            assert result.passed, f"Schema validation failed for {p.persona_id}: {result.errors}"
 
     def test_persona_validates_against_logic(self, persona_profiles: list[PersonaProfile]):
         """All generated personas should pass logic validation."""
         logic_validator = LogicValidator()
         for p in persona_profiles:
             result = logic_validator.validate(p)
-            assert result.passed, (
-                f"Logic validation failed for {p.persona_id}: {result.errors}"
-            )
+            assert result.passed, f"Logic validation failed for {p.persona_id}: {result.errors}"
 
-    def test_corrupted_persona_fails_schema(
-        self, persona_profiles: list[PersonaProfile]
-    ):
+    def test_corrupted_persona_fails_schema(self, persona_profiles: list[PersonaProfile]):
         """A corrupted persona (bad language_samples) should fail schema."""
         schema_validator = SchemaValidator()
         p = persona_profiles[0]
@@ -1194,8 +1239,26 @@ class TestMarketSimulationEdgeCases:
 
         market_sim = MarketSimulator(util_df, attributes)
         scenarios = [
-            {"name": "产品A", "price": str(3999), "capacity": "capacity_2", "installation": "installation_1", "spray_arm": "spray_arm_2", "drying": "drying_3", "brand": "brand_2", "energy": "energy_1"},
-            {"name": "产品B", "price": str(4999), "capacity": "capacity_3", "installation": "installation_1", "spray_arm": "spray_arm_3", "drying": "drying_4", "brand": "brand_4", "energy": "energy_1"},
+            {
+                "name": "产品A",
+                "price": str(3999),
+                "capacity": "capacity_2",
+                "installation": "installation_1",
+                "spray_arm": "spray_arm_2",
+                "drying": "drying_3",
+                "brand": "brand_2",
+                "energy": "energy_1",
+            },
+            {
+                "name": "产品B",
+                "price": str(4999),
+                "capacity": "capacity_3",
+                "installation": "installation_1",
+                "spray_arm": "spray_arm_3",
+                "drying": "drying_4",
+                "brand": "brand_4",
+                "energy": "energy_1",
+            },
         ]
 
         logit_shares = market_sim.simulate_share(scenarios, rule="logit", include_none=False)
@@ -1223,7 +1286,16 @@ class TestMarketSimulationEdgeCases:
 
         market_sim = MarketSimulator(util_df, attributes)
         scenarios = [
-            {"name": "高端款", "price": str(5999), "capacity": "capacity_3", "installation": "installation_1", "spray_arm": "spray_arm_3", "drying": "drying_4", "brand": "brand_4", "energy": "energy_1"},
+            {
+                "name": "高端款",
+                "price": str(5999),
+                "capacity": "capacity_3",
+                "installation": "installation_1",
+                "spray_arm": "spray_arm_3",
+                "drying": "drying_4",
+                "brand": "brand_4",
+                "energy": "energy_1",
+            },
         ]
 
         shares = market_sim.simulate_share(scenarios, rule="logit", include_none=True)
@@ -1250,8 +1322,13 @@ class TestMarketSimulationEdgeCases:
         market_sim = MarketSimulator(util_df, attributes)
         base_scenario = {
             "name": "测试产品",
-            "price": str(3999), "capacity": "capacity_2", "installation": "installation_3",
-            "spray_arm": "spray_arm_1", "drying": "drying_2", "brand": "brand_2", "energy": "energy_1",
+            "price": str(3999),
+            "capacity": "capacity_2",
+            "installation": "installation_3",
+            "spray_arm": "spray_arm_1",
+            "drying": "drying_2",
+            "brand": "brand_2",
+            "energy": "energy_1",
         }
 
         prices = [2999, 3999, 4999, 5999]
@@ -1313,10 +1390,7 @@ class TestPipelineSerialization:
                 sigma=hb_result.population_sigma,
             ),
             individual_utilities=hb_result.individual_utilities,
-            importance={
-                attr_id: float(row["mean"])
-                for attr_id, row in importance_agg.iterrows()
-            },
+            importance={attr_id: float(row["mean"]) for attr_id, row in importance_agg.iterrows()},
             wtp={},
             processing_time_seconds=2.5,
             completed_at=datetime.now(UTC),

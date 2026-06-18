@@ -1,13 +1,12 @@
 # AI_CBC API Service — Multi-stage Docker Build
 # Stage 1: Builder — install dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Apply security updates and install build dependencies
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     gcc \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -15,13 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Include [analysis] extras because Celery worker needs pandas/numpy/pymc.
 COPY pyproject.toml ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir uv && \
+ENV UV_NO_CACHE=1
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel uv && \
     uv pip install --system --no-cache -e ".[analysis]"
 
 # Stage 2: Runtime — minimal image
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim-bookworm AS runtime
 
 WORKDIR /app
+
+# Apply security updates before installing runtime packages
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN groupadd -r aicbc && useradd -r -g aicbc aicbc

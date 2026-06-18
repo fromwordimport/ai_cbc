@@ -33,9 +33,14 @@ def _make_persona(
         "persona_id": "persona-test-001",
         "segment": "测试群体",
         "layer1_demographics": Layer1Demographics(
-            age=age, gender=gender, city=city, income=income,
-            occupation=occupation, education=education,
-            marital_status="已婚无孩", living_type="自有住房",
+            age=age,
+            gender=gender,
+            city=city,
+            income=income,
+            occupation=occupation,
+            education=education,
+            marital_status="已婚无孩",
+            living_type="自有住房",
         ),
         "layer2_behavior": Layer2Behavior(
             price_sensitivity=price_sensitivity,
@@ -60,7 +65,8 @@ def _make_persona(
             stress_response="焦虑时刷购物APP",
             social_behavior="朋友圈少发",
         ),
-        "language_samples": samples or [
+        "language_samples": samples
+        or [
             "洗碗机用起来真的很方便，洗完的碗都亮晶晶的。",
             "对比了好几个品牌，最后还是选了这个性价比高的。",
             "安装师傅非常专业，只用了半小时就全部搞定了。",
@@ -171,7 +177,9 @@ class TestBiasAuditor:
         personas = [
             _make_persona(),  # clean
             _make_persona(occupation="大学生", income="100万元以上"),  # fails (SP-016, high)
-            _make_persona(gender="男", decision_style="参数党，只看性能，不关心价格"),  # fails (SP-004, high)
+            _make_persona(
+                gender="男", decision_style="参数党，只看性能，不关心价格"
+            ),  # fails (SP-004, high)
         ]
         agg = auditor.audit_batch(personas)
 

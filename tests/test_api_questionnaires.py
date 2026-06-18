@@ -37,7 +37,9 @@ class TestCreateStudy:
         data = response.json()
         assert data["study_id"] == "dw-test-001"
         assert data["product_category"] == "洗碗机"
-        assert data["n_attributes"] == 7  # default dishwasher attributes (price, capacity, installation, features, brand, energy, service)
+        assert (
+            data["n_attributes"] == 7
+        )  # default dishwasher attributes (price, capacity, installation, features, brand, energy, service)
         assert data["status"] == "INIT"
 
     def test_create_study_missing_field(self) -> None:

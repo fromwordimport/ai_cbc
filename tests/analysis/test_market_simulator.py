@@ -14,11 +14,14 @@ from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 def sample_utilities() -> pd.DataFrame:
     """Create sample individual utilities."""
     np.random.seed(42)
-    return pd.DataFrame({
-        "price": np.random.normal(-0.002, 0.001, 100),
-        "brand_0": np.random.normal(0.5, 0.3, 100),
-        "brand_1": np.random.normal(0.3, 0.3, 100),
-    }, index=[f"resp_{i:03d}" for i in range(100)])
+    return pd.DataFrame(
+        {
+            "price": np.random.normal(-0.002, 0.001, 100),
+            "brand_0": np.random.normal(0.5, 0.3, 100),
+            "brand_1": np.random.normal(0.3, 0.3, 100),
+        },
+        index=[f"resp_{i:03d}" for i in range(100)],
+    )
 
 
 @pytest.fixture
@@ -29,13 +32,21 @@ def sample_attributes() -> list[Attribute]:
             id="price",
             name="价格",
             type=AttributeType.PRICE,
-            levels=[AttributeLevel(value=2999, label="2999元"), AttributeLevel(value=3999, label="3999元"), AttributeLevel(value=4999, label="4999元")],
+            levels=[
+                AttributeLevel(value=2999, label="2999元"),
+                AttributeLevel(value=3999, label="3999元"),
+                AttributeLevel(value=4999, label="4999元"),
+            ],
         ),
         Attribute(
             id="brand",
             name="品牌",
             type=AttributeType.CATEGORICAL,
-            levels=[AttributeLevel(value="美的", label="美的"), AttributeLevel(value="西门子", label="西门子"), AttributeLevel(value="小米", label="小米")],
+            levels=[
+                AttributeLevel(value="美的", label="美的"),
+                AttributeLevel(value="西门子", label="西门子"),
+                AttributeLevel(value="小米", label="小米"),
+            ],
         ),
     ]
 

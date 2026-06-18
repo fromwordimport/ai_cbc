@@ -8,7 +8,7 @@ from beanie import init_beanie
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import ORJSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -69,6 +69,7 @@ app = FastAPI(
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
     lifespan=lifespan,
+    default_response_class=ORJSONResponse,
 )
 app.state.debug = settings.debug
 
@@ -102,7 +103,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
         api_key = request.headers.get("X-API-Key")
         if not api_key or api_key != settings.api_key:
-            return JSONResponse(
+            return ORJSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"error": "Unauthorized"},
             )
@@ -141,7 +142,7 @@ app.include_router(analysis_routes.router, prefix="/api/v1", tags=["Analysis"])
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception) -> ORJSONResponse:
     """Handle unhandled exceptions.
 
     In production (debug=False) only a generic message is returned to avoid
@@ -149,11 +150,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     """
     logger.error("Unhandled exception", exc_info=exc, path=request.url.path)
     if settings.debug:
-        return JSONResponse(
+        return ORJSONResponse(
             status_code=500,
             content={"error": "Internal server error", "detail": str(exc)},
         )
-    return JSONResponse(
+    return ORJSONResponse(
         status_code=500,
         content={"error": "Internal server error"},
     )

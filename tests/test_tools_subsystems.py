@@ -10,11 +10,9 @@ from typing import Any
 
 import pytest
 
-from aicbc.tools.protocol import ToolCallStatus, call_tool
-
 # Import to trigger registration
 import aicbc.tools.subsystems  # noqa: F401
-
+from aicbc.tools.protocol import ToolCallStatus, call_tool
 
 # ---------------------------------------------------------------------------
 # Tool discovery
@@ -197,18 +195,28 @@ class TestSimulateCBCChoices:
             "questionnaire_id": "q-test-001",
             "study_id": "test-study-001",
             "attributes": [
-                {"id": "price", "name": "价格", "type": "price", "levels": [
-                    {"value": 2999, "label": "¥2,999"},
-                    {"value": 3999, "label": "¥3,999"},
-                    {"value": 4999, "label": "¥4,999"},
-                    {"value": 5999, "label": "¥5,999"},
-                ]},
-                {"id": "brand", "name": "品牌", "type": "categorical", "levels": [
-                    {"value": "美的", "label": "美的"},
-                    {"value": "西门子", "label": "西门子"},
-                    {"value": "方太", "label": "方太"},
-                    {"value": "小米", "label": "小米"},
-                ]},
+                {
+                    "id": "price",
+                    "name": "价格",
+                    "type": "price",
+                    "levels": [
+                        {"value": 2999, "label": "¥2,999"},
+                        {"value": 3999, "label": "¥3,999"},
+                        {"value": 4999, "label": "¥4,999"},
+                        {"value": 5999, "label": "¥5,999"},
+                    ],
+                },
+                {
+                    "id": "brand",
+                    "name": "品牌",
+                    "type": "categorical",
+                    "levels": [
+                        {"value": "美的", "label": "美的"},
+                        {"value": "西门子", "label": "西门子"},
+                        {"value": "方太", "label": "方太"},
+                        {"value": "小米", "label": "小米"},
+                    ],
+                },
             ],
             "choice_sets": [
                 {
@@ -236,11 +244,18 @@ class TestSimulateCBCChoices:
                     ],
                 },
             ],
-            "design_parameters": {"n_choice_sets": 3, "n_alternatives": 3, "algorithm": "d_optimal", "include_none": True},
+            "design_parameters": {
+                "n_choice_sets": 3,
+                "n_alternatives": 3,
+                "algorithm": "d_optimal",
+                "include_none": True,
+            },
             "d_efficiency": 0.92,
         }
 
-    def test_simulate_choices(self, sample_persona: dict[str, Any], sample_questionnaire: dict[str, Any]) -> None:
+    def test_simulate_choices(
+        self, sample_persona: dict[str, Any], sample_questionnaire: dict[str, Any]
+    ) -> None:
         result = call_tool(
             "simulate_cbc_choices",
             persona=sample_persona,
@@ -269,7 +284,9 @@ class TestSimulateCBCChoices:
             assert "reasoning" in r
             assert "confidence" in r
 
-    def test_simulate_deterministic(self, sample_persona: dict[str, Any], sample_questionnaire: dict[str, Any]) -> None:
+    def test_simulate_deterministic(
+        self, sample_persona: dict[str, Any], sample_questionnaire: dict[str, Any]
+    ) -> None:
         # With deterministic=True and same seed, should get same result
         result1 = call_tool(
             "simulate_cbc_choices",
@@ -328,9 +345,13 @@ class TestIntegrationFlow:
             "persona_id": "persona-integ-001",
             "segment": "测试群体",
             "layer1_demographics": {
-                "age": "30岁", "gender": "男", "city": "一线城市",
-                "income": "月收入20K", "occupation": "工程师",
-                "education": "硕士", "marital_status": "已婚",
+                "age": "30岁",
+                "gender": "男",
+                "city": "一线城市",
+                "income": "月收入20K",
+                "occupation": "工程师",
+                "education": "硕士",
+                "marital_status": "已婚",
                 "living_type": "90㎡三居室，自有",
             },
             "layer2_behavior": {

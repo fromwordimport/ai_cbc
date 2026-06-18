@@ -125,30 +125,34 @@ class TestDominantAttribute:
 
     def test_no_dominant_passes(self) -> None:
         """All attributes vary within each choice set."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
-                ],
-            ),
-        ])
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
+                    ],
+                ),
+            ]
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is True
 
     def test_dominant_attribute_fails(self) -> None:
         """All alternatives have the same brand."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "A", "price": 200}),
-                ],
-            ),
-        ])
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "A", "price": 200}),
+                    ],
+                ),
+            ]
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is False
@@ -156,22 +160,25 @@ class TestDominantAttribute:
 
     def test_dominant_in_one_of_many_sets(self) -> None:
         """Second set has dominant price."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
-                ],
-            ),
-            ChoiceSet(
-                choice_set_id=2,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 100}),
-                ],
-            ),
-        ], n_choice_sets=2)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
+                    ],
+                ),
+                ChoiceSet(
+                    choice_set_id=2,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 100}),
+                    ],
+                ),
+            ],
+            n_choice_sets=2,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is False
@@ -179,9 +186,11 @@ class TestDominantAttribute:
 
     def test_empty_choice_set_no_crash(self) -> None:
         """Empty choice sets should not crash the validator."""
-        q = _make_questionnaire([
-            ChoiceSet(choice_set_id=1, alternatives=[]),
-        ])
+        q = _make_questionnaire(
+            [
+                ChoiceSet(choice_set_id=1, alternatives=[]),
+            ]
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is True
@@ -191,43 +200,49 @@ class TestDuplicateChoiceSets:
     """Tests for duplicate choice set detection."""
 
     def test_no_duplicates_passes(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-            ChoiceSet(
-                choice_set_id=2,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "B"}),
-                    Alternative(alt_index=1, attributes={"brand": "A"}),
-                ],
-            ),
-        ], n_choice_sets=2)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+                ChoiceSet(
+                    choice_set_id=2,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "B"}),
+                        Alternative(alt_index=1, attributes={"brand": "A"}),
+                    ],
+                ),
+            ],
+            n_choice_sets=2,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is True
 
     def test_duplicate_sets_fails(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-            ChoiceSet(
-                choice_set_id=2,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-        ], n_choice_sets=2)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+                ChoiceSet(
+                    choice_set_id=2,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+            ],
+            n_choice_sets=2,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is False
@@ -235,22 +250,25 @@ class TestDuplicateChoiceSets:
 
     def test_same_alts_different_order_not_duplicate(self) -> None:
         """Different ordering of alternatives within a set is not a duplicate."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-            ChoiceSet(
-                choice_set_id=2,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "B"}),
-                    Alternative(alt_index=1, attributes={"brand": "A"}),
-                ],
-            ),
-        ], n_choice_sets=2)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+                ChoiceSet(
+                    choice_set_id=2,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "B"}),
+                        Alternative(alt_index=1, attributes={"brand": "A"}),
+                    ],
+                ),
+            ],
+            n_choice_sets=2,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is True
@@ -260,29 +278,35 @@ class TestDEfficiencyCheck:
     """Tests for D-efficiency threshold validation."""
 
     def test_high_efficiency_passes(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-        ], d_efficiency=0.9)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+            ],
+            d_efficiency=0.9,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.score >= 2.0  # at least 2 out of 3
 
     def test_low_efficiency_fails(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-        ], d_efficiency=0.3)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+            ],
+            d_efficiency=0.3,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.passed is False
@@ -290,15 +314,18 @@ class TestDEfficiencyCheck:
 
     def test_none_efficiency_skips_check(self) -> None:
         """When d_efficiency is None, the check is skipped."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                    Alternative(alt_index=1, attributes={"brand": "B"}),
-                ],
-            ),
-        ], d_efficiency=None)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                        Alternative(alt_index=1, attributes={"brand": "B"}),
+                    ],
+                ),
+            ],
+            d_efficiency=None,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         # Should pass (no dominant, no duplicates, d_efficiency=None skips check)
@@ -309,44 +336,50 @@ class TestValidateProhibitedPairs:
     """Tests for prohibited pair violation detection."""
 
     def test_no_violation(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
-                ],
-            ),
-        ])
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
+                    ],
+                ),
+            ]
+        )
         pairs = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="C")])]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert violations == []
 
     def test_single_violation(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
-                ],
-            ),
-        ])
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
+                    ],
+                ),
+            ]
+        )
         pairs = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="A")])]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert len(violations) == 1
         assert "brand=A" in violations[0]
 
     def test_multiple_violations(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
-                ],
-            ),
-        ])
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
+                    ],
+                ),
+            ]
+        )
         pairs = [
             ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="A")]),
             ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="B")]),
@@ -355,20 +388,24 @@ class TestValidateProhibitedPairs:
         assert len(violations) == 2
 
     def test_across_multiple_sets(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                ],
-            ),
-            ChoiceSet(
-                choice_set_id=2,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A"}),
-                ],
-            ),
-        ], n_choice_sets=2, n_alternatives=1)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                    ],
+                ),
+                ChoiceSet(
+                    choice_set_id=2,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A"}),
+                    ],
+                ),
+            ],
+            n_choice_sets=2,
+            n_alternatives=1,
+        )
         pairs = [ProhibitedPair(conditions=[Condition(attribute_id="brand", level_value="A")])]
         violations = QuestionnaireValidator.validate_prohibited_pairs(q, pairs)
         assert len(violations) == 2
@@ -378,15 +415,18 @@ class TestScoreCalculation:
     """Tests for validation score calculation."""
 
     def test_perfect_score(self) -> None:
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
-                ],
-            ),
-        ], d_efficiency=0.9)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "B", "price": 200}),
+                    ],
+                ),
+            ],
+            d_efficiency=0.9,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.score == 3.0
@@ -394,15 +434,18 @@ class TestScoreCalculation:
 
     def test_partial_score(self) -> None:
         """One check fails, score should be 2.0."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "A", "price": 200}),
-                ],
-            ),
-        ], d_efficiency=0.9)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "A", "price": 200}),
+                    ],
+                ),
+            ],
+            d_efficiency=0.9,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.score == 2.0
@@ -410,22 +453,26 @@ class TestScoreCalculation:
 
     def test_all_failures(self) -> None:
         """All checks fail, score should be 0.0."""
-        q = _make_questionnaire([
-            ChoiceSet(
-                choice_set_id=1,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "A", "price": 100}),
-                ],
-            ),
-            ChoiceSet(
-                choice_set_id=2,
-                alternatives=[
-                    Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
-                    Alternative(alt_index=1, attributes={"brand": "A", "price": 100}),
-                ],
-            ),
-        ], n_choice_sets=2, d_efficiency=0.3)
+        q = _make_questionnaire(
+            [
+                ChoiceSet(
+                    choice_set_id=1,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "A", "price": 100}),
+                    ],
+                ),
+                ChoiceSet(
+                    choice_set_id=2,
+                    alternatives=[
+                        Alternative(alt_index=0, attributes={"brand": "A", "price": 100}),
+                        Alternative(alt_index=1, attributes={"brand": "A", "price": 100}),
+                    ],
+                ),
+            ],
+            n_choice_sets=2,
+            d_efficiency=0.3,
+        )
         validator = QuestionnaireValidator()
         result = validator.validate(q)
         assert result.score == 0.0

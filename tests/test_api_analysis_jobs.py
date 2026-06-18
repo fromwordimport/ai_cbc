@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aicbc.analysis.models import AnalysisJobStatus
-from aicbc.analysis.store import get_analysis_store, areset_analysis_store
+from aicbc.analysis.store import areset_analysis_store, get_analysis_store
 from aicbc.main import app
 
 client = TestClient(app)

@@ -26,7 +26,6 @@ from aicbc.core.models.persona import (
 )
 from aicbc.core.scoring.bias_auditor import BiasAuditor
 
-
 # ---------------------------------------------------------------------------
 # Test fixtures
 # ---------------------------------------------------------------------------
@@ -60,8 +59,8 @@ def _build_safe_persona() -> PersonaProfile:
             tension_combination=TensionCombination(
                 labels=["精打细算", "偶尔犒劳自己"],
                 narrative_explanation="她平时习惯精打细算，把每一笔开支都记录在册，"
-                                    "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
-                                    "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。",
+                "但遇到真正认同的事物时，也会允许自己偶尔犒劳一下。"
+                "这种矛盾来自她对安全感的需要和对生活小确幸的渴望。",
             ),
             secret_motivation="希望通过消费获得社会认同",
             defense_mechanism="合理化——将非必要消费解释为对自己的奖励",
@@ -103,7 +102,9 @@ class TestBoundaryAttacks:
     ]
 
     @pytest.mark.parametrize("name,gender,decision_style", BOUNDARY_GENDER_CASES)
-    def test_boundary_gender_explicit_keywords(self, name: str, gender: str, decision_style: str) -> None:
+    def test_boundary_gender_explicit_keywords(
+        self, name: str, gender: str, decision_style: str
+    ) -> None:
         """Explicit gender stereotype keywords from pattern library must be caught."""
         persona = _build_safe_persona()
         persona.layer1_demographics.gender = gender
@@ -111,7 +112,9 @@ class TestBoundaryAttacks:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED", f"{name}: gender explicit keyword attack should fail"
-        assert any(f.category == "gender" for f in result.findings), f"{name}: gender category expected"
+        assert any(f.category == "gender" for f in result.findings), (
+            f"{name}: gender category expected"
+        )
 
     # RULE-FAIR-002: Ethnicity ~ consumption behavior (using keywords from SP-020~SP-022)
     # Note: SP-021 and SP-022 keywords may not match depending on exact text corpus
@@ -127,7 +130,9 @@ class TestBoundaryAttacks:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED", f"{name}: ethnicity explicit keyword attack should fail"
-        assert any(f.category == "ethnicity" for f in result.findings), f"{name}: ethnicity category expected"
+        assert any(f.category == "ethnicity" for f in result.findings), (
+            f"{name}: ethnicity category expected"
+        )
 
     def test_boundary_ethnicity_sp021_poverty(self) -> None:
         """SP-021: ethnicity poverty stereotype — document detection gap if needed."""
@@ -138,7 +143,9 @@ class TestBoundaryAttacks:
         # SP-021 keywords: "少数民族贫困", "民族地区落后", "偏远少数民族"
         # These may not match if the text corpus doesn't contain exact substrings
         if result.status != "FAILED":
-            pytest.skip("SP-021 ethnicity poverty keywords not matching — verify pattern configuration")
+            pytest.skip(
+                "SP-021 ethnicity poverty keywords not matching — verify pattern configuration"
+            )
         assert result.status == "FAILED"
         assert any(f.category == "ethnicity" for f in result.findings)
 
@@ -171,7 +178,9 @@ class TestBoundaryAttacks:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED", f"{name}: region explicit keyword attack should fail"
-        assert any(f.category == "region" for f in result.findings), f"{name}: region category expected"
+        assert any(f.category == "region" for f in result.findings), (
+            f"{name}: region category expected"
+        )
 
     def test_boundary_region_sp014_conservative(self) -> None:
         """SP-014: region conservative stereotype — requires city_keywords match."""
@@ -183,7 +192,9 @@ class TestBoundaryAttacks:
         # SP-014 demographic_match: city_keywords=["县城", "乡镇", "三四线", "农村", "五线"]
         # "乡镇" should match. If not, document the gap.
         if result.status != "FAILED":
-            pytest.skip("SP-014 region conservative keywords not matching — verify city_keywords configuration")
+            pytest.skip(
+                "SP-014 region conservative keywords not matching — verify city_keywords configuration"
+            )
         assert result.status == "FAILED"
         assert any(f.category == "region" for f in result.findings)
 
@@ -225,7 +236,9 @@ class TestBoundaryAttacks:
         # demographic_match=None which means it fires regardless of age. However
         # "不看说明书就下单" is not in the keyword list.
         if result.status != "FAILED":
-            pytest.skip("Subtle age stereotype '不看说明书就下单' not in keyword library — needs pattern expansion")
+            pytest.skip(
+                "Subtle age stereotype '不看说明书就下单' not in keyword library — needs pattern expansion"
+            )
         assert result.status == "FAILED"
 
     # RULE-FAIR-005: Occupation ~ social class (using keywords from SP-019)
@@ -235,7 +248,9 @@ class TestBoundaryAttacks:
     ]
 
     @pytest.mark.parametrize("name,occupation,motivation", BOUNDARY_OCCUPATION_CASES)
-    def test_boundary_occupation_explicit_keywords(self, name: str, occupation: str, motivation: str) -> None:
+    def test_boundary_occupation_explicit_keywords(
+        self, name: str, occupation: str, motivation: str
+    ) -> None:
         """Explicit occupation stereotype keywords from pattern library must be caught."""
         persona = _build_safe_persona()
         persona.layer1_demographics.occupation = occupation
@@ -243,7 +258,9 @@ class TestBoundaryAttacks:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED", f"{name}: occupation explicit keyword attack should fail"
-        assert any(f.category in ("occupation", "occupation-income") for f in result.findings), f"{name}: occupation category expected"
+        assert any(f.category in ("occupation", "occupation-income") for f in result.findings), (
+            f"{name}: occupation category expected"
+        )
 
     def test_boundary_occupation_subtle_may_pass(self) -> None:
         """Subtle occupation stereotypes not in keyword library may evade detection."""
@@ -254,7 +271,9 @@ class TestBoundaryAttacks:
         result = BiasAuditor().audit(persona)
         # Document detection gap: "农民思想简单" is not in SP-019 keywords
         if result.status != "FAILED":
-            pytest.skip("Subtle occupation stereotype '农民思想简单' not in keyword library — needs pattern expansion")
+            pytest.skip(
+                "Subtle occupation stereotype '农民思想简单' not in keyword library — needs pattern expansion"
+            )
         assert result.status == "FAILED"
         assert any(f.category in ("occupation", "occupation-income") for f in result.findings)
 
@@ -266,7 +285,9 @@ class TestBoundaryAttacks:
     ]
 
     @pytest.mark.parametrize("name,income,sensitivity", BOUNDARY_INCOME_CASES)
-    def test_boundary_income_explicit_keywords(self, name: str, income: str, sensitivity: str) -> None:
+    def test_boundary_income_explicit_keywords(
+        self, name: str, income: str, sensitivity: str
+    ) -> None:
         """Explicit income stereotype keywords from pattern library must be caught."""
         persona = _build_safe_persona()
         persona.layer1_demographics.income = income
@@ -274,7 +295,9 @@ class TestBoundaryAttacks:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED", f"{name}: income explicit keyword attack should fail"
-        assert any(f.category == "income" for f in result.findings), f"{name}: income category expected"
+        assert any(f.category == "income" for f in result.findings), (
+            f"{name}: income category expected"
+        )
 
     def test_boundary_income_sp024_rich_waste_standalone(self) -> None:
         """SP-024: rich waste stereotype — medium severity, single finding may not fail.
@@ -300,7 +323,9 @@ class TestBoundaryAttacks:
     ]
 
     @pytest.mark.parametrize("name,marital,trigger", BOUNDARY_MARITAL_CASES)
-    def test_boundary_marital_explicit_keywords(self, name: str, marital: str, trigger: str) -> None:
+    def test_boundary_marital_explicit_keywords(
+        self, name: str, marital: str, trigger: str
+    ) -> None:
         """Explicit marital stereotype keywords from pattern library must be caught."""
         persona = _build_safe_persona()
         persona.layer1_demographics.marital_status = marital
@@ -308,7 +333,9 @@ class TestBoundaryAttacks:
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED", f"{name}: marital explicit keyword attack should fail"
-        assert any(f.category == "marital-status" for f in result.findings), f"{name}: marital-status category expected"
+        assert any(f.category == "marital-status" for f in result.findings), (
+            f"{name}: marital-status category expected"
+        )
 
     def test_boundary_marital_subtle_may_pass(self) -> None:
         """Subtle marital stereotypes not in keyword library may evade detection."""
@@ -319,7 +346,9 @@ class TestBoundaryAttacks:
         result = BiasAuditor().audit(persona)
         # Document detection gap: "单身人士不考虑家庭需求" is not in SP-025 keywords
         if result.status != "FAILED":
-            pytest.skip("Subtle marital stereotype not in keyword library — needs pattern expansion")
+            pytest.skip(
+                "Subtle marital stereotype not in keyword library — needs pattern expansion"
+            )
         assert result.status == "FAILED"
         assert any(f.category == "marital-status" for f in result.findings)
 
@@ -441,7 +470,9 @@ class TestCovertBias:
         # Note: euphemistic region bias is harder to detect with keyword matching
         # These tests document the gap; future improvement needed for semantic detection
         if result.status != "FAILED":
-            pytest.skip(f"{name}: covert region bias detection gap — needs semantic analysis upgrade")
+            pytest.skip(
+                f"{name}: covert region bias detection gap — needs semantic analysis upgrade"
+            )
         assert result.status == "FAILED", f"{name}: covert region bias should fail"
 
     COVERT_ETHNICITY_CASES = [
@@ -460,7 +491,9 @@ class TestCovertBias:
         # Note: euphemistic ethnicity bias is harder to detect with keyword matching
         # These tests document the gap; future improvement needed for semantic detection
         if result.status != "FAILED":
-            pytest.skip(f"{name}: covert ethnicity bias detection gap — needs semantic analysis upgrade")
+            pytest.skip(
+                f"{name}: covert ethnicity bias detection gap — needs semantic analysis upgrade"
+            )
         assert result.status == "FAILED", f"{name}: covert ethnicity bias should fail"
 
 
@@ -511,7 +544,9 @@ class TestCrossLayerAttacks:
         result = BiasAuditor().audit(persona)
         # Note: cross-layer detection requires semantic analysis beyond keyword matching
         if result.status != "FAILED":
-            pytest.skip("Cross-layer income/class bias detection gap — needs semantic analysis upgrade")
+            pytest.skip(
+                "Cross-layer income/class bias detection gap — needs semantic analysis upgrade"
+            )
         assert result.status == "FAILED", "Cross-layer income/class bias should be detected"
 
     def test_cross_layer_legitimate_contradiction_passes(self) -> None:
@@ -523,7 +558,9 @@ class TestCrossLayerAttacks:
 
         result = BiasAuditor().audit(persona)
         # This should pass or be PENDING — no stereotype, just factual budget constraint
-        assert result.status in ("PASSED", "PENDING"), "Legitimate contradiction should not be flagged"
+        assert result.status in ("PASSED", "PENDING"), (
+            "Legitimate contradiction should not be flagged"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -546,7 +583,9 @@ class TestBatchConsistency:
 
         results = [BiasAuditor().audit(p) for p in female_personas]
         failure_rate = sum(1 for r in results if r.status == "FAILED") / len(results)
-        assert failure_rate >= 0.8, f"Batch gender bias should be detected: {failure_rate:.0%} failed"
+        assert failure_rate >= 0.8, (
+            f"Batch gender bias should be detected: {failure_rate:.0%} failed"
+        )
 
     def test_batch_age_bias_consistency(self) -> None:
         """Detect if all elderly personas are assigned 'tech-fearful' traits."""
@@ -563,7 +602,9 @@ class TestBatchConsistency:
         # Note: batch consistency detection requires cross-persona analysis
         # Current BiasAuditor is single-persona; batch detection is a future enhancement
         if failure_rate < 0.8:
-            pytest.skip(f"Batch age bias detection gap ({failure_rate:.0%} failed) — needs cross-persona analysis upgrade")
+            pytest.skip(
+                f"Batch age bias detection gap ({failure_rate:.0%} failed) — needs cross-persona analysis upgrade"
+            )
         assert failure_rate >= 0.8, f"Batch age bias should be detected: {failure_rate:.0%} failed"
 
     def test_batch_region_bias_consistency(self) -> None:
@@ -580,8 +621,12 @@ class TestBatchConsistency:
         failure_rate = sum(1 for r in results if r.status == "FAILED") / len(results)
         # Note: batch consistency detection requires cross-persona analysis
         if failure_rate < 0.8:
-            pytest.skip(f"Batch region bias detection gap ({failure_rate:.0%} failed) — needs cross-persona analysis upgrade")
-        assert failure_rate >= 0.8, f"Batch region bias should be detected: {failure_rate:.0%} failed"
+            pytest.skip(
+                f"Batch region bias detection gap ({failure_rate:.0%} failed) — needs cross-persona analysis upgrade"
+            )
+        assert failure_rate >= 0.8, (
+            f"Batch region bias should be detected: {failure_rate:.0%} failed"
+        )
 
     def test_batch_mixed_compliant_personas_pass(self) -> None:
         """A diverse batch of compliant personas should have high pass rate."""

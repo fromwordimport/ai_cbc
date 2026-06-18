@@ -25,9 +25,15 @@ from aicbc.llm.client import LLMResponse, Provider
 def _mock_llm_response(content: dict[str, Any], model: str = "claude-sonnet-4-6") -> LLMResponse:
     text = json.dumps(content, ensure_ascii=False)
     return LLMResponse(
-        content=text, model=model, provider=Provider.ANTHROPIC,
-        prompt_tokens=100, completion_tokens=200, total_tokens=300,
-        estimated_cost_usd=0.003, latency_seconds=0.5, raw_response=None,
+        content=text,
+        model=model,
+        provider=Provider.ANTHROPIC,
+        prompt_tokens=100,
+        completion_tokens=200,
+        total_tokens=300,
+        estimated_cost_usd=0.003,
+        latency_seconds=0.5,
+        raw_response=None,
     )
 
 
@@ -38,9 +44,14 @@ def sample_persona() -> PersonaProfile:
         persona_id="persona-sim-001",
         segment="精致白领-新一线城市",
         layer1_demographics=Layer1Demographics(
-            age="28岁", gender="女", city="新一线城市", income="15-30万元",
-            occupation="互联网产品经理", education="本科",
-            marital_status="已婚无孩", living_type="自有住房（89㎡）",
+            age="28岁",
+            gender="女",
+            city="新一线城市",
+            income="15-30万元",
+            occupation="互联网产品经理",
+            education="本科",
+            marital_status="已婚无孩",
+            living_type="自有住房（89㎡）",
         ),
         layer2_behavior=Layer2Behavior(
             price_sensitivity="中等敏感",
@@ -99,7 +110,9 @@ def mock_llm_client() -> MagicMock:
 class TestConversationMode:
     """Tests for conversational research simulation."""
 
-    def test_converse_returns_turn(self, mock_llm_client: MagicMock, sample_persona: PersonaProfile) -> None:
+    def test_converse_returns_turn(
+        self, mock_llm_client: MagicMock, sample_persona: PersonaProfile
+    ) -> None:
         """A single conversational turn should return structured output."""
         sim = BehaviorSimulator(llm_client=mock_llm_client)
         turn = sim.converse(
@@ -113,7 +126,9 @@ class TestConversationMode:
         assert turn.emotion_tag == "hesitant"
         assert turn.inconsistency_flag is False
 
-    def test_converse_uses_context(self, mock_llm_client: MagicMock, sample_persona: PersonaProfile) -> None:
+    def test_converse_uses_context(
+        self, mock_llm_client: MagicMock, sample_persona: PersonaProfile
+    ) -> None:
         """Context should be passed to the LLM prompt."""
         sim = BehaviorSimulator(llm_client=mock_llm_client)
         sim.converse(
@@ -142,7 +157,9 @@ class TestConversationMode:
         assert turn.consumer_response == "[模拟生成失败]"
         assert turn.emotion_tag == "unknown"
 
-    def test_run_interview_multiple_questions(self, mock_llm_client: MagicMock, sample_persona: PersonaProfile) -> None:
+    def test_run_interview_multiple_questions(
+        self, mock_llm_client: MagicMock, sample_persona: PersonaProfile
+    ) -> None:
         """Running an interview with multiple questions should produce multiple turns."""
         sim = BehaviorSimulator(llm_client=mock_llm_client)
         questions = [
@@ -180,7 +197,11 @@ class TestPurchaseDecisionMode:
         sim = BehaviorSimulator(llm_client=client)
         trace = sim.simulate_purchase_decision(
             persona=sample_persona,
-            product={"name": "高端洗碗机", "price_cny": 15000, "core_selling_points": ["智能", "静音"]},
+            product={
+                "name": "高端洗碗机",
+                "price_cny": 15000,
+                "core_selling_points": ["智能", "静音"],
+            },
         )
 
         assert trace.final_decision == "not_buy"
@@ -227,7 +248,11 @@ class TestPurchaseDecisionMode:
         sim = BehaviorSimulator(llm_client=client)
         trace = sim.simulate_purchase_decision(
             persona=sample_persona,
-            product={"name": "洗碗机X1", "price_cny": 4500, "core_selling_points": ["静音", "省水"]},
+            product={
+                "name": "洗碗机X1",
+                "price_cny": 4500,
+                "core_selling_points": ["静音", "省水"],
+            },
         )
 
         assert trace.final_decision == "buy"

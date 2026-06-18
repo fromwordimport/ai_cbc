@@ -17,7 +17,6 @@ from aicbc.api.dependencies import (
     get_seed_generator,
 )
 from aicbc.core.audit import get_audit_logger
-from aicbc.core.models.persona import PersonaProfile
 from aicbc.core.store import (
     MemoryPersonaStore,
     MemoryQuestionnaireStore,
@@ -180,7 +179,10 @@ class TestStudyExport:
             client.post("/api/v1/personas/generate", json={"count": 2, "study_id": "sexport"})
             client.post(
                 "/api/v1/studies/sexport/simulate-responses",
-                json={"persona_ids": ["persona-sexport-001", "persona-sexport-002"], "mode": "rule"},
+                json={
+                    "persona_ids": ["persona-sexport-001", "persona-sexport-002"],
+                    "mode": "rule",
+                },
             )
 
             # Seed an analysis job for export coverage.
@@ -255,7 +257,10 @@ class TestStudyDeleteCascade:
             client.post("/api/v1/personas/generate", json={"count": 2, "study_id": "scascade"})
             client.post(
                 "/api/v1/studies/scascade/simulate-responses",
-                json={"persona_ids": ["persona-scascade-001", "persona-scascade-002"], "mode": "rule"},
+                json={
+                    "persona_ids": ["persona-scascade-001", "persona-scascade-002"],
+                    "mode": "rule",
+                },
             )
 
             job = AnalysisJobStatus(
@@ -328,7 +333,11 @@ class TestStoreCascadeHelpers:
         assert store.get_response("r2") is not None
 
     def test_response_store_delete_by_study(self) -> None:
-        from aicbc.questionnaire.response_models import CBCRawDataset, DatasetMetadata, PersonaResponse
+        from aicbc.questionnaire.response_models import (
+            CBCRawDataset,
+            DatasetMetadata,
+            PersonaResponse,
+        )
 
         store = MemoryResponseStore()
         r1 = PersonaResponse(
@@ -369,8 +378,6 @@ class TestStoreCascadeHelpers:
 
         assert store.delete_by_study("s1") == 1
         assert store.get_job("a1") is None
-
-from aicbc.core.privacy import redact_pii
 
 
 class TestPIIRedactionInAuditLogs:
