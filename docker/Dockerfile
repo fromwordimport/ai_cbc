@@ -15,7 +15,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 COPY pyproject.toml ./
 COPY src/ ./src/
 ENV UV_NO_CACHE=1
-RUN pip install --no-cache-dir uv && \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel uv && \
     uv pip install --system --no-cache -e ".[analysis]"
 
 # Stage 2: Runtime — minimal image
