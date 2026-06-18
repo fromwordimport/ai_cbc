@@ -86,11 +86,18 @@ ignore_missing_imports = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-v -m \"not slow\""
+addopts = "-v"
 # Coverage is CI-only. To run locally: uv run pytest --cov=src --cov-report=term-missing
-norecursedirs = ["tests/performance", ".git", ".tox", "dist", "build"]
+norecursedirs = [".git", ".tox", "dist", "build"]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: pure unit tests with no external dependencies",
+    "integration: tests requiring DB/Redis/Celery/API",
+    "e2e: end-to-end full pipeline tests",
+    "slow: tests taking >30s (deselect with '-m \"not slow\"')",
+    "security: fast security validation tests",
+    "redteam: slow adversarial/penetration/bias tests",
+    "performance: load and regression tests",
+    "external: tests requiring real external services (LLM/Mongo/Redis)",
 ]
 
 [tool.coverage.run]
