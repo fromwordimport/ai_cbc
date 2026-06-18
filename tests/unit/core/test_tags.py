@@ -1,14 +1,12 @@
 """Tests for tag system JSON schemas, Pydantic models, and tag loader."""
 
 import json
-import pytest
-
-pytestmark = pytest.mark.unit
-
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+
+pytestmark = pytest.mark.unit
 
 from aicbc.core.models.persona import (
     DishwasherContext,
@@ -29,7 +27,7 @@ from aicbc.utils.tag_loader import (
     validate_tag_value,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 TAGS_DIR = PROJECT_ROOT / "configs" / "tags"
 
 
