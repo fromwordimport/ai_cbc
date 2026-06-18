@@ -29,6 +29,7 @@ from aicbc.questionnaire.models import (
     DesignParameters,
     ProhibitedPair,
 )
+from aicbc.questionnaire.generator import _dishwasher_default_attributes
 
 
 def _make_attr(id: str, levels: list[str]) -> Attribute:
@@ -302,7 +303,7 @@ class TestOrthogonalDesign:
     def test_orthogonal_questionnaire_basic_generation(self) -> None:
         attrs = _make_orth_attrs()
         dp = DesignParameters(
-            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42
+            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED
         )
         q = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
@@ -315,7 +316,7 @@ class TestOrthogonalDesign:
     def test_orthogonal_questionnaire_efficiency_reported(self) -> None:
         attrs = _make_orth_attrs()
         dp = DesignParameters(
-            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42
+            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED
         )
         q = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
@@ -328,7 +329,7 @@ class TestOrthogonalDesign:
     def test_orthogonal_questionnaire_reproducibility(self) -> None:
         attrs = _make_orth_attrs()
         dp = DesignParameters(
-            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED, seed=42
+            n_choice_sets=3, n_alternatives=2, algorithm=DesignAlgorithm.BALANCED
         )
         q1 = generate_orthogonal_questionnaire(
             study_id="test-orth", attributes=attrs, design_parameters=dp, seed=42
@@ -343,14 +344,12 @@ class TestOrthogonalDesign:
 
     def test_orthogonal_questionnaire_dishwasher_defaults(self) -> None:
         """Test with the default dishwasher 7-attribute set."""
-        from aicbc.questionnaire.generator import _dishwasher_default_attributes
-
         attrs = _dishwasher_default_attributes()
         dp = DesignParameters(
-            n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.BALANCED, seed=42
+            n_choice_sets=12, n_alternatives=3, algorithm=DesignAlgorithm.BALANCED
         )
         q = generate_orthogonal_questionnaire(
-            study_id="dw-orth", attributes=attrs, design_parameters=dp, seed=42
+            study_id="dw-orth", attributes=attrs, design_parameters=dp
         )
         assert len(q.choice_sets) == 12
         assert all(len(cs.alternatives) == 3 for cs in q.choice_sets)
