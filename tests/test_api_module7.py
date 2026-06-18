@@ -320,7 +320,7 @@ class TestLatentClassEndpoint:
         """POST should queue a latent class job without running sampling."""
         mock_result = MagicMock()
         mock_result.id = "fake-celery-id"
-        with patch("aicbc.analysis.tasks.run_latent_class_task") as mock_task:
+        with patch("aicbc.analysis.routes.run_latent_class_task") as mock_task:
             mock_task.delay.return_value = mock_result
             response = client.post(
                 f"/api/v1/studies/{study_id}/analysis/latent-class",
