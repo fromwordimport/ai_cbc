@@ -1,4 +1,4 @@
-"""Security and cost anomaly tests for AI_CBC (Task #14).
+"""Security and cost anomaly tests for AI_CBC.
 
 Covers:
 1. 安全异常测试用例 — LLM tool call failures, malformed output, provider errors,
@@ -15,12 +15,10 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.redteam, pytest.mark.slow, pytest.mark.integration]
+pytestmark = [pytest.mark.redteam, pytest.mark.slow]
 
 from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from aicbc.agents.base import (
     BaseAgent,
@@ -112,6 +110,11 @@ def mock_llm_client(mock_settings: MagicMock) -> LLMClient:
     return client
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
 def _build_anthropic_response(
     content_text: str, input_tokens: int, output_tokens: int
 ) -> MagicMock:
@@ -140,6 +143,32 @@ def _build_openai_response(
     usage.completion_tokens = completion_tokens
     response.usage = usage
     return response
+
+
+def _make_test_agent(
+    max_corrections: int = 3,
+    examples: list[DynamicExample] | None = None,
+) -> BaseAgent:
+    """Factory for a minimal concrete BaseAgent subclass for testing."""
+
+    class ConcreteAgent(BaseAgent[str]):
+        def execute(self, **kwargs: Any) -> str:
+            return "done"
+
+    return ConcreteAgent(
+        system_instruction=SystemInstruction(
+            role="测试助手",
+            expertise=["测试"],
+            constraints=["不要编造数据"],
+        ),
+        rules=RuleInjection(
+            rules=["RULE-001: 必须真实", "RULE-002: 不得偏见"],
+            forbidden_patterns=["AI", "模型"],
+            required_fields=["reasoning"],
+        ),
+        examples=examples,
+        max_corrections=max_corrections,
+    )
 
 
 # ===========================================================================
@@ -786,34 +815,3 @@ class TestBaseAgentDegradationUnderCostFuse:
 
         resolved = cost_fuse.resolve_model("claude-sonnet-4-6")
         assert resolved == "claude-haiku-4-5"
-
-
-# ===========================================================================
-# Helpers
-# ===========================================================================
-
-
-def _make_test_agent(
-    max_corrections: int = 3,
-    examples: list[DynamicExample] | None = None,
-) -> BaseAgent:
-    """Factory for a minimal concrete BaseAgent subclass for testing."""
-
-    class ConcreteAgent(BaseAgent[str]):
-        def execute(self, **kwargs: Any) -> str:
-            return "done"
-
-    return ConcreteAgent(
-        system_instruction=SystemInstruction(
-            role="测试助手",
-            expertise=["测试"],
-            constraints=["不要编造数据"],
-        ),
-        rules=RuleInjection(
-            rules=["RULE-001: 必须真实", "RULE-002: 不得偏见"],
-            forbidden_patterns=["AI", "模型"],
-            required_fields=["reasoning"],
-        ),
-        examples=examples,
-        max_corrections=max_corrections,
-    )

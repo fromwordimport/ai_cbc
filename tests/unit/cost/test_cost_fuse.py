@@ -1,21 +1,18 @@
-"""Integration tests for CostFuse + LLMClient.
+"""Unit tests for CostFuse and LLMClient cost integration.
 
-Verifies that the fuse intercepts LLM calls at the correct thresholds
-and degrades models automatically.
+All LLM calls are mocked — no real API requests are made.
 """
 
 from __future__ import annotations
 
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.unit
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from aicbc.config.settings import CostFuseSettings
-from aicbc.cost.fuse import CostFuse, CostFuseError
+from aicbc.cost.fuse import CostFuse, CostFuseError, DegradationLevel
 from aicbc.cost.tracker import CostTracker, FuseStatus
 from aicbc.llm.client import LLMClient, LLMResponse
 
@@ -37,13 +34,15 @@ def tight_fuse_settings():
 
 @pytest.fixture
 def cost_tracker(tight_fuse_settings):
+    """Fresh CostTracker with tight settings."""
     t = CostTracker(settings=tight_fuse_settings)
-    t.reset()  # Ensure no persisted state from previous runs leaks into tests
+    t.reset()
     return t
 
 
 @pytest.fixture
 def cost_fuse(cost_tracker):
+    """Fresh CostFuse wrapping the tracker."""
     return CostFuse(tracker=cost_tracker)
 
 
@@ -86,6 +85,11 @@ def mock_settings():
     return settings
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
 def _build_anthropic_response(content_text: str, input_tokens: int, output_tokens: int):
     """Build a mock Anthropic Messages API response."""
     response = MagicMock()
@@ -97,6 +101,102 @@ def _build_anthropic_response(content_text: str, input_tokens: int, output_token
     usage.output_tokens = output_tokens
     response.usage = usage
     return response
+
+
+def _make_mock_response(cost_usd: float = 0.01, model: str = "claude-sonnet-4-6"):
+    """Build a mock LLMResponse-like object."""
+    response = MagicMock()
+    response.estimated_cost_usd = cost_usd
+    response.provider = MagicMock()
+    response.provider.value = "anthropic"
+    response.model = model
+    response.prompt_tokens = 100
+    response.completion_tokens = 50
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Tests: CostFuse high-level wrapper
+# ---------------------------------------------------------------------------
+
+
+class TestCostFuse:
+    """Tests for CostFuse high-level wrapper."""
+
+    def test_pre_call_check_normal(self, cost_fuse):
+        """Normal state should allow call with requested model."""
+        allowed, status, model = cost_fuse.pre_call_check(
+            study_id="study-001",
+            requested_model="claude-sonnet-4-6",
+        )
+        assert allowed is True
+        assert status == FuseStatus.NORMAL
+        assert model == "claude-sonnet-4-6"
+
+    def test_pre_call_check_degrade(self, cost_fuse):
+        """DEGRADE state should allow call but switch model."""
+        # Push to 95%
+        cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
+        allowed, status, model = cost_fuse.pre_call_check(
+            study_id="study-001",
+            requested_model="claude-sonnet-4-6",
+        )
+        assert allowed is True
+        assert status == FuseStatus.DEGRADE
+        assert model == "claude-haiku-4-5"  # degraded model
+
+    def test_pre_call_check_fuse_blocks(self, cost_fuse):
+        """FUSE state should block calls."""
+        cost_fuse.tracker.record(cost_usd=100 / 7.2, study_id="study-001")
+        allowed, status, model = cost_fuse.pre_call_check(
+            study_id="study-001",
+            requested_model="claude-sonnet-4-6",
+        )
+        assert allowed is False
+        assert status == FuseStatus.FUSE
+
+    def test_pre_call_check_emergency_blocks(self, cost_fuse):
+        """EMERGENCY state should block calls."""
+        cost_fuse.tracker.record(cost_usd=120 / 7.2, study_id="study-001")
+        allowed, status, model = cost_fuse.pre_call_check(
+            study_id="study-001",
+            requested_model="claude-sonnet-4-6",
+        )
+        assert allowed is False
+        assert status == FuseStatus.EMERGENCY
+
+    def test_record_call(self, cost_fuse):
+        """record_call should extract data from mock response."""
+        response = _make_mock_response(cost_usd=0.01)
+        cost_fuse.record_call(
+            response,
+            study_id="study-001",
+            persona_id="persona-001",
+            task_phase="generation",
+        )
+
+        assert cost_fuse.tracker.get_study_cost("study-001") > 0
+
+    def test_get_degradation_level(self, cost_fuse):
+        """Degradation level should match fuse status."""
+        assert cost_fuse.get_degradation_level("study-001") == DegradationLevel.STANDARD
+
+        cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
+        assert cost_fuse.get_degradation_level("study-001") == DegradationLevel.DEGRADED
+
+        cost_fuse.tracker.record(cost_usd=30 / 7.2, study_id="study-001")  # now 125%
+        assert cost_fuse.get_degradation_level("study-001") == DegradationLevel.EMERGENCY
+
+    def test_resolve_model_normal(self, cost_fuse):
+        """Normal state should return requested model."""
+        model = cost_fuse.resolve_model("claude-sonnet-4-6", study_id="study-001")
+        assert model == "claude-sonnet-4-6"
+
+    def test_resolve_model_degraded(self, cost_fuse):
+        """Degraded state should return degrade_model."""
+        cost_fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
+        model = cost_fuse.resolve_model("claude-sonnet-4-6", study_id="study-001")
+        assert model == "claude-haiku-4-5"
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +300,7 @@ class TestLLMClientCostFuseIntegration:
 class TestBatchSimulationFuse:
     """Tests simulating batch operations with cost fuse."""
 
-    def test_batch_stops_on_cost_fuse(self, cost_fuse):
+    def test_batch_stops_on_cost_fuse(self, mock_settings, cost_fuse):
         """Simulate a batch that hits the fuse mid-way."""
         # Pre-load tracker to 90% of daily budget
         cost_fuse.tracker.record(cost_usd=18 / 7.2)
@@ -288,3 +388,70 @@ class TestBatchSimulationFuse:
         # study-B should also be blocked
         status_b, _ = cost_fuse.tracker.check_fuse_status("study-B")
         assert status_b == FuseStatus.FUSE
+
+
+# ---------------------------------------------------------------------------
+# Tests: CostFuse security — blocking before API call
+# ---------------------------------------------------------------------------
+
+
+class TestCostFuseSecurity:
+    """Security tests: cost fuse should block calls before they reach the API."""
+
+    def test_cost_fuse_blocks_before_api_call(self, mock_settings, cost_fuse):
+        """When fuse is triggered, the API should never be called."""
+        cost_fuse.tracker.record(cost_usd=20 / 7.2)  # Exhaust daily budget
+
+        create_spy = MagicMock()
+
+        with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
+            client = LLMClient(cost_fuse=cost_fuse)
+
+        with (
+            patch.object(client._anthropic.messages, "create", create_spy),
+            pytest.raises(CostFuseError, match="Cost fuse triggered"),
+        ):
+            client.generate(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="claude-sonnet-4-6",
+            )
+
+        create_spy.assert_not_called()
+
+    def test_cost_fuse_degrades_model_before_api_call(self, mock_settings, cost_fuse):
+        """When status is DEGRADE, model should be switched before API call."""
+        cost_fuse.tracker.record(cost_usd=19 / 7.2)  # 95% of daily budget
+
+        mock_response = _build_anthropic_response("Degraded", 10, 5)
+        create_spy = MagicMock(return_value=mock_response)
+
+        with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
+            client = LLMClient(cost_fuse=cost_fuse)
+
+        with patch.object(client._anthropic.messages, "create", create_spy):
+            result = client.generate(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="claude-sonnet-4-6",
+            )
+
+        call_kwargs = create_spy.call_args.kwargs
+        assert call_kwargs["model"] == "claude-haiku-4-5"
+        assert result.model == "claude-haiku-4-5"
+
+    def test_cost_fuse_records_cost_even_on_degraded_call(self, mock_settings, cost_fuse):
+        """Cost should be recorded even when model was degraded."""
+        cost_fuse.tracker.record(cost_usd=19 / 7.2)
+        initial_cost = cost_fuse.tracker.get_global_total()
+
+        mock_response = _build_anthropic_response("OK", 1000, 500)
+
+        with patch("aicbc.llm.client.get_settings", return_value=mock_settings):
+            client = LLMClient(cost_fuse=cost_fuse)
+
+        with patch.object(client._anthropic.messages, "create", return_value=mock_response):
+            client.generate(
+                messages=[{"role": "user", "content": "Hi"}],
+                model="claude-sonnet-4-6",
+            )
+
+        assert cost_fuse.tracker.get_global_total() > initial_cost

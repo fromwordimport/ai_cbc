@@ -1,7 +1,4 @@
-"""Tests for CostTracker and CostFuse.
-
-All LLM calls are mocked — no real API requests are made.
-"""
+"""Unit tests for CostTracker."""
 
 from __future__ import annotations
 
@@ -12,10 +9,7 @@ pytestmark = pytest.mark.unit
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
-import pytest
-
 from aicbc.config.settings import CostFuseSettings
-from aicbc.cost.fuse import CostFuse, DegradationLevel
 from aicbc.cost.tracker import CostRecord, CostTracker, FuseStatus
 
 # ---------------------------------------------------------------------------
@@ -40,12 +34,6 @@ def tracker(fuse_settings):
     t = CostTracker(settings=fuse_settings)
     t.reset()  # Ensure no persisted state from previous runs leaks into tests
     return t
-
-
-@pytest.fixture
-def fuse(tracker):
-    """Return a CostFuse wrapping the tracker."""
-    return CostFuse(tracker=tracker)
 
 
 # ---------------------------------------------------------------------------
@@ -218,90 +206,6 @@ class TestFuseStatus:
 
 
 # ---------------------------------------------------------------------------
-# Tests: CostFuse integration
-# ---------------------------------------------------------------------------
-
-
-class TestCostFuse:
-    """Tests for CostFuse high-level wrapper."""
-
-    def test_pre_call_check_normal(self, fuse):
-        """Normal state should allow call with requested model."""
-        allowed, status, model = fuse.pre_call_check(
-            study_id="study-001",
-            requested_model="claude-sonnet-4-6",
-        )
-        assert allowed is True
-        assert status == FuseStatus.NORMAL
-        assert model == "claude-sonnet-4-6"
-
-    def test_pre_call_check_degrade(self, fuse):
-        """DEGRADE state should allow call but switch model."""
-        # Push to 95%
-        fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
-        allowed, status, model = fuse.pre_call_check(
-            study_id="study-001",
-            requested_model="claude-sonnet-4-6",
-        )
-        assert allowed is True
-        assert status == FuseStatus.DEGRADE
-        assert model == "claude-haiku-4-5"  # degraded model
-
-    def test_pre_call_check_fuse_blocks(self, fuse):
-        """FUSE state should block calls."""
-        fuse.tracker.record(cost_usd=100 / 7.2, study_id="study-001")
-        allowed, status, model = fuse.pre_call_check(
-            study_id="study-001",
-            requested_model="claude-sonnet-4-6",
-        )
-        assert allowed is False
-        assert status == FuseStatus.FUSE
-
-    def test_pre_call_check_emergency_blocks(self, fuse):
-        """EMERGENCY state should block calls."""
-        fuse.tracker.record(cost_usd=120 / 7.2, study_id="study-001")
-        allowed, status, model = fuse.pre_call_check(
-            study_id="study-001",
-            requested_model="claude-sonnet-4-6",
-        )
-        assert allowed is False
-        assert status == FuseStatus.EMERGENCY
-
-    def test_record_call(self, fuse):
-        """record_call should extract data from mock response."""
-        response = _make_mock_response(cost_usd=0.01)
-        fuse.record_call(
-            response,
-            study_id="study-001",
-            persona_id="persona-001",
-            task_phase="generation",
-        )
-
-        assert fuse.tracker.get_study_cost("study-001") > 0
-
-    def test_get_degradation_level(self, fuse):
-        """Degradation level should match fuse status."""
-        assert fuse.get_degradation_level("study-001") == DegradationLevel.STANDARD
-
-        fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
-        assert fuse.get_degradation_level("study-001") == DegradationLevel.DEGRADED
-
-        fuse.tracker.record(cost_usd=30 / 7.2, study_id="study-001")  # now 125%
-        assert fuse.get_degradation_level("study-001") == DegradationLevel.EMERGENCY
-
-    def test_resolve_model_normal(self, fuse):
-        """Normal state should return requested model."""
-        model = fuse.resolve_model("claude-sonnet-4-6", study_id="study-001")
-        assert model == "claude-sonnet-4-6"
-
-    def test_resolve_model_degraded(self, fuse):
-        """Degraded state should return degrade_model."""
-        fuse.tracker.record(cost_usd=95 / 7.2, study_id="study-001")
-        model = fuse.resolve_model("claude-sonnet-4-6", study_id="study-001")
-        assert model == "claude-haiku-4-5"
-
-
-# ---------------------------------------------------------------------------
 # Tests: Notification deduplication
 # ---------------------------------------------------------------------------
 
@@ -374,3 +278,185 @@ class TestCostRecord:
         )
         assert record.cached is True
         assert record.degraded is True
+
+
+# ---------------------------------------------------------------------------
+# Tests: CostTracker per-study isolation and global budget
+# ---------------------------------------------------------------------------
+
+
+class TestCostTrackerIsolation:
+    """Tests for per-study cost isolation and global budget effects."""
+
+    def test_per_study_isolation(self, tracker):
+        """Different studies should have independent cost tracking."""
+        tracker.record(cost_usd=5 / 7.2, study_id="study-A")
+        tracker.record(cost_usd=9.6 / 7.2, study_id="study-B")
+
+        # study-A at 50% of 100 CNY = NORMAL
+        status_a, _ = tracker.check_fuse_status("study-A")
+        assert status_a == FuseStatus.NORMAL
+
+        # study-B at 96% of 100 CNY = DEGRADE (>= 95%)
+        status_b, _ = tracker.check_fuse_status("study-B")
+        assert status_b == FuseStatus.DEGRADE
+
+    def test_global_daily_budget_affects_all_studies(self, tracker):
+        """Daily budget is global and affects all studies."""
+        # Exhaust daily budget via study-A
+        tracker.record(cost_usd=200 / 7.2, study_id="study-A")
+
+        # study-B should also be blocked
+        status_b, _ = tracker.check_fuse_status("study-B")
+        assert status_b == FuseStatus.FUSE
+
+
+# ---------------------------------------------------------------------------
+# Tests: CostTracker thread safety
+# ---------------------------------------------------------------------------
+
+
+class TestCostTrackerThreadSafety:
+    """Tests for thread safety of cost recording."""
+
+    def test_thread_safety_simulation(self, tracker):
+        """Simulate concurrent cost recording to verify thread safety."""
+        import threading
+
+        def _record_costs(study_id: str, n_calls: int) -> None:
+            for _ in range(n_calls):
+                tracker.record(
+                    cost_usd=0.1,
+                    study_id=study_id,
+                    task_phase="test",
+                )
+
+        threads = [
+            threading.Thread(target=_record_costs, args=(f"study-{i}", 50))
+            for i in range(4)
+        ]
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Total: 4 threads * 50 calls * 0.1 USD * 7.2 = 144 CNY
+        assert tracker.get_global_total() == pytest.approx(144.0, abs=1.0)
+
+        # Each study should have 50 calls
+        for i in range(4):
+            summary = tracker.get_study_summary(f"study-{i}")
+            assert summary.total_calls == 50
+
+    def test_zero_cost_call_does_not_affect_status(self, tracker):
+        """A zero-cost call should not change fuse status."""
+        tracker.record(cost_usd=5.0 / 7.2, study_id="study-001")
+        status_before, _ = tracker.check_fuse_status("study-001")
+
+        tracker.record(cost_usd=0.0, study_id="study-001")
+        status_after, _ = tracker.check_fuse_status("study-001")
+
+        assert status_before == status_after
+
+    def test_negative_cost_is_handled_gracefully(self, tracker):
+        """Negative cost (e.g., refund) should reduce total cost."""
+        tracker.record(cost_usd=5.0 / 7.2, study_id="study-001")
+        initial = tracker.get_study_cost("study-001")
+
+        tracker.record(cost_usd=-1.0 / 7.2, study_id="study-001")
+        after = tracker.get_study_cost("study-001")
+
+        assert after < initial
+
+
+# ---------------------------------------------------------------------------
+# Tests: CostTracker threshold boundary precision
+# ---------------------------------------------------------------------------
+
+
+class TestCostTrackerThresholdBoundaries:
+    """Test cost tracker behavior at and around all threshold boundaries."""
+
+    def test_exactly_at_80_percent_warning(self, tracker):
+        """Exactly 80% should trigger WARNING, not DEGRADE."""
+        tracker.record(cost_usd=80.0 / 7.2, study_id="study-001")
+        status, details = tracker.check_fuse_status("study-001")
+        assert status == FuseStatus.WARNING
+        assert details["ratios"]["study"] == pytest.approx(0.8, abs=0.01)
+
+    def test_exactly_at_95_percent_degrade(self, tracker):
+        """Exactly 95% should trigger DEGRADE."""
+        tracker.record(cost_usd=95.0 / 7.2, study_id="study-001")
+        status, details = tracker.check_fuse_status("study-001")
+        assert status == FuseStatus.DEGRADE
+        assert details["ratios"]["study"] == pytest.approx(0.95, abs=0.01)
+
+    def test_exactly_at_100_percent_fuse(self, tracker):
+        """Exactly 100% should trigger FUSE (calls blocked)."""
+        tracker.record(cost_usd=100.0 / 7.2, study_id="study-001")
+        allowed, status, _ = tracker.should_allow_call("study-001")
+        assert allowed is False
+        assert status == FuseStatus.FUSE
+
+    def test_exactly_at_120_percent_emergency(self, tracker):
+        """Exactly 120% should trigger EMERGENCY."""
+        tracker.record(cost_usd=120.0 / 7.2, study_id="study-001")
+        status, _ = tracker.check_fuse_status("study-001")
+        assert status == FuseStatus.EMERGENCY
+
+    def test_just_below_threshold_boundary(self, tracker):
+        """79.9% should remain NORMAL, not WARNING."""
+        tracker.record(cost_usd=79.9 / 7.2, study_id="study-001")
+        status, _ = tracker.check_fuse_status("study-001")
+        assert status == FuseStatus.NORMAL
+
+    def test_just_above_threshold_boundary(self, tracker):
+        """80.1% should trigger WARNING."""
+        tracker.record(cost_usd=80.1 / 7.2, study_id="study-001")
+        status, _ = tracker.check_fuse_status("study-001")
+        assert status == FuseStatus.WARNING
+
+    def test_monthly_budget_triggers_emergency(self, tracker):
+        """Monthly budget at 120% should trigger EMERGENCY even if daily is fine."""
+        # Daily: 100 CNY = 50% (NORMAL)
+        # Monthly: 600 CNY = 120% (EMERGENCY) — need monthly setting
+        tracker._settings.monthly_cny = 500.0
+        tracker.record(cost_usd=100.0 / 7.2)  # daily
+        tracker.record(cost_usd=500.0 / 7.2)  # additional for monthly
+        status, _ = tracker.check_fuse_status()
+        assert status == FuseStatus.EMERGENCY
+
+    def test_weekly_budget_triggers_fuse(self, tracker):
+        """Weekly budget at 100% should trigger FUSE."""
+        # Temporarily raise daily threshold so weekly wins
+        tracker._settings.daily_cny = 1000.0
+        tracker.record(cost_usd=500.0 / 7.2)
+        status, _ = tracker.check_fuse_status()
+        assert status == FuseStatus.FUSE
+
+
+# ---------------------------------------------------------------------------
+# Tests: Notification escalation and de-escalation
+# ---------------------------------------------------------------------------
+
+
+class TestNotificationEscalation:
+    """Tests for notification behavior on status changes."""
+
+    def test_notification_on_escalation_then_deescalation(self, tracker):
+        """Status going up then down should trigger notifications on each change."""
+        # Start at NORMAL
+        tracker.notify_if_changed(FuseStatus.NORMAL, {})
+
+        # Escalate to WARNING
+        tracker.record(cost_usd=80.0 / 7.2, study_id="study-001")
+        status, details = tracker.check_fuse_status("study-001")
+        assert tracker.notify_if_changed(status, details) is True
+        assert status == FuseStatus.WARNING
+
+        # Reset and de-escalate back to NORMAL
+        tracker.reset()
+        status, details = tracker.check_fuse_status("study-001")
+        assert tracker.notify_if_changed(status, details) is True
+        assert status == FuseStatus.NORMAL
