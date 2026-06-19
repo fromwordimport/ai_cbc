@@ -27,14 +27,12 @@ if [ ! -f /swapfile ]; then
     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 fi
 
-# 4. 创建应用目录（幂等：仅当不存在时创建并设置属主）
+# 4. 创建应用目录及子目录（幂等）
 if [ ! -d "$APP_DIR" ]; then
     sudo mkdir -p "$APP_DIR"
-    sudo chown "$USER:$USER" "$APP_DIR"
 fi
+sudo chown -R "$USER:$USER" "$APP_DIR"
 
-# 5. 创建子目录（确保当前用户对应用目录有写权限）
-sudo chown "$USER:$USER" "$APP_DIR"
 mkdir -p "$APP_DIR/logs"
 mkdir -p "$APP_DIR/backups/mongo"
 mkdir -p "$APP_DIR/ssl"
