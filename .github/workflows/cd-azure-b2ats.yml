@@ -62,6 +62,8 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USER }}
@@ -78,8 +80,6 @@ jobs:
             git reset --hard origin/master
             export IMAGE_TAG=${IMAGE_TAG}
             bash scripts/deploy-to-azure-b2ats.sh
-        env:
-          IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
 
       - name: Verify deployment health
         uses: appleboy/ssh-action@v1.0.3
