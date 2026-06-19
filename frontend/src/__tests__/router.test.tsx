@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { RouterProvider, createMemoryRouter, Navigate, Outlet } from 'react-router-dom'
+import { RouterProvider, createMemoryRouter, Navigate } from 'react-router-dom'
 import { Suspense } from 'react'
 import { router } from '@/router'
 
