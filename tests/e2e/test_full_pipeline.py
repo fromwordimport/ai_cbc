@@ -859,16 +859,10 @@ class TestEffectsCodingConsistency:
         for col in feature_cols:
             if "_" in col:
                 attr_id, idx_str = col.rsplit("_", 1)
-                assert attr_id in attr_ids, (
-                    f"Column {col} references unknown attribute {attr_id}"
-                )
-                assert idx_str.isdigit(), (
-                    f"Column {col} has non-numeric level index {idx_str}"
-                )
+                assert attr_id in attr_ids, f"Column {col} references unknown attribute {attr_id}"
+                assert idx_str.isdigit(), f"Column {col} has non-numeric level index {idx_str}"
             else:
-                assert col in attr_ids, (
-                    f"Column {col} does not match any attribute id"
-                )
+                assert col in attr_ids, f"Column {col} does not match any attribute id"
 
         # Each categorical/ordinal attribute has exactly k-1 columns indexed 0..k-2
         for attr in dishwasher_study.attributes:
@@ -876,8 +870,7 @@ class TestEffectsCodingConsistency:
                 expected = {f"{attr.id}_{i}" for i in range(len(attr.levels) - 1)}
                 actual = {c for c in feature_cols if c.startswith(f"{attr.id}_")}
                 assert actual == expected, (
-                    f"Attribute {attr.id} expected columns {sorted(expected)}, "
-                    f"got {sorted(actual)}"
+                    f"Attribute {attr.id} expected columns {sorted(expected)}, got {sorted(actual)}"
                 )
 
     def test_n_parameters_matches_datadict(self, dishwasher_study: CBCStudy):
