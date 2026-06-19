@@ -57,6 +57,7 @@ uv run pytest tests/performance/
 - Heavy imports (`aicbc.main`, `aicbc.analysis.store`) are lazy-loaded once and cached in `conftest.py`.
 - Use `app.dependency_overrides` to inject mocks for FastAPI `TestClient` tests.
 - The `@pytest.mark.slow` marker excludes expensive tests (e.g., full MCMC sampling) from the default run.
+- **Test File Integrity**: 任何对测试文件（包括本目录和 `../frontend/src/__tests__/`) 的修改，必须事先获得用户明确授权。详见根目录 `../CLAUDE.md` 的 `Core Design Principles`。
 
 ## Useful Fixtures
 
@@ -76,3 +77,4 @@ Frontend tests live in `../frontend/src/__tests__/` and run via Vitest, not pyte
 - `../src/CLAUDE.md` — backend source conventions.
 - `../src/aicbc/api/dependencies.py` — dependency singletons and `reset_dependencies()`.
 - `../src/aicbc/main.py` — FastAPI app used in integration tests.
+- `../CLAUDE.md` — global repository guidance, including the Test File Integrity principle.

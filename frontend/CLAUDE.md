@@ -62,3 +62,4 @@ npm run test:coverage    # runs vitest with 60% coverage thresholds
 - `../src/CLAUDE.md` — backend architecture and API details.
 - `../docs/数据字典.md` — API payload schemas.
 - `../tests/CLAUDE.md` — test suite overview (mostly backend; frontend tests live here).
+- `../CLAUDE.md` — global repository guidance and team roles.

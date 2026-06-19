@@ -83,3 +83,4 @@ uv run bandit -r src/
 - `../configs/` — prompt template and tag config assets.
 - `../tests/` — test suite conventions.
 - `../scripts/` — dev server and batch simulation scripts.
+- `../CLAUDE.md` — global repository guidance and team roles.
