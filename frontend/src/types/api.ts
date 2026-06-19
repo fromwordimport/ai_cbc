@@ -592,24 +592,17 @@ export interface AuditLogListResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Persona Full Detail (expanded 4-layer profile)
+// Authentication
 // ---------------------------------------------------------------------------
 
-export interface PersonaFullDetail {
-  persona_id: string
-  segment: string
-  layer1_demographics: Record<string, unknown>
-  layer2_behavior: Record<string, unknown>
-  layer3_psychology: Record<string, unknown>
-  layer4_scenarios: Record<string, unknown>
-  scene_reactions: Record<string, string> | null
-  mini_biography: { past: string; present: string; future: string } | null
-  language_samples: string[]
-  dishwasher_context: Record<string, unknown>
-  authenticity_score: number | null
-  bias_audit_status: string
-  status: string
-  version: string
-  generation_metadata: Record<string, unknown>
-  created_at: string
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+  role: 'researcher' | 'admin'
+  expires_in_minutes: number
 }
