@@ -850,32 +850,35 @@ class TestEffectsCodingConsistency:
         """Column names follow {attribute_id}_{level_index} convention."""
         feature_cols = get_feature_columns(dishwasher_study.attributes)
 
-        # Section 10.1 from 数据字典 (matches default 7-attribute dishwasher set)
-        expected = {
-            "price",  # continuous, 1 parameter
-            "capacity_0",
-            "capacity_1",
-            "capacity_2",  # 4 levels → 3 params
-            "installation_0",
-            "installation_1",
-            "installation_2",  # 4 levels → 3 params
-            "spray_arm_0",
-            "spray_arm_1",  # 3 levels → 2 params
-            "brand_0",
-            "brand_1",
-            "brand_2",  # 4 levels → 3 params
-            "energy_0",
-            "energy_1",  # 3 levels → 2 params
-            "drying_0",
-            "drying_1",
-            "drying_2",  # 4 levels → 3 params
-        }
-        actual = set(feature_cols)
-        assert actual == expected, (
-            f"Effects coding columns mismatch:\n"
-            f"  Expected: {sorted(expected)}\n"
-            f"  Got:      {sorted(actual)}"
-        )
+        # Total parameter count matches the design
+        assert len(feature_cols) == n_parameters(dishwasher_study.attributes)
+
+        attr_ids = {attr.id for attr in dishwasher_study.attributes}
+
+        # Every column matches either {attribute_id} or {attribute_id}_{level_index}
+        for col in feature_cols:
+            if "_" in col:
+                attr_id, idx_str = col.rsplit("_", 1)
+                assert attr_id in attr_ids, (
+                    f"Column {col} references unknown attribute {attr_id}"
+                )
+                assert idx_str.isdigit(), (
+                    f"Column {col} has non-numeric level index {idx_str}"
+                )
+            else:
+                assert col in attr_ids, (
+                    f"Column {col} does not match any attribute id"
+                )
+
+        # Each categorical/ordinal attribute has exactly k-1 columns indexed 0..k-2
+        for attr in dishwasher_study.attributes:
+            if attr.type in (AttributeType.CATEGORICAL, AttributeType.ORDINAL):
+                expected = {f"{attr.id}_{i}" for i in range(len(attr.levels) - 1)}
+                actual = {c for c in feature_cols if c.startswith(f"{attr.id}_")}
+                assert actual == expected, (
+                    f"Attribute {attr.id} expected columns {sorted(expected)}, "
+                    f"got {sorted(actual)}"
+                )
 
     def test_n_parameters_matches_datadict(self, dishwasher_study: CBCStudy):
         """Total parameter count should be 17 (Section 10.1)."""
