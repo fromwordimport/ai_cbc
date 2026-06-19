@@ -33,7 +33,8 @@ if [ ! -d "$APP_DIR" ]; then
     sudo chown "$USER:$USER" "$APP_DIR"
 fi
 
-# 5. 创建子目录
+# 5. 创建子目录（确保当前用户对应用目录有写权限）
+sudo chown "$USER:$USER" "$APP_DIR"
 mkdir -p "$APP_DIR/logs"
 mkdir -p "$APP_DIR/backups/mongo"
 mkdir -p "$APP_DIR/ssl"
