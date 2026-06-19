@@ -72,7 +72,8 @@ uv run bandit -r src/
 - Copy `.env.example` to `.env` and set LLM keys.
 - `SECRET_KEY` must be ≥ 32 chars in production.
 - `API_KEY` defaults to `dev-key-change-in-prod`; production must override it.
-- Dev API key is hard-coded in `frontend/src/services/api.ts`.
+- Frontend uses JWT sessions: `POST /api/v1/auth/login` returns a Bearer token with role claim.
+- Service accounts still authenticate with `X-API-Key` + optional `X-User-Role`.
 
 ## Cross-References
 

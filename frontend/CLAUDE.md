@@ -47,7 +47,9 @@ npm run test:coverage    # runs vitest with 60% coverage thresholds
 ## API Communication
 
 - Base URL `/api/v1` is proxied by Vite dev server to `http://localhost:8000`.
-- `src/services/api.ts` injects `X-API-Key: dev-key-change-in-prod` via request interceptor.
+- `src/services/api.ts` sends `Authorization: Bearer <token>` from `localStorage`.
+- `src/services/auth.ts` handles login/logout and token persistence.
+- `src/pages/Login.tsx` is the unauthenticated entry point.
 - `rootApi` instance handles root-level endpoints (`/health`, `/ready`, `/cost-status`, `/metrics`, `/dashboard/summary`).
 - Response interceptor maps HTTP status codes to Ant Design `message.error` notifications.
 
