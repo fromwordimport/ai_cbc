@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # AI_CBC MongoDB 备份并上传至 Azure Blob
 # 建议在服务器上通过 cron 每日执行一次
+#
+# 注意：docker-compose.azure-b2ats.yml 已将宿主机的 ./backups/mongo 挂载到容器的 /backup，
+# 因此 docker exec 内执行 mongodump --out /backup/<timestamp> 会直接写入宿主机备份目录。
 
 set -euo pipefail
 
@@ -22,7 +25,11 @@ cleanup() {
     if [ -n "${TIMESTAMP:-}" ] && [ -f "$BACKUP_BASE/$TIMESTAMP.tar.gz" ]; then
         rm -f "$BACKUP_BASE/$TIMESTAMP.tar.gz"
     fi
-    exit $exit_code
+    # 无论成功或失败，都清理超过保留期的本地备份
+    if [ -d "$BACKUP_BASE" ]; then
+        find "$BACKUP_BASE" -maxdepth 1 -name "*.tar.gz" -type f -mtime +"$RETENTION_DAYS" -exec rm -f {} +
+    fi
+    return $exit_code
 }
 trap cleanup EXIT
 
@@ -33,22 +40,33 @@ if ! flock -n 200; then
     exit 1
 fi
 
-# 1. 预检：确认 MongoDB 容器在运行
+# 预检：依赖命令
+if ! command -v docker >/dev/null 2>&1; then
+    echo "ERROR: docker 命令未安装" >&2
+    exit 1
+fi
+
+if ! command -v az >/dev/null 2>&1; then
+    echo "ERROR: Azure CLI (az) 未安装" >&2
+    exit 1
+fi
+
+# 预检：确认 MongoDB 容器在运行
 if ! docker ps --format '{{.Names}}' | grep -qx "aicbc-mongo"; then
     echo "ERROR: aicbc-mongo 容器未运行，跳过备份" >&2
     exit 1
 fi
 
-# 2. 执行 mongodump
+# 1. 执行 mongodump（输出到容器 /backup，实际即宿主机 $BACKUP_DIR）
 mkdir -p "$BACKUP_DIR"
 docker exec aicbc-mongo mongodump --out "/backup/$TIMESTAMP"
 
-# 3. 压缩备份
-cd "$BACKUP_BASE"
+# 2. 压缩备份
+cd "$BACKUP_BASE" || { echo "ERROR: 无法进入备份目录 $BACKUP_BASE" >&2; exit 1; }
 tar czf "$TIMESTAMP.tar.gz" "$TIMESTAMP"
 rm -rf "$TIMESTAMP"
 
-# 4. 上传到 Azure Blob（如果配置了连接串）
+# 3. 上传到 Azure Blob（如果配置了连接串）
 if [ -n "$AZURE_STORAGE_CONNECTION_STRING" ]; then
     if az storage blob upload \
         --connection-string "$AZURE_STORAGE_CONNECTION_STRING" \
@@ -64,8 +82,5 @@ if [ -n "$AZURE_STORAGE_CONNECTION_STRING" ]; then
 else
     echo "未配置 AZURE_STORAGE_CONNECTION_STRING，备份保留在本地：$BACKUP_BASE/$TIMESTAMP.tar.gz"
 fi
-
-# 5. 清理本地旧备份（无论上传是否成功都执行）
-find "$BACKUP_BASE" -maxdepth 1 -name "*.tar.gz" -type f -mtime +"$RETENTION_DAYS" -exec rm -f {} +
 
 echo "MongoDB 备份完成：$TIMESTAMP.tar.gz"
