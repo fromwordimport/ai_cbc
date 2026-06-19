@@ -19,7 +19,7 @@ from aicbc.analysis import routes as analysis_routes
 from aicbc.api.middleware.audit_log import AuditLogMiddleware
 from aicbc.api.middleware.rate_limit import RateLimitMiddleware
 from aicbc.api.middleware.rbac import RBACMiddleware
-from aicbc.api.routes import admin, personas, questionnaires, responses, simulations
+from aicbc.api.routes import admin, auth, personas, questionnaires, responses, simulations
 from aicbc.config.settings import get_settings
 from aicbc.core.models.db_documents import ALL_DOCUMENT_MODELS
 from aicbc.monitoring.health import router as health_router
@@ -150,6 +150,7 @@ app.add_middleware(
 
 # Register routes
 app.include_router(health_router, tags=["Health"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
 app.include_router(personas.router, prefix="/api/v1", tags=["Personas"])
 app.include_router(simulations.router, prefix="/api/v1", tags=["Simulations"])
