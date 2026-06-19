@@ -1,0 +1,139 @@
+# AI_CBC Azure B2ats v2 裁剪版部署
+# 约束：1 GiB RAM，只运行 api / mongo / redis / nginx
+# worker / beat / prometheus / grafana 在此规格下移除
+
+services:
+  api:
+    image: ghcr.io/fromwordimport/aicbc:latest
+    container_name: aicbc-api
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - MONGODB_URL=mongodb://mongo:27017/aicbc
+      - REDIS_URL=redis://redis:6379/0
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_WORKERS=1
+      - METRICS_PATH=/metrics
+      - SLOW_REQUEST_THRESHOLD=5.0
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.8'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - aicbc-network
+
+  mongo:
+    image: mongo:7.0
+    container_name: aicbc-mongo
+    environment:
+      - MONGO_INITDB_DATABASE=aicbc
+    command:
+      - "--bind_ip"
+      - "0.0.0.0"
+      - "--wiredTigerCacheSizeGB"
+      - "0.125"
+    volumes:
+      - mongo_data:/data/db
+      - ./backups/mongo:/backup
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks:
+      - aicbc-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: aicbc-redis
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "64mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      - "--appendonly"
+      - "yes"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.2'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    networks:
+      - aicbc-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: aicbc-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.azure-b2ats.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: '0.2'
+    networks:
+      - aicbc-network
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  aicbc-network:
+    driver: bridge
