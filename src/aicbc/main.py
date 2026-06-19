@@ -3,10 +3,8 @@
 import os
 from contextlib import asynccontextmanager
 
-import structlog
-from beanie import init_beanie
-from fastapi import FastAPI, Request, status
 import jwt as pyjwt
+import structlog
 from beanie import init_beanie
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware

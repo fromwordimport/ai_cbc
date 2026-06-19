@@ -14,7 +14,6 @@ import type {
   SimulateResponsesResponse,
   RawDatasetExportResponse,
   PersonaDetail,
-  PersonaFullDetail,
   AnalysisJobStatus,
   AnalysisResultResponse,
   ImportanceResponse,
@@ -300,7 +299,7 @@ export const getPersona = async (personaId: string): Promise<PersonaDetail> => {
   return data
 }
 
-export const getPersonaFullDetail = async (personaId: string): Promise<PersonaFullDetail> => {
+export const getPersonaFullDetail = async (personaId: string): Promise<PersonaDetail> => {
   const { data } = await api.get(`/personas/${personaId}`)
   return data
 }

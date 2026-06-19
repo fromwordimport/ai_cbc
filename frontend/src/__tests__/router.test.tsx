@@ -1,8 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { RouterProvider, createMemoryRouter, Navigate } from 'react-router-dom'
+import { RouterProvider, createMemoryRouter, Navigate, Outlet } from 'react-router-dom'
 import { Suspense } from 'react'
 import { router } from '@/router'
+
+// Mock authentication so route navigation renders the protected layout.
+vi.mock('@/services/token', () => ({
+  isAuthenticated: () => true,
+  getToken: () => 'test-token',
+  getRole: () => 'researcher',
+}))
 
 // Mock all page components to avoid loading real implementations
 vi.mock('@/components/Layout', () => ({
@@ -12,6 +19,12 @@ vi.mock('@/components/Layout', () => ({
         <div data-testid="outlet">Outlet Content</div>
       </div>
     )
+  },
+}))
+
+vi.mock('@/pages/Login', () => ({
+  default: function MockLogin() {
+    return <div data-testid="page-login">Login</div>
   },
 }))
 
@@ -56,7 +69,8 @@ describe('router', () => {
 
 describe('router route configuration', () => {
   const rootRoute = router.routes.find((r: any) => r.path === '/')
-  const children = (rootRoute?.children || []) as any[]
+  const layoutRoute = rootRoute?.children?.[0]
+  const children = (layoutRoute?.children || []) as any[]
 
   const routeMap = new Map(children.map((c: any) => [c.path || 'index', c]))
 
@@ -310,7 +324,8 @@ describe('router 404 handling', () => {
 
 describe('router lazy loading verification', () => {
   const rootRoute = router.routes.find((r: any) => r.path === '/')
-  const children = (rootRoute?.children || []) as any[]
+  const layoutRoute = rootRoute?.children?.[0]
+  const children = (layoutRoute?.children || []) as any[]
 
   it('lazy imports are defined for all page components', () => {
     // Verify that the router config references lazy-loaded components
