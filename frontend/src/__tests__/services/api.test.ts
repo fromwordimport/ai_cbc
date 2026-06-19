@@ -346,17 +346,27 @@ describe('API service wrappers', () => {
   })
 
   describe('interceptors', () => {
-    it('request interceptor injects X-API-Key header', () => {
+    it('request interceptor injects Authorization header when token exists', () => {
+      localStorage.setItem('aicbc_token', 'test-token')
       const headers = new axios.AxiosHeaders()
       const config = { headers } as InternalAxiosRequestConfig
-      const result = api.injectApiKey(config)
-      expect(result.headers.get('X-API-Key')).toBe('dev-key-change-in-prod')
+      const result = api.injectAuthToken(config)
+      expect(result.headers.get('Authorization')).toBe('Bearer test-token')
+      localStorage.removeItem('aicbc_token')
+    })
+
+    it('request interceptor omits Authorization when no token', () => {
+      localStorage.removeItem('aicbc_token')
+      const headers = new axios.AxiosHeaders()
+      const config = { headers } as InternalAxiosRequestConfig
+      const result = api.injectAuthToken(config)
+      expect(result.headers.get('Authorization')).toBeUndefined()
     })
 
     it('handleError handles 401', async () => {
       const error = { response: { status: 401, data: {} } }
       await expect(api.handleError(error)).rejects.toBe(error)
-      expect(messageError).toHaveBeenCalledWith('认证失败，请检查 API Key')
+      expect(messageError).toHaveBeenCalledWith('登录已过期，请重新登录')
     })
 
     it('handleError handles 403', async () => {
