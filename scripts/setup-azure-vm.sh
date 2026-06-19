@@ -11,7 +11,7 @@ sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 # 2. 安装 Docker（使用 Docker 官方安装脚本）
-# 参考：https://docs.docker.com/engine/install/ubuntu/
+# 参考文档：https://docs.docker.com/engine/install/ubuntu/
 if ! command -v docker &> /dev/null; then
     curl -fsSL https://get.docker.com | sh
     sudo usermod -aG docker "$USER"
@@ -28,15 +28,7 @@ if [ ! -f /swapfile ]; then
 fi
 
 # 4. 创建应用目录及子目录（幂等）
-if [ ! -d "$APP_DIR" ]; then
-    sudo mkdir -p "$APP_DIR"
-fi
-sudo chown -R "$USER:$USER" "$APP_DIR"
-
-mkdir -p "$APP_DIR/logs"
-mkdir -p "$APP_DIR/backups/mongo"
-mkdir -p "$APP_DIR/ssl"
-mkdir -p "$APP_DIR/certbot/www"
-mkdir -p "$APP_DIR/certbot/conf"
+sudo mkdir -p "$APP_DIR"/{logs,backups/mongo,ssl,certbot/{www,conf}}
+sudo chown -R "$(whoami):$(whoami)" "$APP_DIR"
 
 echo "VM 初始化完成。下一步：克隆项目到 $APP_DIR 并配置 .env"
