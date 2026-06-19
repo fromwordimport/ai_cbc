@@ -8,9 +8,10 @@ APP_DIR="/opt/aicbc"
 
 # 1. 更新系统
 sudo apt-get update
-sudo apt-get upgrade -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
-# 2. 安装 Docker
+# 2. 安装 Docker（使用 Docker 官方安装脚本）
+# 参考：https://docs.docker.com/engine/install/ubuntu/
 if ! command -v docker &> /dev/null; then
     curl -fsSL https://get.docker.com | sh
     sudo usermod -aG docker "$USER"
@@ -26,9 +27,11 @@ if [ ! -f /swapfile ]; then
     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 fi
 
-# 4. 创建应用目录
-sudo mkdir -p "$APP_DIR"
-sudo chown "$USER:$USER" "$APP_DIR"
+# 4. 创建应用目录（幂等：仅当不存在时创建并设置属主）
+if [ ! -d "$APP_DIR" ]; then
+    sudo mkdir -p "$APP_DIR"
+    sudo chown "$USER:$USER" "$APP_DIR"
+fi
 
 # 5. 创建子目录
 mkdir -p "$APP_DIR/logs"
