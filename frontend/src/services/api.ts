@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
+import { clearAuth, getToken } from './token'
 import type {
   StudyListResponse,
   StudyDetail,
@@ -44,7 +45,6 @@ import type {
   AdminSettings,
 } from '@/types/api'
 
-const API_KEY = import.meta.env.VITE_API_KEY || 'dev-key-change-in-prod'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 const ROOT_API_BASE_URL = import.meta.env.VITE_ROOT_API_BASE_URL || ''
 
@@ -66,21 +66,19 @@ const rootApi = axios.create({
 })
 
 // ---------------------------------------------------------------------------
-// Request interceptor: inject API Key
+// Request interceptor: inject Bearer token
 // ---------------------------------------------------------------------------
 
-export const injectApiKey = (config: InternalAxiosRequestConfig) => {
-  config.headers.set('X-API-Key', API_KEY)
-  // Admin endpoints require the admin role in production (DEBUG=false).
-  // The backend RBAC middleware accepts X-User-Role for service accounts.
-  if (config.url?.startsWith('/admin')) {
-    config.headers.set('X-User-Role', 'admin')
+export const injectAuthToken = (config: InternalAxiosRequestConfig) => {
+  const token = getToken()
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`)
   }
   return config
 }
 
-api.interceptors.request.use(injectApiKey, (error) => Promise.reject(error))
-rootApi.interceptors.request.use(injectApiKey, (error) => Promise.reject(error))
+api.interceptors.request.use(injectAuthToken, (error) => Promise.reject(error))
+rootApi.interceptors.request.use(injectAuthToken, (error) => Promise.reject(error))
 
 // ---------------------------------------------------------------------------
 // Response interceptor: unified error handling
@@ -91,7 +89,9 @@ export const handleError = (error: { response?: { status: number; data?: { detai
     const status = error.response.status
     const detail = error.response.data?.detail || error.response.data?.error || '未知错误'
     if (status === 401) {
-      message.error('认证失败，请检查 API Key')
+      message.error('登录已过期，请重新登录')
+      clearAuth()
+      window.location.href = '/login'
     } else if (status === 403) {
       message.error('权限不足')
     } else if (status === 404) {
