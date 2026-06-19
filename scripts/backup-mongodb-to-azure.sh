@@ -58,20 +58,19 @@ if ! docker ps --format '{{.Names}}' | grep -qx "aicbc-mongo"; then
 fi
 
 # 1. 执行 mongodump（输出到容器 /backup，实际即宿主机 $BACKUP_DIR）
-mkdir -p "$BACKUP_DIR"
+mkdir -p "$BACKUP_DIR" || { echo "ERROR: 无法创建备份目录 $BACKUP_DIR" >&2; exit 1; }
 docker exec aicbc-mongo mongodump --out "/backup/$TIMESTAMP"
 
-# 2. 压缩备份
-cd "$BACKUP_BASE" || { echo "ERROR: 无法进入备份目录 $BACKUP_BASE" >&2; exit 1; }
-tar czf "$TIMESTAMP.tar.gz" "$TIMESTAMP"
-rm -rf "$TIMESTAMP"
+# 2. 压缩备份（使用绝对路径，避免依赖 cd）
+tar czf "$BACKUP_BASE/$TIMESTAMP.tar.gz" -C "$BACKUP_BASE" "$TIMESTAMP"
+rm -rf "$BACKUP_DIR"
 
 # 3. 上传到 Azure Blob（如果配置了连接串）
 if [ -n "$AZURE_STORAGE_CONNECTION_STRING" ]; then
     if az storage blob upload \
         --connection-string "$AZURE_STORAGE_CONNECTION_STRING" \
         --container-name "$AZURE_BACKUP_CONTAINER" \
-        --file "$TIMESTAMP.tar.gz" \
+        --file "$BACKUP_BASE/$TIMESTAMP.tar.gz" \
         --name "aicbc-mongo-$TIMESTAMP.tar.gz" \
         --overwrite false; then
         echo "备份已上传：aicbc-mongo-$TIMESTAMP.tar.gz"
