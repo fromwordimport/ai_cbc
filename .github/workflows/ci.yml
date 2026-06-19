@@ -9,7 +9,7 @@ name: CI
 
 on:
   push:
-    branches: [master, release/*, hotfix/*, feature/*, worktree/*, worktree-*]
+    branches: [master, release/*, hotfix/*]
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
