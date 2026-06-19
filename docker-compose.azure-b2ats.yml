@@ -7,6 +7,8 @@ services:
     # 使用预构建镜像直接部署，适用于 Azure 等云端环境，无需本地构建
     image: ghcr.io/fromwordimport/aicbc:latest
     container_name: aicbc-api
+    env_file:
+      - .env
     environment:
       - ENVIRONMENT=production
       - DEBUG=false
@@ -18,24 +20,6 @@ services:
       - API_WORKERS=1
       - METRICS_PATH=/metrics
       - SLOW_REQUEST_THRESHOLD=5.0
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SECRET_KEY=${SECRET_KEY:-}
-      - COST_FUSE_SINGLE_STUDY_CNY=${COST_FUSE_SINGLE_STUDY_CNY}
-      - COST_FUSE_DAILY_CNY=${COST_FUSE_DAILY_CNY}
-      - COST_FUSE_WEEKLY_CNY=${COST_FUSE_WEEKLY_CNY}
-      - COST_FUSE_MONTHLY_CNY=${COST_FUSE_MONTHLY_CNY}
-      - COST_FUSE_DEGRADE_MODEL=${COST_FUSE_DEGRADE_MODEL}
-      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
-      - ANTHROPIC_MODEL_PERSONA=${ANTHROPIC_MODEL_PERSONA:-claude-sonnet-4-6}
-      - ANTHROPIC_MODEL_SIMULATION=${ANTHROPIC_MODEL_SIMULATION:-claude-sonnet-4-6}
-      - ANTHROPIC_MODEL_AUDIT=${ANTHROPIC_MODEL_AUDIT:-claude-haiku-4-5}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
-      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.3}
-      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-4096}
-      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-120}
-      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-3}
     depends_on:
       mongo:
         condition: service_healthy
