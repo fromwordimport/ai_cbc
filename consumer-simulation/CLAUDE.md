@@ -48,3 +48,4 @@ When editing any document here, preserve:
 - `../configs/tags/*.json` — machine-readable tag definitions consumed by generators.
 - `../docs/目标人群角色卡设计.md` — target-audience role cards.
 - `../cbc-questionnaire-system/04-CBC与模拟消费者集成方案.md` — downstream integration contract.
+- `../CLAUDE.md` — global repository guidance, team roles, and editing conventions.

@@ -40,3 +40,4 @@ Files use two-digit prefixes (`01-` through `07-`) to indicate reading order.
 - `../docs/建模管线与API设计.md` — cross-cutting modeling pipeline.
 - `../docs/数据字典.md` — `AnalysisResult` schema.
 - `../src/aicbc/analysis/` — implementation of these specifications.
+- `../CLAUDE.md` — global repository guidance, team roles, and editing conventions.

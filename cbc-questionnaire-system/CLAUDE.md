@@ -37,3 +37,4 @@ Files use two-digit prefixes (`01-` through `05-`) to indicate reading order.
 - `../docs/数据字典.md` — data contracts for `CBCQuestionnaire`, `CBCRawDataset`.
 - `../cbc-analysis-system/02-数据接口规范.md` — downstream analysis input format.
 - `../src/aicbc/questionnaire/` — implementation of these specifications.
+- `../CLAUDE.md` — global repository guidance, team roles, and editing conventions.
