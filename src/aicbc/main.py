@@ -6,14 +6,15 @@ from contextlib import asynccontextmanager
 import structlog
 from beanie import init_beanie
 from fastapi import FastAPI, Request, status
+import jwt as pyjwt
+from beanie import init_beanie
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.responses import ORJSONResponse
+from jwt import PyJWTError
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
-
-import jwt as pyjwt
-from jwt import PyJWTError
 
 from aicbc.analysis import routes as analysis_routes
 from aicbc.api.middleware.audit_log import AuditLogMiddleware
@@ -121,7 +122,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             except PyJWTError:
                 pass
 
-        return JSONResponse(
+        return ORJSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"error": "Unauthorized"},
         )

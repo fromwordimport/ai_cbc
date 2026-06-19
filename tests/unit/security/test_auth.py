@@ -93,10 +93,15 @@ def test_login_with_wrong_password(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_login_with_wrong_username(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": "hacker", "password": "researcher-pass"},
+    )
+    assert response.status_code == 401
+
+
 def test_jwt_researcher_can_read_and_create(client: TestClient) -> None:
-    token = create_access_token("researcher", "researcher", settings=client.app.state.settings if hasattr(client.app.state, "settings") else None)
-    # Use auth_settings from fixture indirectly via decode above; for create we can pass settings manually
-    # Simpler: create token without settings override using default get_settings monkeypatched to auth_settings.
     token = create_access_token("researcher", "researcher")
     headers = {"Authorization": f"Bearer {token}"}
     assert client.get("/api/v1/studies", headers=headers).status_code == 200
