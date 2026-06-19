@@ -70,6 +70,7 @@ Standard interfaces (full schemas in [`docs/数据字典.md`](docs/数据字典.
 2. **Four-Layer Persona Model**: Demographics → Behavior → Psychology → Scenarios. Upper layers explain anomalies in lower layers.
 3. **Statistical Rigor**: HB models must report R-hat and ESS; R-hat > 1.1 means non-convergence. Effects coding is the default. Price coefficients must be negative for WTP calculations.
 4. **Bias Zero-Tolerance**: Virtual consumer preferences must not systematically correlate with protected attributes. All persona batches undergo automated bias auditing.
+5. **Test File Integrity**: 不得在用户未明确授权的情况下修改测试文件（包括 `tests/`、`frontend/src/__tests__/` 目录及任何 `*test*.py`、`*spec*` 等测试相关文件）。若确需改动，必须先获得用户明确授权。
 
 ## Editing Conventions
 
