@@ -54,6 +54,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         "/docs",
         "/redoc",
         "/openapi.json",
+        "/api/v1/auth/login",
     }
 
     # Method-based minimum role.
