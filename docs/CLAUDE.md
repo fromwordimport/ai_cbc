@@ -36,28 +36,11 @@ This directory contains **cross-cutting documentation** that spans all three sub
 
 ## Editing Conventions
 
-- Documents use Markdown with **Chinese as the primary language**.
-- Frontmatter uses Chinese blockquote style (`> **版本**：v1.0`), not YAML.
-- Cross-references use relative paths with `[]()` links.
+遵循根目录 `../CLAUDE.md` 中的全局编辑规范。本目录特有的补充：
+
 - **Update `docs/文档索引与导航.md`** when adding new documents.
 - Parameter tables are authoritative — changing a threshold (e.g., `rhat_max < 1.1`) requires同步 updates in all referencing documents.
 
 ## Role Ownership
 
-| Role | Key Documents |
-|------|---------------|
-| 小P (PM) | `文档索引与导航.md`, `项目进度计划与里程碑.md`, `风险管理登记册.md` |
-| 小联 (Conjoint Expert) | `洗碗机CBC实验设计方案.md`, `cbc-questionnaire-system/` |
-| 小数 (Data/Modeling Scientist) | `建模管线与API设计.md` (with 小端), `cbc-analysis-system/` |
-| 小应 (LLM Application Engineer) | `consumer-simulation/07-Harness架构设计方案.md`, prompts, `src/aicbc/agents/` |
-| 小示 (Behavior Engineer) | `consumer-simulation/02-阶段一-画像生成.md`, `configs/tags/`, `docs/目标人群角色卡设计.md` |
-| 小端 (Backend Engineer) | `数据字典.md`, `全链路集成架构设计.md`, `端到端数据流与集成规范.md`, `src/aicbc/api/`, `src/aicbc/core/store*.py` |
-| 小伦 (Ethics/Bias Auditor) | `伦理与偏见审计规范.md`, `虚拟消费者公平性规范.md`, `tests/redteam/` |
-| 小测 (QA Engineer) | `consumer-simulation/14-测试规范.md`, `docs/测试/`, `tests/` |
-| 小验 (Business Acceptance) | `项目成功标准书.md`, `业务验收标准与KPI框架.md`, `docs/验收/` |
-| 小维 (DevOps/MLOps) | `CI-CD流水线设计.md`, `.github/workflows/`, `docker/`, `k8s/`, `docker-compose.yml` |
-| 小控 (Cost Engineer) | `成本管控方案.md`, `src/aicbc/cost/`, cost env vars |
-| 小前 (Frontend Engineer) | `frontend/`, `docs/测试/前端Staging冒烟测试清单.md` |
-| 小速 (Performance Engineer) | Performance gates and optimizations |
-| 小培 (Training) | `docs/training/`, training materials and onboarding |
-| 小安 (Security Engineer) | `Agent安全架构纲要.md`, `安全架构与红队测试规范.md`, security reviews |
+参见根目录 `../CLAUDE.md` 中的团队角色表。本目录文档主要由 小P、小联、小数、小端、小伦、小测、小验、小维、小控、小前、小培、小安 负责。
