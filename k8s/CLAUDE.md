@@ -97,3 +97,4 @@ The template includes:
 - `../.github/workflows/cd-production.yml` — production deployment (manual approval)
 - `../.github/workflows/security-scan.yml` — scheduled security scans
 - `../.github/workflows/nightly.yml` — scheduled full tests and performance checks
+- `../CLAUDE.md` — global repository guidance and team roles.

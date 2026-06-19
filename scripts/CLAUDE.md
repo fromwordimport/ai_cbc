@@ -28,3 +28,4 @@ This directory contains **utility scripts** for development, verification, and b
 - `../src/CLAUDE.md` — backend source conventions.
 - `../frontend/CLAUDE.md` — frontend dev server usage.
 - `../tests/CLAUDE.md` — test conventions.
+- `../CLAUDE.md` — global repository guidance and team roles.

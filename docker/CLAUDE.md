@@ -46,3 +46,4 @@ docker compose up --build
 - `../k8s/CLAUDE.md` — Kubernetes production deployment.
 - `../src/CLAUDE.md` — backend source conventions.
 - `../docs/CI-CD流水线设计.md` — CI/CD design.
+- `../CLAUDE.md` — global repository guidance and team roles.

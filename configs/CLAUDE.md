@@ -33,3 +33,4 @@ This directory holds **runtime configuration assets** consumed by the backend an
 - `../消费者画像.md` — source-of-truth tag system.
 - `../consumer-simulation/` — generation subsystem specs.
 - `../src/aicbc/generators/profile_generator.py` — consumer of `prompts/persona_generation.txt`.
+- `../CLAUDE.md` — global repository guidance and team roles.
