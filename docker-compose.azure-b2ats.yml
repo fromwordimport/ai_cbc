@@ -4,6 +4,7 @@
 
 services:
   api:
+    # 使用预构建镜像直接部署，适用于 Azure 等云端环境，无需本地构建
     image: ghcr.io/fromwordimport/aicbc:latest
     container_name: aicbc-api
     environment:
@@ -19,7 +20,7 @@ services:
       - SLOW_REQUEST_THRESHOLD=5.0
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SECRET_KEY=${SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY:-}
     depends_on:
       mongo:
         condition: service_healthy
