@@ -1,8 +1,10 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { Spin } from 'antd'
 import Layout from './components/Layout'
+import { isAuthenticated } from './services/token'
 
+const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const ImportanceDashboard = lazy(() => import('./pages/ImportanceDashboard'))
 const MarketSimulator = lazy(() => import('./pages/MarketSimulator'))
@@ -31,26 +33,44 @@ const Loading = (
   />
 )
 
+const AuthGuard: React.FC = () => {
+  return isAuthenticated() ? <Outlet /> : <Navigate to="/login" replace />
+}
+
 export const router = createBrowserRouter([
   {
+    path: '/login',
+    element: (
+      <Suspense fallback={Loading}>
+        <Login />
+      </Suspense>
+    ),
+  },
+  {
     path: '/',
-    element: <Layout />,
+    element: <AuthGuard />,
     children: [
-      { index: true, element: <Suspense fallback={Loading}><Dashboard /></Suspense> },
-      { path: 'importance', element: <Suspense fallback={Loading}><ImportanceDashboard /></Suspense> },
-      { path: 'market-simulator', element: <Suspense fallback={Loading}><MarketSimulator /></Suspense> },
-      { path: 'studies/new', element: <Suspense fallback={Loading}><StudyCreate /></Suspense> },
-      { path: 'studies/:studyId/questionnaire', element: <Suspense fallback={Loading}><QuestionnairePreview /></Suspense> },
-      { path: 'studies/:studyId/responses', element: <Suspense fallback={Loading}><ResponseSimulator /></Suspense> },
-      { path: 'personas', element: <Suspense fallback={Loading}><PersonaManager /></Suspense> },
-      { path: 'personas/:personaId', element: <Suspense fallback={Loading}><PersonaDetail /></Suspense> },
-      { path: 'interview', element: <Suspense fallback={Loading}><InterviewLab /></Suspense> },
-      { path: 'segment-comparison', element: <Suspense fallback={Loading}><SegmentComparison /></Suspense> },
-      { path: 'questionnaires', element: <Suspense fallback={Loading}><QuestionnaireConfig /></Suspense> },
-      { path: 'analysis-status', element: <Suspense fallback={Loading}><AnalysisStatus /></Suspense> },
-      { path: 'responses', element: <Navigate to="/studies/demo-study-001/responses" replace /> },
-      { path: 'studies/:studyId/design', element: <Suspense fallback={Loading}><AttributeDesign /></Suspense> },
-      { path: 'settings', element: <Suspense fallback={Loading}><Settings /></Suspense> },
+      {
+        path: '/',
+        element: <Layout />,
+        children: [
+          { index: true, element: <Suspense fallback={Loading}><Dashboard /></Suspense> },
+          { path: 'importance', element: <Suspense fallback={Loading}><ImportanceDashboard /></Suspense> },
+          { path: 'market-simulator', element: <Suspense fallback={Loading}><MarketSimulator /></Suspense> },
+          { path: 'studies/new', element: <Suspense fallback={Loading}><StudyCreate /></Suspense> },
+          { path: 'studies/:studyId/questionnaire', element: <Suspense fallback={Loading}><QuestionnairePreview /></Suspense> },
+          { path: 'studies/:studyId/responses', element: <Suspense fallback={Loading}><ResponseSimulator /></Suspense> },
+          { path: 'personas', element: <Suspense fallback={Loading}><PersonaManager /></Suspense> },
+          { path: 'personas/:personaId', element: <Suspense fallback={Loading}><PersonaDetail /></Suspense> },
+          { path: 'interview', element: <Suspense fallback={Loading}><InterviewLab /></Suspense> },
+          { path: 'segment-comparison', element: <Suspense fallback={Loading}><SegmentComparison /></Suspense> },
+          { path: 'questionnaires', element: <Suspense fallback={Loading}><QuestionnaireConfig /></Suspense> },
+          { path: 'analysis-status', element: <Suspense fallback={Loading}><AnalysisStatus /></Suspense> },
+          { path: 'responses', element: <Navigate to="/studies/demo-study-001/responses" replace /> },
+          { path: 'studies/:studyId/design', element: <Suspense fallback={Loading}><AttributeDesign /></Suspense> },
+          { path: 'settings', element: <Suspense fallback={Loading}><Settings /></Suspense> },
+        ],
+      },
     ],
   },
 ])
