@@ -431,22 +431,27 @@ class TestFullPipelineE2E:
         feature_cols = get_feature_columns(attributes)
         expected_param_count = n_parameters(attributes)
         assert len(feature_cols) == expected_param_count
-        # price should be a single column (continuous)
+
+        # price should be a single column (continuous/price attribute)
         assert "price" in feature_cols
-        # 3-level categoricals → 2 parameters each (brand has 4 levels → 3)
-        assert "capacity_0" in feature_cols
-        assert "capacity_1" in feature_cols
-        assert "installation_0" in feature_cols
-        assert "installation_1" in feature_cols
-        assert "features_0" in feature_cols
-        assert "features_1" in feature_cols
-        assert "brand_0" in feature_cols
-        assert "brand_1" in feature_cols
-        assert "brand_2" in feature_cols
-        assert "energy_0" in feature_cols
-        assert "energy_1" in feature_cols
-        # Total: 1 (price) + 2 + 2 + 2 + 3 + 2 = 12
-        assert len(feature_cols) == 12
+
+        # Each categorical/ordinal attribute produces k-1 columns with indices 0..k-2
+        for attr in attributes:
+            if attr.type in (AttributeType.CATEGORICAL, AttributeType.ORDINAL):
+                prefix_cols = [c for c in feature_cols if c.startswith(f"{attr.id}_")]
+                assert len(prefix_cols) == len(attr.levels) - 1, (
+                    f"Attribute {attr.id} should have {len(attr.levels) - 1} columns, "
+                    f"got {len(prefix_cols)}"
+                )
+                expected_names = [f"{attr.id}_{i}" for i in range(len(attr.levels) - 1)]
+                assert set(prefix_cols) == set(expected_names), (
+                    f"Attribute {attr.id} columns mismatch: expected {expected_names}, "
+                    f"got {prefix_cols}"
+                )
+            else:
+                assert attr.id in feature_cols, (
+                    f"Continuous/price attribute {attr.id} missing from feature_cols"
+                )
 
         # ── Step 4b: Validate dataset ──
         validation = validate_dataset(simulated_dataset, attributes)
