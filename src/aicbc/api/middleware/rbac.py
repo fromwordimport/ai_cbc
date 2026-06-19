@@ -93,8 +93,10 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        role = self._resolve_role(request)
-        request.state.role = role
+        role = getattr(request.state, "role", None)
+        if role is None:
+            role = self._resolve_role(request)
+            request.state.role = role
 
         required = self._required_role(request)
         if not self._role_satisfies(role, required):
