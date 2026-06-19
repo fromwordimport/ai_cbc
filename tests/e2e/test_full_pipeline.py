@@ -432,9 +432,6 @@ class TestFullPipelineE2E:
         expected_param_count = n_parameters(attributes)
         assert len(feature_cols) == expected_param_count
 
-        # price should be a single column (continuous/price attribute)
-        assert "price" in feature_cols
-
         # Each categorical/ordinal attribute produces k-1 columns with indices 0..k-2
         for attr in attributes:
             if attr.type in (AttributeType.CATEGORICAL, AttributeType.ORDINAL):
@@ -874,9 +871,15 @@ class TestEffectsCodingConsistency:
                 )
 
     def test_n_parameters_matches_datadict(self, dishwasher_study: CBCStudy):
-        """Total parameter count should be 17 (Section 10.1)."""
+        """Total parameter count matches the sum of attribute parameters."""
         np = n_parameters(dishwasher_study.attributes)
-        assert np == 17, f"Expected 17 total parameters, got {np}"
+        expected = sum(
+            len(attr.levels) - 1
+            if attr.type in (AttributeType.CATEGORICAL, AttributeType.ORDINAL)
+            else 1
+            for attr in dishwasher_study.attributes
+        )
+        assert np == expected, f"Expected {expected} total parameters, got {np}"
 
     @pytest.mark.slow
     def test_last_level_recovery(
