@@ -5,7 +5,7 @@
 services:
   api:
     # 使用预构建镜像直接部署，适用于 Azure 等云端环境，无需本地构建
-    image: ghcr.io/fromwordimport/aicbc:latest
+    image: ghcr.io/fromwordimport/ai_cbc:latest
     container_name: aicbc-api
     env_file:
       - .env
@@ -54,7 +54,7 @@ services:
       - "--bind_ip"
       - "0.0.0.0"
       - "--wiredTigerCacheSizeGB"
-      - "0.125"
+      - "0.25"
     volumes:
       - mongo_data:/data/db
       - ./backups/mongo:/backup
