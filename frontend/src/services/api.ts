@@ -53,7 +53,9 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000,
+  // Persona generation can trigger multiple sequential LLM calls
+  // (4 layers + auxiliary + bias retry), so allow up to 3 minutes.
+  timeout: 180000,
 })
 
 // Root-level endpoints are not prefixed with /api/v1.
