@@ -75,6 +75,9 @@ jobs:
             cd /opt/aicbc
             git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/fromwordimport/ai_cbc.git
             git fetch origin master
+            echo "=== 本地变更检查 ==="
+            git status --short
+            git diff --stat
             if ! git diff --quiet HEAD; then
               echo "WARNING: 检测到本地变更，中止部署以防止数据丢失" >&2
               exit 1
