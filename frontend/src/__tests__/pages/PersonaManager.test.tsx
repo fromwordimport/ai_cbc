@@ -6,11 +6,13 @@ import PersonaManager from '@/pages/PersonaManager'
 const getPersonas = vi.fn()
 const generatePersonas = vi.fn()
 const deletePersona = vi.fn()
+const getStudies = vi.fn()
 
 vi.mock('@/services/api', () => ({
   getPersonas: (...args: any[]) => getPersonas(...args),
   generatePersonas: (...args: any[]) => generatePersonas(...args),
   deletePersona: (...args: any[]) => deletePersona(...args),
+  getStudies: (...args: any[]) => getStudies(...args),
 }))
 
 vi.mock('antd', async () => {
@@ -28,6 +30,7 @@ vi.mock('antd', async () => {
 describe('PersonaManager', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getStudies.mockResolvedValue({ studies: [] })
   })
 
   const renderPage = () =>
@@ -74,7 +77,7 @@ describe('PersonaManager', () => {
     fireEvent.click(screen.getByText('批量生成'))
     await waitFor(() => expect(screen.getByText('批量生成虚拟消费者')).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText('例如：dishwasher-2024q3'), { target: { value: 's1' } })
+    fireEvent.change(screen.getByTestId('study-id-input').querySelector('input')!, { target: { value: 's1' } })
     fireEvent.click(screen.getByText('开始生成'))
     await waitFor(() => expect(generatePersonas).toHaveBeenCalledWith({ study_id: 's1', count: 2 }))
   })

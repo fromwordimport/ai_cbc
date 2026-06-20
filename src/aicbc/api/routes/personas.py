@@ -113,7 +113,14 @@ async def generate_personas_batch(
         return str(exc)
 
     for i in range(request.count):
-        persona_id = f"persona-{safe_study_id}-{i + 1:03d}"
+        base_persona_id = f"persona-{safe_study_id}-{i + 1:03d}"
+        persona_id = base_persona_id
+        # Avoid overwriting previously generated personas by appending a suffix
+        # when the deterministic ID already exists.
+        suffix = 1
+        while await store.aget(persona_id) is not None:
+            persona_id = f"{base_persona_id}-{suffix:03d}"
+            suffix += 1
         try:
             seed = seed_gen.generate_seed()
             profile = profile_gen.generate(persona_id, seed)

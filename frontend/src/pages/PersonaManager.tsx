@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Tag, Space, Modal, Form, Input, message, Spin, Pagination, Popconfirm, Alert } from 'antd'
+import { Card, Table, Button, Tag, Space, Modal, Form, Input, message, Spin, Pagination, Popconfirm, Alert, AutoComplete } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
-import { getPersonas, generatePersonas, deletePersona } from '@/services/api'
-import type { PersonaSummary } from '@/types/api'
+import { getPersonas, generatePersonas, deletePersona, getStudies } from '@/services/api'
+import type { PersonaSummary, StudySummary } from '@/types/api'
 
 const PersonaManager: React.FC = () => {
   const navigate = useNavigate()
@@ -15,6 +15,9 @@ const PersonaManager: React.FC = () => {
   const [genModalOpen, setGenModalOpen] = useState(false)
   const [genLoading, setGenLoading] = useState(false)
   const [genForm] = Form.useForm()
+
+  const [studies, setStudies] = useState<StudySummary[]>([])
+  const [studiesLoading, setStudiesLoading] = useState(false)
 
   const fetchPersonas = async (p = page, ps = pageSize) => {
     setLoading(true)
@@ -32,6 +35,15 @@ const PersonaManager: React.FC = () => {
   useEffect(() => {
     fetchPersonas()
   }, [page, pageSize])
+
+  useEffect(() => {
+    if (!genModalOpen) return
+    setStudiesLoading(true)
+    getStudies(1, 100)
+      .then((res) => setStudies(res.studies))
+      .catch(() => message.error('加载研究列表失败'))
+      .finally(() => setStudiesLoading(false))
+  }, [genModalOpen])
 
   const handleDelete = async (personaId: string) => {
     try {
@@ -177,9 +189,25 @@ const PersonaManager: React.FC = () => {
           <Form.Item
             label="研究ID"
             name="study_id"
-            rules={[{ required: true, message: '请输入研究ID' }]}
+            rules={[{ required: true, message: '请输入或选择研究ID' }]}
           >
-            <Input placeholder="例如：dishwasher-2024q3" />
+            <AutoComplete
+              data-testid="study-id-input"
+              options={studies.map((s) => ({
+                value: s.study_id,
+                label: `${s.study_id} (${s.product_category || '未分类'})`,
+              }))}
+              placeholder="输入或选择研究ID"
+              allowClear
+              showSearch
+              filterOption={(input, option) => {
+                const value = String(option?.value || '').toLowerCase()
+                const label = String(option?.label || '').toLowerCase()
+                const query = input.toLowerCase()
+                return value.includes(query) || label.includes(query)
+              }}
+              notFoundContent={studiesLoading ? <Spin size="small" /> : '无匹配研究'}
+            />
           </Form.Item>
           <Form.Item
             label="生成数量"
