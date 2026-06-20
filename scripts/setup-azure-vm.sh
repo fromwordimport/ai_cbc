@@ -11,7 +11,7 @@ sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 # 2. 确保基础工具已安装
-sudo apt-get install -y curl
+sudo apt-get install -y curl git certbot ufw
 
 # 3. 安装 Docker（使用 Docker 官方安装脚本）
 # 参考文档：https://docs.docker.com/engine/install/ubuntu/
@@ -31,7 +31,15 @@ if [ ! -f /swapfile ]; then
     echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 fi
 
-# 5. 创建应用目录及子目录（幂等）
+# 5. 配置 UFW 防火墙（仅开放 22/80/443）
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+
+# 6. 创建应用目录及子目录（幂等）
 # 目录归当前执行用户所有，便于后续 git clone 和 docker compose 操作
 sudo mkdir -p "$APP_DIR"/{logs,backups/mongo,ssl,certbot/{www,conf}}
 sudo chown -R "$(whoami):$(whoami)" "$APP_DIR"
