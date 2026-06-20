@@ -64,14 +64,16 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USER }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          envs: IMAGE_TAG
+          envs: IMAGE_TAG,GITHUB_TOKEN
           script_stop: true
           script: |
             cd /opt/aicbc
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/fromwordimport/ai_cbc.git
             git fetch origin master
             if ! git diff --quiet HEAD; then
               echo "WARNING: 检测到本地变更，中止部署以防止数据丢失" >&2
