@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Tag, Space, Modal, Form, Input, message, Spin, Pagination, Popconfirm, Alert, Typography } from 'antd'
+import { Card, Table, Button, Tag, Space, Modal, Form, Input, message, Spin, Pagination, Popconfirm, Alert } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
 import { getPersonas, generatePersonas, deletePersona } from '@/services/api'
 import type { PersonaSummary } from '@/types/api'
