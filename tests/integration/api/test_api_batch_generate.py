@@ -134,6 +134,28 @@ class TestBatchGenerateHappyPath:
         finally:
             _clear_overrides()
 
+    def test_repeated_generation_uses_continuous_ids(
+        self, mock_llm_client: MagicMock, clean_store: PersonaStore
+    ) -> None:
+        """Repeated generation for the same study should continue the sequence."""
+        _override_deps(mock_llm_client, clean_store)
+
+        try:
+            first = client.post(
+                "/api/v1/personas/generate", json={"count": 2, "study_id": "continuous"}
+            )
+            assert first.status_code == 201
+            assert first.json()["personas"][0]["persona_id"] == "persona-continuous-001"
+
+            second = client.post(
+                "/api/v1/personas/generate", json={"count": 2, "study_id": "continuous"}
+            )
+            assert second.status_code == 201
+            ids = [p["persona_id"] for p in second.json()["personas"]]
+            assert ids == ["persona-continuous-003", "persona-continuous-004"]
+        finally:
+            _clear_overrides()
+
     def test_personas_stored_after_generation(
         self, mock_llm_client: MagicMock, clean_store: PersonaStore
     ) -> None:
