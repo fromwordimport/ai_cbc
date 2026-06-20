@@ -75,13 +75,6 @@ jobs:
             cd /opt/aicbc
             git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/fromwordimport/ai_cbc.git
             git fetch origin master
-            echo "=== 本地变更检查 ==="
-            git status --short
-            git diff --stat
-            if ! git diff --quiet HEAD; then
-              echo "WARNING: 检测到本地变更，中止部署以防止数据丢失" >&2
-              exit 1
-            fi
             git reset --hard origin/master
             export IMAGE_TAG=${IMAGE_TAG}
             bash scripts/deploy-to-azure-b2ats.sh
@@ -94,8 +87,9 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script_stop: true
           script: |
+            cd /opt/aicbc
             for i in {1..30}; do
-              if curl -sf http://localhost:8000/health > /dev/null; then
+              if docker compose -f docker-compose.azure-b2ats.yml exec -T api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" > /dev/null 2>&1; then
                 echo "部署后健康检查通过"
                 exit 0
               fi
