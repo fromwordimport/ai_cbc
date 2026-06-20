@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Table, Button, Tag, Space, Modal, Form, Input, message, Spin, Pagination, Popconfirm } from 'antd'
+import { Card, Table, Button, Tag, Space, Modal, Form, Input, message, Spin, Pagination, Popconfirm, Alert, Typography } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
 import { getPersonas, generatePersonas, deletePersona } from '@/services/api'
 import type { PersonaSummary } from '@/types/api'
@@ -185,11 +185,19 @@ const PersonaManager: React.FC = () => {
             label="生成数量"
             name="count"
             rules={[{ required: true, message: '请输入数量' }]}
-            initialValue={10}
+            initialValue={2}
+            extra="单次建议 1-3 个，最多 5 个。大量生成请分多次操作，每个画像需要多次 LLM 调用，耗时约 30-90 秒。"
           >
-            <Input type="number" min={1} max={100} />
+            <Input type="number" min={1} max={5} />
           </Form.Item>
           <Form.Item>
+            <Alert
+              message="生成耗时提示"
+              description="当前为同步生成：前端会保持连接等待后端完成。若网络不稳定或生成数量较多，仍可能超时，建议少量多次。"
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
             <Button type="primary" htmlType="submit" loading={genLoading} block>
               开始生成
             </Button>

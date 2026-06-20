@@ -76,6 +76,6 @@ describe('PersonaManager', () => {
 
     fireEvent.change(screen.getByPlaceholderText('例如：dishwasher-2024q3'), { target: { value: 's1' } })
     fireEvent.click(screen.getByText('开始生成'))
-    await waitFor(() => expect(generatePersonas).toHaveBeenCalledWith({ study_id: 's1', count: 10 }))
+    await waitFor(() => expect(generatePersonas).toHaveBeenCalledWith({ study_id: 's1', count: 2 }))
   })
 })
