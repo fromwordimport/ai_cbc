@@ -68,6 +68,24 @@ describe('PersonaManager', () => {
     await waitFor(() => expect(deletePersona).toHaveBeenCalledWith('p1'))
   })
 
+  it('filters personas by study id', async () => {
+    getPersonas.mockResolvedValue({ personas: [], total: 0 })
+    getStudies.mockResolvedValue({
+      studies: [
+        { study_id: 's1', product_category: '洗碗机' },
+        { study_id: 's2', product_category: '冰箱' },
+      ],
+    })
+
+    renderPage()
+    await waitFor(() => expect(getPersonas).toHaveBeenCalledWith(1, 20, undefined))
+
+    fireEvent.change(screen.getByTestId('study-filter-input').querySelector('input')!, {
+      target: { value: 's1' },
+    })
+    await waitFor(() => expect(getPersonas).toHaveBeenCalledWith(1, 20, 's1'))
+  })
+
   it('opens generate modal and submits', async () => {
     getPersonas.mockResolvedValue({ personas: [], total: 0 })
     generatePersonas.mockResolvedValue({ generated: 5 })

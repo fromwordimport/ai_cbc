@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from datetime import UTC, datetime
 
@@ -112,15 +113,25 @@ async def generate_personas_batch(
             return "Generation failed. Please try again or contact support."
         return str(exc)
 
+    # Determine the next continuous sequence number for this study so that
+    # repeated generation produces persona-study-001, -002, -003, ...
+    # instead of overwriting or creating non-continuous suffixes.
+    prefix = f"persona-{safe_study_id}-"
+    seq_pattern = re.compile(rf"^{re.escape(prefix)}(\d{{3}})$")
+    existing_items, _ = await store.alist_all(study_id=safe_study_id, page=1, page_size=10000)
+    max_seq = 0
+    for p in existing_items:
+        match = seq_pattern.match(p.persona_id)
+        if match:
+            max_seq = max(max_seq, int(match.group(1)))
+
+    next_seq = max_seq + 1
     for i in range(request.count):
-        base_persona_id = f"persona-{safe_study_id}-{i + 1:03d}"
-        persona_id = base_persona_id
-        # Avoid overwriting previously generated personas by appending a suffix
-        # when the deterministic ID already exists.
-        suffix = 1
+        persona_id = f"{prefix}{next_seq + i:03d}"
+        # Defensive guard against concurrent writes or pre-existing IDs.
         while await store.aget(persona_id) is not None:
-            persona_id = f"{base_persona_id}-{suffix:03d}"
-            suffix += 1
+            next_seq += 1
+            persona_id = f"{prefix}{next_seq + i:03d}"
         try:
             seed = seed_gen.generate_seed()
             profile = profile_gen.generate(persona_id, seed)

@@ -18,11 +18,32 @@ const PersonaManager: React.FC = () => {
 
   const [studies, setStudies] = useState<StudySummary[]>([])
   const [studiesLoading, setStudiesLoading] = useState(false)
+  const [filterStudyId, setFilterStudyId] = useState<string | undefined>(undefined)
 
-  const fetchPersonas = async (p = page, ps = pageSize) => {
+  const loadStudies = async () => {
+    setStudiesLoading(true)
+    try {
+      const res = await getStudies(1, 100)
+      setStudies(res.studies)
+    } catch {
+      message.error('加载研究列表失败')
+    } finally {
+      setStudiesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadStudies()
+  }, [])
+
+  useEffect(() => {
+    fetchPersonas()
+  }, [page, pageSize, filterStudyId])
+
+  const fetchPersonas = async (p = page, ps = pageSize, studyId = filterStudyId) => {
     setLoading(true)
     try {
-      const res = await getPersonas(p, ps)
+      const res = await getPersonas(p, ps, studyId)
       setPersonas(res.personas)
       setTotal(res.total)
     } catch (err) {
@@ -33,16 +54,8 @@ const PersonaManager: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchPersonas()
-  }, [page, pageSize])
-
-  useEffect(() => {
     if (!genModalOpen) return
-    setStudiesLoading(true)
-    getStudies(1, 100)
-      .then((res) => setStudies(res.studies))
-      .catch(() => message.error('加载研究列表失败'))
-      .finally(() => setStudiesLoading(false))
+    loadStudies()
   }, [genModalOpen])
 
   const handleDelete = async (personaId: string) => {
@@ -152,6 +165,37 @@ const PersonaManager: React.FC = () => {
         title="虚拟消费者画像管理"
         extra={
           <Space>
+            <AutoComplete
+              data-testid="study-filter-input"
+              options={studies.map((s) => ({
+                value: s.study_id,
+                label: `${s.study_id} (${s.product_category || '未分类'})`,
+              }))}
+              placeholder="按研究ID筛选"
+              allowClear
+              showSearch
+              value={filterStudyId}
+              filterOption={(input, option) => {
+                const value = String(option?.value || '').toLowerCase()
+                const label = String(option?.label || '').toLowerCase()
+                const query = input.toLowerCase()
+                return value.includes(query) || label.includes(query)
+              }}
+              notFoundContent={studiesLoading ? <Spin size="small" /> : '无匹配研究'}
+              onSelect={(value: string) => {
+                setFilterStudyId(value)
+                setPage(1)
+              }}
+              onClear={() => {
+                setFilterStudyId(undefined)
+                setPage(1)
+              }}
+              onChange={(value: string) => {
+                setFilterStudyId(value || undefined)
+                setPage(1)
+              }}
+              style={{ width: 260 }}
+            />
             <Button type="primary" onClick={() => setGenModalOpen(true)}>
               批量生成
             </Button>
