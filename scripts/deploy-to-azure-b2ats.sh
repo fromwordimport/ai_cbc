@@ -44,9 +44,11 @@ docker compose -f "$COMPOSE_FILE" down
 docker compose -f "$COMPOSE_FILE" up -d
 
 # 5. 等待 API 健康（最多 90 秒）
+# docker-compose.azure-b2ats.yml 没有暴露 8000 端口到宿主机，
+# 因此通过 docker compose exec 在容器内检查 /health。
 log "等待 API 健康检查..."
 for i in {1..45}; do
-    if curl -sf http://localhost:8000/health > /dev/null; then
+    if docker compose -f "$COMPOSE_FILE" exec -T api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" > /dev/null 2>&1; then
         log "API health check passed"
         break
     fi
@@ -54,7 +56,7 @@ for i in {1..45}; do
     sleep 2
 done
 
-if ! curl -sf http://localhost:8000/health > /dev/null; then
+if ! docker compose -f "$COMPOSE_FILE" exec -T api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" > /dev/null 2>&1; then
     log "ERROR: API health check failed after 90 seconds"
     exit 1
 fi
