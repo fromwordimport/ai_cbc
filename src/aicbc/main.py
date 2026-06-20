@@ -75,6 +75,8 @@ app.state.debug = settings.debug
 
 # CORS: allow frontend origin
 cors_origins = ["https://aicbc.fromworldimport.com"]
+if settings.frontend_origins:
+    cors_origins.extend(origin.strip() for origin in settings.frontend_origins.split(",") if origin.strip())
 if settings.debug:
     cors_origins.append("http://localhost:3000")
 

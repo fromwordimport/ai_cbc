@@ -189,6 +189,13 @@ class Settings(BaseSettings):
     metrics_path: str = "/metrics"
     slow_request_threshold: float = 5.0
 
+    # CORS
+    frontend_origins: str = Field(
+        default="",
+        alias="FRONTEND_ORIGINS",
+        description="Comma-separated list of allowed frontend origins for CORS",
+    )
+
     @property
     def is_production(self) -> bool:
         """Return True if running in production environment."""
