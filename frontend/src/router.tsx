@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { Spin } from 'antd'
 import Layout from './components/Layout'
@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
       { path: 'segment-comparison', element: <Suspense fallback={Loading}><SegmentComparison /></Suspense> },
       { path: 'questionnaires', element: <Suspense fallback={Loading}><QuestionnaireConfig /></Suspense> },
       { path: 'analysis-status', element: <Suspense fallback={Loading}><AnalysisStatus /></Suspense> },
-      { path: 'responses', element: <Navigate to="/studies/demo-study-001/responses" replace /> },
+      { path: 'responses', element: <Suspense fallback={Loading}><ResponseSimulator /></Suspense> },
       { path: 'studies/:studyId/design', element: <Suspense fallback={Loading}><AttributeDesign /></Suspense> },
       { path: 'settings', element: <Suspense fallback={Loading}><Settings /></Suspense> },
     ],

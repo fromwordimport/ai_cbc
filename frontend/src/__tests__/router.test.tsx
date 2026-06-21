@@ -132,13 +132,6 @@ describe('router route configuration', () => {
     }
   })
 
-  it('responses route uses Navigate for redirect', () => {
-    const responsesRoute = routeMap.get('responses')
-    expect(responsesRoute).toBeDefined()
-    // The element should be a Navigate component
-    expect(responsesRoute?.element?.type).toBe(Navigate)
-  })
-
   it('all non-redirect routes use Suspense wrapper', () => {
     for (const child of children) {
       if (child.element?.type === Navigate) {
@@ -316,7 +309,7 @@ describe('router lazy loading verification', () => {
     // Verify that the router config references lazy-loaded components
     // by checking the Suspense children are lazy components
     const nonRedirectRoutes = children.filter((c: any) => c.element?.type !== Navigate)
-    expect(nonRedirectRoutes.length).toBe(14)
+    expect(nonRedirectRoutes.length).toBe(15)
 
     for (const route of nonRedirectRoutes) {
       const suspenseChild = route.element?.props?.children

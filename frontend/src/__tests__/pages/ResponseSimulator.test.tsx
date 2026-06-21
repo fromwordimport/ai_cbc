@@ -47,7 +47,7 @@ describe('ResponseSimulator', () => {
     simulateResponses.mockResolvedValue({ simulated: 2, failed: 0 })
 
     renderPage()
-    await waitFor(() => expect(getPersonas).toHaveBeenCalledWith(1, 100))
+    await waitFor(() => expect(getPersonas).toHaveBeenCalledWith(1, 100, 's1'))
 
     // Select personas
     fireEvent.mouseDown(screen.getByText('选择要模拟的虚拟消费者'))

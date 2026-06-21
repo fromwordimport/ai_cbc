@@ -1,29 +1,52 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Card, Button, Select, InputNumber, Checkbox, message, Spin, Alert, Space, Typography } from 'antd'
-import { getPersonas, simulateResponses, exportDataset } from '@/services/api'
-import type { PersonaSummary, SimulateResponsesRequest } from '@/types/api'
+import { getPersonas, simulateResponses, exportDataset, getStudies } from '@/services/api'
+import type { PersonaSummary, SimulateResponsesRequest, StudySummary } from '@/types/api'
 
 const { Text } = Typography
 
 const ResponseSimulator: React.FC = () => {
   const { studyId } = useParams<{ studyId: string }>()
+  const [studies, setStudies] = useState<StudySummary[]>([])
+  const [selectedStudyId, setSelectedStudyId] = useState<string | undefined>(studyId)
   const [personas, setPersonas] = useState<PersonaSummary[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [mode, setMode] = useState<'rule' | 'llm'>('rule')
   const [deterministic, setDeterministic] = useState(false)
   const [seed, setSeed] = useState<number | undefined>(undefined)
   const [loading, setLoading] = useState(false)
+  const [studiesLoading, setStudiesLoading] = useState(false)
   const [simulating, setSimulating] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ simulated: number; failed: number } | null>(null)
 
   useEffect(() => {
+    if (studyId) return
+    const fetchStudies = async () => {
+      setStudiesLoading(true)
+      try {
+        const res = await getStudies(1, 100)
+        setStudies(res.studies)
+      } catch {
+        message.error('加载研究列表失败')
+      } finally {
+        setStudiesLoading(false)
+      }
+    }
+    fetchStudies()
+  }, [studyId])
+
+  useEffect(() => {
+    if (!selectedStudyId) {
+      setPersonas([])
+      return
+    }
     const fetch = async () => {
       setLoading(true)
       try {
-        const res = await getPersonas(1, 100)
+        const res = await getPersonas(1, 100, selectedStudyId)
         setPersonas(res.personas)
       } catch {
         message.error('加载画像失败')
@@ -32,11 +55,11 @@ const ResponseSimulator: React.FC = () => {
       }
     }
     fetch()
-  }, [])
+  }, [selectedStudyId])
 
   const handleSimulate = async () => {
-    if (!studyId || selectedIds.length === 0) {
-      message.warning('请选择至少一个虚拟消费者')
+    if (!selectedStudyId || selectedIds.length === 0) {
+      message.warning('请选择研究和至少一个虚拟消费者')
       return
     }
     setSimulating(true)
@@ -49,7 +72,7 @@ const ResponseSimulator: React.FC = () => {
         deterministic,
       }
       if (seed !== undefined) payload.seed = seed
-      const res = await simulateResponses(studyId, payload)
+      const res = await simulateResponses(selectedStudyId, payload)
       setResult({ simulated: res.simulated || selectedIds.length, failed: res.failed || 0 })
       message.success(`模拟完成：${res.simulated || selectedIds.length} 个消费者已作答`)
     } catch (err) {
@@ -62,10 +85,10 @@ const ResponseSimulator: React.FC = () => {
   }
 
   const handleExport = async () => {
-    if (!studyId) return
+    if (!selectedStudyId) return
     setExporting(true)
     try {
-      const res = await exportDataset(studyId)
+      const res = await exportDataset(selectedStudyId)
       message.success(`数据集导出成功：${res.n_total_records} 条记录`)
     } catch {
       message.error('导出失败')
@@ -75,19 +98,32 @@ const ResponseSimulator: React.FC = () => {
   }
 
   return (
-    <Spin spinning={loading}>
+    <Spin spinning={loading || studiesLoading}>
       {error && <Alert message="模拟失败" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
 
       <Card
         title="模拟作答"
         extra={
           <Space>
-            <Button onClick={handleExport} loading={exporting}>
+            <Button onClick={handleExport} loading={exporting} disabled={!selectedStudyId}>
               导出数据集
             </Button>
           </Space>
         }
       >
+        {!studyId && (
+          <Select
+            placeholder="选择研究项目"
+            value={selectedStudyId}
+            onChange={(value) => {
+              setSelectedStudyId(value)
+              setSelectedIds([])
+            }}
+            style={{ width: '100%', marginBottom: 16 }}
+            options={studies.map((s) => ({ label: `${s.study_id} (${s.product_category || '未分类'})`, value: s.study_id }))}
+          />
+        )}
+
         <Select
           mode="multiple"
           placeholder="选择要模拟的虚拟消费者"
@@ -124,7 +160,7 @@ const ResponseSimulator: React.FC = () => {
           />
         </Space>
 
-        <Button type="primary" onClick={handleSimulate} loading={simulating} disabled={selectedIds.length === 0} block>
+        <Button type="primary" onClick={handleSimulate} loading={simulating} disabled={selectedIds.length === 0 || !selectedStudyId} block>
           开始模拟作答
         </Button>
 

@@ -495,11 +495,9 @@ class GenerateQuestionnaireResponse(BaseModel):
     validation_errors: list[str]
 
 
-class QuestionnaireDetailResponse(BaseModel):
-    """Full questionnaire with all choice sets."""
+class DesignParametersView(BaseModel):
+    """Experimental design parameters for a questionnaire."""
 
-    questionnaire_id: str
-    study_id: str
     algorithm: str
     d_efficiency: float | None
     a_efficiency: float | None
@@ -507,6 +505,14 @@ class QuestionnaireDetailResponse(BaseModel):
     n_choice_sets: int
     n_alternatives: int
     include_none: bool
+
+
+class QuestionnaireDetailResponse(BaseModel):
+    """Full questionnaire with all choice sets."""
+
+    questionnaire_id: str
+    study_id: str
+    design_params: DesignParametersView
     choice_sets: list[ChoiceSetView]
     created_at: datetime
 
@@ -516,13 +522,15 @@ class QuestionnaireDetailResponse(BaseModel):
         return cls(
             questionnaire_id=q.questionnaire_id,
             study_id=q.study_id,
-            algorithm=q.design_parameters.algorithm.value,
-            d_efficiency=q.d_efficiency,
-            a_efficiency=q.a_efficiency,
-            n_attributes=len(q.attributes),
-            n_choice_sets=len(q.choice_sets),
-            n_alternatives=q.design_parameters.n_alternatives,
-            include_none=q.design_parameters.include_none,
+            design_params=DesignParametersView(
+                algorithm=q.design_parameters.algorithm.value,
+                d_efficiency=q.d_efficiency,
+                a_efficiency=q.a_efficiency,
+                n_attributes=len(q.attributes),
+                n_choice_sets=len(q.choice_sets),
+                n_alternatives=q.design_parameters.n_alternatives,
+                include_none=q.design_parameters.include_none,
+            ),
             choice_sets=[
                 ChoiceSetView(
                     choice_set_id=cs.choice_set_id,
