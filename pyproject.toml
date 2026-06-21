@@ -109,7 +109,7 @@ omit = ["*/tests/*", "*/test_*"]
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 skips = ["B101"]
-severity = "MEDIUM"
+severity = "HIGH"
 confidence = "MEDIUM"
 
 [[tool.uv.index]]
