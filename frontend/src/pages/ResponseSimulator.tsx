@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Card, Button, Select, InputNumber, Checkbox, message, Spin, Alert, Space, Typography } from 'antd'
+import { Card, Button, Select, InputNumber, Checkbox, message, Spin, Alert, Space, Typography, Table } from 'antd'
 import { getPersonas, simulateResponses, exportDataset, getStudies } from '@/services/api'
-import type { PersonaSummary, SimulateResponsesRequest, StudySummary } from '@/types/api'
+import type { PersonaSummary, SimulateResponsesRequest, StudySummary, RawDatasetExportResponse } from '@/types/api'
 
 const { Text } = Typography
 
@@ -21,6 +21,8 @@ const ResponseSimulator: React.FC = () => {
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ simulated: number; failed: number } | null>(null)
+  const [dataset, setDataset] = useState<RawDatasetExportResponse | null>(null)
+  const [showTable, setShowTable] = useState(false)
 
   useEffect(() => {
     if (studyId) return
@@ -89,6 +91,17 @@ const ResponseSimulator: React.FC = () => {
     setExporting(true)
     try {
       const res = await exportDataset(selectedStudyId)
+      setDataset(res)
+      // Trigger JSON file download
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${res.study_id || 'dataset'}_responses.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
       message.success(`数据集导出成功：${res.n_total_records} 条记录`)
     } catch {
       message.error('导出失败')
@@ -96,6 +109,32 @@ const ResponseSimulator: React.FC = () => {
       setExporting(false)
     }
   }
+
+  const datasetColumns = [
+    { title: '受访者', dataIndex: 'respondent_id', key: 'respondent_id' },
+    { title: '选择集', dataIndex: 'choice_set_id', key: 'choice_set_id' },
+    { title: '选择集索引', dataIndex: 'choice_set_index', key: 'choice_set_index' },
+    {
+      title: '选择方案',
+      key: 'chosen',
+      render: (_: unknown, record: Record<string, unknown>) => {
+        const alternatives = (record.alternatives || []) as Array<{ alt_index: number; chosen: boolean; attributes: Record<string, unknown> }>
+        const chosen = alternatives.find((alt) => alt.chosen)
+        if (record.none_chosen) return '都不选'
+        if (chosen) return `选项 ${String.fromCharCode(65 + chosen.alt_index)}`
+        return '-'
+      },
+    },
+    {
+      title: '方案属性',
+      key: 'attrs',
+      render: (_: unknown, record: Record<string, unknown>) => {
+        const alternatives = (record.alternatives || []) as Array<{ alt_index: number; chosen: boolean; attributes: Record<string, unknown> }>
+        const chosen = alternatives.find((alt) => alt.chosen)
+        return chosen ? JSON.stringify(chosen.attributes) : '-'
+      },
+    },
+  ]
 
   return (
     <Spin spinning={loading || studiesLoading}>
@@ -107,6 +146,9 @@ const ResponseSimulator: React.FC = () => {
           <Space>
             <Button onClick={handleExport} loading={exporting} disabled={!selectedStudyId}>
               导出数据集
+            </Button>
+            <Button onClick={() => setShowTable((s) => !s)} disabled={!dataset}>
+              {showTable ? '隐藏数据' : '查看数据'}
             </Button>
           </Space>
         }
@@ -181,6 +223,20 @@ const ResponseSimulator: React.FC = () => {
           />
         )}
       </Card>
+
+      {showTable && dataset && (
+        <Card title="导出数据预览" style={{ marginTop: 16 }}>
+          <Table
+            rowKey={(record: Record<string, unknown>) =>
+              `${record.respondent_id}-${record.choice_set_id}`
+            }
+            columns={datasetColumns}
+            dataSource={dataset.choice_records as Record<string, unknown>[]}
+            pagination={{ pageSize: 10 }}
+            size="small"
+          />
+        </Card>
+      )}
     </Spin>
   )
 }
