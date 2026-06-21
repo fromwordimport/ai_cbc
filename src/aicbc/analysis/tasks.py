@@ -33,6 +33,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    task_routes={
+        "aicbc.analysis.*": {"queue": "analysis"},
+    },
     result_expires=300,  # Results expire after 5 minutes to reduce Redis memory/commands
     result_extended=False,  # Do not store task name/args in result backend
     task_ignore_result=True,  # Most tasks only need state (PENDING/STARTED/SUCCESS), not return value

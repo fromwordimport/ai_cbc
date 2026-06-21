@@ -64,7 +64,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     container_name: aicbc-worker
-    command: celery -A aicbc.tasks worker --loglevel=info --concurrency=2
+    command: celery -A src.aicbc.analysis.tasks worker --loglevel=info --concurrency=2 -Q analysis,celery
     environment:
       - ENVIRONMENT=production
       - MONGODB_URL=mongodb://mongo:27017/aicbc
@@ -77,7 +77,7 @@ services:
       mongo:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery -A aicbc.tasks inspect ping --destination celery@$$HOSTNAME || exit 1"]
+      test: ["CMD-SHELL", "celery -A src.aicbc.analysis.tasks inspect ping --destination celery@$$HOSTNAME || exit 1"]
       interval: 30s
       timeout: 10s
       start_period: 30s
@@ -99,7 +99,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     container_name: aicbc-beat
-    command: celery -A aicbc.tasks beat --loglevel=info
+    command: celery -A src.aicbc.analysis.tasks beat --loglevel=info
     environment:
       - ENVIRONMENT=production
       - REDIS_URL=redis://redis:6379/0
@@ -107,7 +107,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery -A aicbc.tasks inspect ping --destination celery@$$HOSTNAME || exit 1"]
+      test: ["CMD-SHELL", "celery -A src.aicbc.analysis.tasks inspect ping --destination celery@$$HOSTNAME || exit 1"]
       interval: 30s
       timeout: 10s
       start_period: 30s
