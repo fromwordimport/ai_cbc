@@ -149,7 +149,8 @@ jobs:
           retention-days: 30
 
   # ==========================================================================
-  # Stage 2: Security Scan
+  # Stage 2: Security Scan (fast gate for PR/push)
+  # Deeper scheduled scans live in security-scan.yml.
   # ==========================================================================
   security:
     runs-on: ubuntu-22.04
