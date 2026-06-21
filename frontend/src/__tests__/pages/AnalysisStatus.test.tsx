@@ -8,6 +8,7 @@ const getStudies = vi.fn()
 const analyzeStudy = vi.fn()
 const getAnalysisStatus = vi.fn()
 const getConvergence = vi.fn()
+const listAnalyses = vi.fn()
 
 vi.mock('@/services/api', () => ({
   getStudies: (...args: any[]) => getStudies(...args),
@@ -16,6 +17,7 @@ vi.mock('@/services/api', () => ({
   getConvergence: (...args: any[]) => getConvergence(...args),
   getAnalysisVisualization: vi.fn(),
   runLatentClassAnalysis: vi.fn(),
+  listAnalyses: (...args: any[]) => listAnalyses(...args),
 }))
 
 vi.mock('antd', async () => {
@@ -92,5 +94,26 @@ describe('AnalysisStatus', () => {
     expect(screen.getByText('报告')).toBeInTheDocument()
     expect(screen.getByText('可视化')).toBeInTheDocument()
     expect(screen.getByText('LCM')).toBeInTheDocument()
+  })
+
+  it('loads existing analysis jobs on mount', async () => {
+    getStudies.mockResolvedValue({
+      studies: [{ study_id: 's1', product_category: '洗碗机' }],
+    })
+    listAnalyses.mockResolvedValue([
+      {
+        analysis_id: 'a2',
+        study_id: 's1',
+        status: 'COMPLETED',
+        model_type: 'hb',
+        progress_percent: 100,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ])
+
+    renderPage()
+    await waitFor(() => expect(listAnalyses).toHaveBeenCalledWith('s1'))
+    await waitFor(() => expect(screen.getByText('a2')).toBeInTheDocument())
   })
 })

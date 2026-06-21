@@ -112,7 +112,7 @@ export const handleError = (error: { response?: { status: number; data?: { detai
     const detailRaw = error.response.data?.detail ?? error.response.data?.error
     const detail = formatDetail(detailRaw)
     // Expose formatted detail to callers
-    ;(error as any).detail = detail
+    ;(error as { detail?: string }).detail = detail
     if (status === 401) {
       // Already on the login page; no need to redirect or show "session expired".
       if (window.location.pathname === '/login') {

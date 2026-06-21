@@ -12,7 +12,7 @@ import {
 import { useAppStore } from '@/stores/appStore'
 import {
   getStudies, analyzeStudy, getAnalysisStatus, getConvergence,
-  getAnalysisVisualization, runLatentClassAnalysis,
+  getAnalysisVisualization, runLatentClassAnalysis, listAnalyses,
 } from '@/services/api'
 import type { StudySummary, AnalysisJobStatus, ConvergenceDiagnostics } from '@/types/api'
 
@@ -29,8 +29,9 @@ const AnalysisStatus: React.FC = () => {
     runningJobs, addJob, updateJob,
     completedJobs,
     studies, setStudies,
+    setJobs,
   } = useAppStore()
-  const [jobs, setJobs] = useState<JobRow[]>([])
+  const [jobs, setJobRows] = useState<JobRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [selectedStudyId, setSelectedStudyId] = useState<string | undefined>()
   const [selectedModelType, setSelectedModelType] = useState<'hb' | 'mnl' | 'latent_class'>('hb')
@@ -45,7 +46,7 @@ const AnalysisStatus: React.FC = () => {
 
   useEffect(() => {
     const allJobs = [...runningJobs, ...completedJobs]
-    setJobs((prev) =>
+    setJobRows((prev) =>
       allJobs.map((job) => {
         const existing = prev.find((j) => j.job.analysis_id === job.analysis_id)
         return {
@@ -74,20 +75,20 @@ const AnalysisStatus: React.FC = () => {
   }, [runningJobs, updateJob])
 
   const fetchConvergence = async (studyId: string, analysisId: string) => {
-    setJobs((prev) =>
+    setJobRows((prev) =>
       prev.map((j) =>
         j.job.analysis_id === analysisId ? { ...j, convLoading: true } : j,
       ),
     )
     try {
       const conv = await getConvergence(studyId, analysisId)
-      setJobs((prev) =>
+      setJobRows((prev) =>
         prev.map((j) =>
           j.job.analysis_id === analysisId ? { ...j, convergence: conv, convLoading: false } : j,
         ),
       )
     } catch {
-      setJobs((prev) =>
+      setJobRows((prev) =>
         prev.map((j) =>
           j.job.analysis_id === analysisId ? { ...j, convLoading: false } : j,
         ),
@@ -107,12 +108,37 @@ const AnalysisStatus: React.FC = () => {
       addJob(job)
       message.success(`分析任务已启动: ${job.analysis_id}`)
     } catch (err) {
-      const detail = (err as any)?.detail
+      const detail = (err as { detail?: string })?.detail
       setError(detail || (err instanceof Error ? err.message : '启动分析失败'))
     } finally {
       setStartingJob(false)
     }
   }
+
+  const loadJobs = async () => {
+    if (studies.length === 0) return
+    try {
+      const all: AnalysisJobStatus[] = []
+      await Promise.all(
+        studies.map(async (study) => {
+          try {
+            const jobsForStudy = await listAnalyses(study.study_id)
+            all.push(...jobsForStudy)
+          } catch {
+            // ignore per-study errors
+          }
+        }),
+      )
+      setJobs(all)
+    } catch {
+      message.error('加载任务列表失败')
+    }
+  }
+
+  useEffect(() => {
+    loadJobs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studies])
 
   const statusConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
     PENDING: { color: 'default', icon: <ClockCircleOutlined />, label: '等待中' },
@@ -312,7 +338,7 @@ const AnalysisStatus: React.FC = () => {
             onClick={handleStartAnalysis} loading={startingJob} disabled={!selectedStudyId}>
             启动分析
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => window.location.reload()}>
+          <Button icon={<ReloadOutlined />} onClick={async () => { await getStudies().then((res) => setStudies(res.studies)); await loadJobs(); message.success('任务列表已刷新') }}>
             刷新
           </Button>
         </Space>

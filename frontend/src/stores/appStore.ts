@@ -21,6 +21,7 @@ interface AppState {
   updateJob: (job: AnalysisJobStatus) => void
   removeJob: (analysisId: string) => void
   clearCompletedJobs: () => void
+  setJobs: (jobs: AnalysisJobStatus[]) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -70,4 +71,23 @@ export const useAppStore = create<AppState>((set) => ({
       completedJobs: state.completedJobs.filter((j) => j.analysis_id !== analysisId),
     })),
   clearCompletedJobs: () => set({ completedJobs: [] }),
+  setJobs: (jobs) =>
+    set(() => {
+      const running: AnalysisJobStatus[] = []
+      const completed: AnalysisJobStatus[] = []
+      const seen = new Set<string>()
+      for (const job of jobs) {
+        if (seen.has(job.analysis_id)) continue
+        seen.add(job.analysis_id)
+        if (TERMINAL_STATUSES.has(job.status)) {
+          completed.push(job)
+        } else {
+          running.push(job)
+        }
+      }
+      return {
+        runningJobs: running,
+        completedJobs: completed.slice(-10),
+      }
+    }),
 }))
