@@ -211,6 +211,11 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed frontend origins for CORS",
     )
 
+    # HB resource limits (useful for memory-constrained deployments such as B2ats v2)
+    hb_max_chains: int = Field(default=8, alias="HB_MAX_CHAINS", ge=1)
+    hb_cores: int | None = Field(default=None, alias="HB_CORES", ge=1)
+    hb_max_draws: int | None = Field(default=None, alias="HB_MAX_DRAWS", ge=100)
+
     @property
     def is_production(self) -> bool:
         """Return True if running in production environment."""

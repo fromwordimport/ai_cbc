@@ -251,11 +251,19 @@ def run_analysis_task(
         # ── Fit model ────────────────────────────────────────────────
         log.info("analysis_fitting_model")
         if model_type == "hb":
+            requested_chains = config.get("n_chains", 4)
+            n_chains = min(requested_chains, settings.hb_max_chains)
+            n_cores = settings.hb_cores if settings.hb_cores is not None else config.get("n_cores", 1)
+            requested_draws = config.get("n_draws", 1000)
+            requested_tune = config.get("n_tune", 1000)
+            max_draws = settings.hb_max_draws
             hb_config = HBConfig(
-                n_draws=config.get("n_draws", 1000),
-                n_tune=config.get("n_tune", 1000),
-                n_chains=config.get("n_chains", 4),
+                n_draws=requested_draws,
+                n_tune=requested_tune,
+                n_chains=n_chains,
+                n_cores=n_cores,
                 target_accept=config.get("target_accept", 0.9),
+                max_draws=max_draws,
             )
             engine = HBEngine(hb_config)
             result = engine.fit(df_long, feature_cols)

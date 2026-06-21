@@ -24,12 +24,14 @@ class HBConfig:
     n_draws: int = 1000
     n_tune: int = 1000
     n_chains: int = 4
+    n_cores: int | None = None  # PyMC default = min(chains, 4); set to 1 to limit memory
     target_accept: float = 0.8  # 0.8 sufficient for Mixed Logit; saves 2-3x sampling time vs 0.9
     mu_prior_mean: float = 0.0
     mu_prior_sigma: float = 10.0
     sigma_prior: str = "half_normal"
     lkj_eta: float = 2.0
     random_seed: int | None = 42
+    max_draws: int | None = None  # Hard cap on small-sample auto-boosting
 
 
 @dataclass
@@ -136,6 +138,12 @@ class HBEngine:
         n_resp = len(self._resp_ids)
         n_features = len(feature_cols)
 
+        # Stack task tensors for vectorized likelihood (assumes constant n_alts)
+        X_all = np.stack([task["X"] for task in self._tasks])
+        resp_indices = np.array([task["resp_idx"] for task in self._tasks], dtype=int)
+        chosen_indices = np.array([task["y"] for task in self._tasks], dtype=int)
+        n_tasks = len(self._tasks)
+
         self.model = pm.Model()
 
         with self.model:
@@ -171,23 +179,15 @@ class HBEngine:
             z = pm.Normal("z", mu=0, sigma=1, shape=(n_resp, n_features))
             beta = pm.Deterministic("beta", mu + (chol @ z.T).T)
 
-            # ── Likelihood ──
-            # Vectorized log-softmax for numerical stability
-            log_probs = []
-            for task in self._tasks:
-                X = task["X"]  # (n_alts, n_features)
-                resp = task["resp_idx"]
-                chosen = task["y"]
-
-                # Utilities for this task
-                utilities = pm.math.dot(X, beta[resp])  # (n_alts,)
-
-                # Log-softmax (numerically stable)
-                log_prob = pm.math.log_softmax(utilities)[chosen]
-                log_probs.append(log_prob)
-
-            # Total log-likelihood as potential
-            pm.Potential("log_likelihood", pm.math.sum(log_probs))
+            # ── Likelihood (vectorized across tasks) ──
+            # X_all: (n_tasks, n_alts, n_features)
+            # beta_per_task: (n_tasks, n_features)
+            # utilities: (n_tasks, n_alts)
+            beta_per_task = beta[resp_indices]
+            utilities = pm.math.sum(X_all * beta_per_task[:, None, :], axis=2)
+            log_probs = pm.math.log_softmax(utilities)
+            chosen_log_probs = log_probs[pm.math.arange(n_tasks), chosen_indices]
+            pm.Potential("log_likelihood", chosen_log_probs.sum())
 
         return self.model
 
@@ -217,23 +217,32 @@ class HBEngine:
         assert self.model is not None
 
         # ── Data-scale adaptive sampling ──
-        # Small samples (n_resp < 50) require more posterior exploration
-        # because there are fewer data points per individual.
+        # Small samples (n_resp < 50) benefit from more posterior exploration,
+        # but memory-constrained deployments can cap this via max_draws.
         n_resp = len(self._resp_ids) if self._resp_ids is not None else 0
         if n_resp < 50:
-            self.config.n_draws = max(self.config.n_draws, 2000)
-            self.config.n_tune = max(self.config.n_tune, 2000)
+            boost_draws = max(self.config.n_draws, 2000)
+            boost_tune = max(self.config.n_tune, 2000)
+            if self.config.max_draws is not None:
+                boost_draws = min(boost_draws, self.config.max_draws)
+                boost_tune = min(boost_tune, self.config.max_draws)
+            self.config.n_draws = boost_draws
+            self.config.n_tune = boost_tune
+
+        sample_kwargs = {
+            "draws": self.config.n_draws,
+            "tune": self.config.n_tune,
+            "chains": self.config.n_chains,
+            "target_accept": self.config.target_accept,
+            "return_inferencedata": True,
+            "random_seed": self.config.random_seed,
+            "progressbar": False,
+        }
+        if self.config.n_cores is not None:
+            sample_kwargs["cores"] = self.config.n_cores
 
         with self.model:
-            self.trace = pm.sample(
-                draws=self.config.n_draws,
-                tune=self.config.n_tune,
-                chains=self.config.n_chains,
-                target_accept=self.config.target_accept,
-                return_inferencedata=True,
-                random_seed=self.config.random_seed,
-                progressbar=False,
-            )
+            self.trace = pm.sample(**sample_kwargs)
 
         # ── Convergence diagnostics ──
         diagnostics = self._compute_diagnostics()
