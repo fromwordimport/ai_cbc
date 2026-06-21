@@ -59,7 +59,11 @@ def decode_access_token(
     role = payload.get("role")
     exp_timestamp = payload.get("exp")
 
-    if not isinstance(sub, str) or not isinstance(role, str) or not isinstance(exp_timestamp, (int, float)):
+    if (
+        not isinstance(sub, str)
+        or not isinstance(role, str)
+        or not isinstance(exp_timestamp, (int, float))
+    ):
         raise JWTError("Malformed token payload")
 
     exp = datetime.fromtimestamp(exp_timestamp, tz=UTC)

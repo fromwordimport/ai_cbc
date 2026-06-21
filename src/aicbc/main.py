@@ -78,7 +78,9 @@ app.state.debug = settings.debug
 # CORS: allow frontend origin
 cors_origins = ["https://aicbc.fromworldimport.com"]
 if settings.frontend_origins:
-    cors_origins.extend(origin.strip() for origin in settings.frontend_origins.split(",") if origin.strip())
+    cors_origins.extend(
+        origin.strip() for origin in settings.frontend_origins.split(",") if origin.strip()
+    )
 if settings.debug:
     cors_origins.append("http://localhost:3000")
 
@@ -91,7 +93,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
     - In debug mode, auth is skipped to preserve local development ergonomics.
     """
 
-    EXEMPT_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/ready", "/metrics", "/api/v1/auth/login"}
+    EXEMPT_PATHS = {
+        "/health",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/ready",
+        "/metrics",
+        "/api/v1/auth/login",
+    }
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path

@@ -41,7 +41,9 @@ async def login(request: LoginRequest) -> LoginResponse:
     ]
 
     for expected_username, password_hash, role in credentials:
-        if request.username == expected_username and verify_password(request.password, password_hash):
+        if request.username == expected_username and verify_password(
+            request.password, password_hash
+        ):
             token = create_access_token(subject=request.username, role=role)
             return LoginResponse(
                 access_token=token,

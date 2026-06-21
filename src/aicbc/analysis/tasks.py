@@ -100,6 +100,7 @@ def init_mongo_for_worker(**kwargs: object) -> None:
         logger.exception("worker_mongodb_init_failed")
         raise
 
+
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
