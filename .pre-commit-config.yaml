@@ -34,3 +34,4 @@ repos:
       - id: bandit
         args: ["-c", "pyproject.toml", "-r", "src/", "--severity-level", "high"]
         additional_dependencies: ["bandit[toml]"]
+        pass_filenames: false
