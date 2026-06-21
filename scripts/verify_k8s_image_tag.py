@@ -132,7 +132,7 @@ def check_overlay(overlay: str) -> bool:
 
 def main() -> int:
     ok = True
-    for overlay in ("staging", "prod"):
+    for overlay in ("staging", "prod", "minimal"):
         ok = check_overlay(overlay) and ok
     return 0 if ok else 1
 
