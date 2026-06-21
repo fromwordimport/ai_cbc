@@ -7,12 +7,16 @@ FastAPI event loop to a background worker process.
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import structlog
 from celery import Celery
+from celery.signals import worker_process_init
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from aicbc.config.settings import get_settings
 
@@ -23,6 +27,53 @@ celery_app = Celery(
     broker=settings.celery_broker_url,
     backend=settings.celery_broker_url,
 )
+
+_mongo_client: AsyncIOMotorClient[Any] | None = None
+
+
+@worker_process_init.connect  # type: ignore[untyped-decorator]
+def init_mongo_for_worker(**kwargs: object) -> None:
+    """Initialize MongoDB/Beanie in each Celery worker process.
+
+    The FastAPI main process initializes Beanie during lifespan, but Celery
+    worker pool processes are separate and must set up their own Motor client
+    before any Mongo-backed store can be used.
+    """
+    use_memory = os.environ.get("USE_MEMORY_STORE", "").lower() in ("1", "true", "yes")
+    env = settings.environment.lower()
+    is_dev_without_mongo = env in ("development", "dev", "testing", "test") and (
+        not settings.database.mongodb_url
+        or settings.database.mongodb_url == "mongodb://localhost:27017"
+    )
+    if use_memory or is_dev_without_mongo:
+        logger.info("worker_using_memory_store")
+        return
+
+    import asyncio
+
+    from beanie import init_beanie
+
+    from aicbc.core.models.db_documents import ALL_DOCUMENT_MODELS
+
+    global _mongo_client
+
+    async def _init() -> None:
+        global _mongo_client
+        _mongo_client = AsyncIOMotorClient(
+            settings.database.mongodb_url,
+            maxPoolSize=settings.database.mongodb_max_connections,
+        )
+        await init_beanie(
+            database=_mongo_client[settings.database.mongodb_database],
+            document_models=ALL_DOCUMENT_MODELS,
+        )
+        logger.info("worker_mongodb_beanie_initialized")
+
+    try:
+        asyncio.run(_init())
+    except Exception:
+        logger.exception("worker_mongodb_init_failed")
+        raise
 
 celery_app.conf.update(
     task_serializer="json",
