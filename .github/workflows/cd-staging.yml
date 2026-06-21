@@ -97,7 +97,7 @@ jobs:
         if: steps.check-kubeconfig.outputs.skip != 'true'
         run: |
           cd k8s/overlays/staging
-          kustomize edit set image aicbc-api=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          kustomize edit set image ghcr.io/fromwordimport/ai_cbc=ghcr.io/${{ github.repository }}:${{ github.sha }}
 
       - name: Deploy to staging
         if: steps.check-kubeconfig.outputs.skip != 'true'

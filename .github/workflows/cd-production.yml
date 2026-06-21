@@ -83,7 +83,7 @@ jobs:
       - name: Update image tag in production overlay
         run: |
           cd k8s/overlays/prod
-          kustomize edit set image aicbc-api=ghcr.io/${{ github.repository }}:${{ needs.verify-image.outputs.image_tag }}
+          kustomize edit set image ghcr.io/fromwordimport/ai_cbc=ghcr.io/${{ github.repository }}:${{ needs.verify-image.outputs.image_tag }}
 
       - name: Deploy to production
         run: |
