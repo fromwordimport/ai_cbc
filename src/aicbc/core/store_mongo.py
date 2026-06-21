@@ -387,24 +387,21 @@ class MongoResponseStore:
         return items, total
 
     def save_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
-        """Persist (or merge) a raw dataset for a study."""
+        """Persist a raw dataset for a study, replacing any existing dataset."""
         asyncio.run(self.asave_dataset(study_id, dataset))
 
     async def asave_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
         """Async version of :meth:`save_dataset`."""
         doc = await DatasetDocument.find_one(DatasetDocument.study_id == study_id)
+        data = dataset.model_dump(mode="json")
         if doc is not None:
-            existing = CBCRawDataset.model_validate(doc.data)
-            merged_records = existing.choice_records + dataset.choice_records
-            existing.choice_records = merged_records
-            existing.metadata.n_respondents += dataset.metadata.n_respondents
-            doc.data = existing.model_dump(mode="json")
+            doc.data = data
             doc.updated_at = datetime.now(UTC)
             await doc.save()
         else:
             await DatasetDocument(
                 study_id=study_id,
-                data=dataset.model_dump(mode="json"),
+                data=data,
             ).insert()
 
     def get_dataset(self, study_id: str) -> CBCRawDataset | None:

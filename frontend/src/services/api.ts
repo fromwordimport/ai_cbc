@@ -86,7 +86,7 @@ rootApi.interceptors.request.use(injectAuthToken, (error) => Promise.reject(erro
 // Response interceptor: unified error handling
 // ---------------------------------------------------------------------------
 
-export const handleError = (error: { response?: { status: number; data?: { detail?: string; error?: string } }; request?: unknown; message?: string; config?: { url?: string } }) => {
+export const handleError = (error: { response?: { status: number; data?: { detail?: unknown; error?: unknown } }; request?: unknown; message?: string; config?: { url?: string } }) => {
   // Don't show global error toast or redirect for the login request itself;
   // the Login page handles its own error display.
   const url = error.config?.url || ''
@@ -94,9 +94,25 @@ export const handleError = (error: { response?: { status: number; data?: { detai
     return Promise.reject(error)
   }
 
+  const formatDetail = (raw: unknown): string => {
+    if (raw === null || raw === undefined) return '未知错误'
+    if (typeof raw === 'string') return raw
+    if (typeof raw === 'object') {
+      try {
+        return JSON.stringify(raw, null, 2)
+      } catch {
+        return '[无法序列化的错误对象]'
+      }
+    }
+    return String(raw)
+  }
+
   if (error.response) {
     const status = error.response.status
-    const detail = error.response.data?.detail || error.response.data?.error || '未知错误'
+    const detailRaw = error.response.data?.detail ?? error.response.data?.error
+    const detail = formatDetail(detailRaw)
+    // Expose formatted detail to callers
+    ;(error as any).detail = detail
     if (status === 401) {
       // Already on the login page; no need to redirect or show "session expired".
       if (window.location.pathname === '/login') {

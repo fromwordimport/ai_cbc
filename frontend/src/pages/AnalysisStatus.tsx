@@ -107,7 +107,8 @@ const AnalysisStatus: React.FC = () => {
       addJob(job)
       message.success(`分析任务已启动: ${job.analysis_id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '启动分析失败')
+      const detail = (err as any)?.detail
+      setError(detail || (err instanceof Error ? err.message : '启动分析失败'))
     } finally {
       setStartingJob(false)
     }

@@ -197,15 +197,9 @@ class MemoryResponseStore:
         return self.list_responses_by_study(study_id, page=page, page_size=page_size)
 
     def save_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
-        """Store (or merge) a raw dataset for a study."""
+        """Store a raw dataset for a study, replacing any existing dataset."""
         with self._lock:
-            existing = self._datasets.get(study_id)
-            if existing is not None:
-                merged_records = existing.choice_records + dataset.choice_records
-                existing.choice_records = merged_records
-                existing.metadata.n_respondents += dataset.metadata.n_respondents
-            else:
-                self._datasets[study_id] = dataset
+            self._datasets[study_id] = dataset
 
     async def asave_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
         """Async-compatible save_dataset (delegates to sync implementation)."""
