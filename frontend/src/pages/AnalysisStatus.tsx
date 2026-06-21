@@ -7,12 +7,13 @@ import {
   PlayCircleOutlined, ReloadOutlined, CheckCircleOutlined,
   CloseCircleOutlined, SyncOutlined, ClockCircleOutlined,
   ExperimentOutlined, FileTextOutlined, BarChartOutlined,
-  ClusterOutlined,
+  ClusterOutlined, StopOutlined,
 } from '@ant-design/icons'
 import { useAppStore } from '@/stores/appStore'
 import {
   getStudies, analyzeStudy, getAnalysisStatus, getConvergence,
   getAnalysisVisualization, runLatentClassAnalysis, listAnalyses,
+  cancelAnalysis,
 } from '@/services/api'
 import type { StudySummary, AnalysisJobStatus, ConvergenceDiagnostics } from '@/types/api'
 
@@ -39,6 +40,8 @@ const AnalysisStatus: React.FC = () => {
   const [vizOpen, setVizOpen] = useState(false)
   const [vizData, setVizData] = useState<unknown>(null)
   const [vizLoading, setVizLoading] = useState(false)
+
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     getStudies().then((res) => setStudies(res.studies)).catch(() => {})
@@ -113,6 +116,32 @@ const AnalysisStatus: React.FC = () => {
     } finally {
       setStartingJob(false)
     }
+  }
+
+  const handleCancel = async (studyId: string, analysisId: string) => {
+    Modal.confirm({
+      title: '确认停止分析',
+      content: '停止后任务将被标记为已取消，是否继续？',
+      okText: '停止',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        setCancellingIds((prev) => new Set(prev).add(analysisId))
+        try {
+          const updated = await cancelAnalysis(studyId, analysisId)
+          updateJob(updated)
+          message.success('分析任务已停止')
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : '停止分析失败')
+        } finally {
+          setCancellingIds((prev) => {
+            const next = new Set(prev)
+            next.delete(analysisId)
+            return next
+          })
+        }
+      },
+    })
   }
 
   const loadJobs = async () => {
@@ -216,8 +245,20 @@ const AnalysisStatus: React.FC = () => {
       render: (_: unknown, record: JobRow) => {
         const { study_id, analysis_id, status, model_type } = record.job
         const isCompleted = status === 'COMPLETED'
+        const canCancel = ['PENDING', 'QUEUED', 'RUNNING'].includes(status)
+        const isCancelling = cancellingIds.has(analysis_id)
         return (
           <Space size="small">
+            <Button
+              size="small"
+              danger
+              icon={<StopOutlined />}
+              disabled={!canCancel}
+              loading={isCancelling}
+              onClick={() => handleCancel(study_id, analysis_id)}
+            >
+              停止
+            </Button>
             <Button
               size="small"
               icon={<FileTextOutlined />}

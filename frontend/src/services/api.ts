@@ -270,6 +270,14 @@ export const deleteAnalysis = async (studyId: string, analysisId: string): Promi
   await api.delete(`/studies/${studyId}/analysis/${analysisId}`)
 }
 
+export const cancelAnalysis = async (
+  studyId: string,
+  analysisId: string,
+): Promise<AnalysisJobStatus> => {
+  const { data } = await api.post(`/studies/${studyId}/analysis/${analysisId}/cancel`)
+  return data
+}
+
 export const getConvergence = async (
   studyId: string,
   analysisId: string,

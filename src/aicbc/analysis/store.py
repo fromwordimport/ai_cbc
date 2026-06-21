@@ -110,7 +110,7 @@ class MemoryAnalysisStore:
             job.status = status
             if status == "RUNNING" and job.started_at is None:
                 job.started_at = datetime.now(UTC)
-            if status == "COMPLETED":
+            if status in ("COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT") and job.completed_at is None:
                 job.completed_at = datetime.now(UTC)
             if progress is not None:
                 job.progress_percent = progress

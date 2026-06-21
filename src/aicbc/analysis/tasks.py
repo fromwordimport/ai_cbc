@@ -6,6 +6,7 @@ FastAPI event loop to a background worker process.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from datetime import UTC, datetime
@@ -29,6 +30,28 @@ celery_app = Celery(
 )
 
 _mongo_client: AsyncIOMotorClient[Any] | None = None
+_worker_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _get_worker_loop() -> asyncio.AbstractEventLoop:
+    """Return the persistent event loop for this worker process.
+
+    Celery prefork workers run tasks in the child process main thread.
+    Motor/Beanie require a single long-lived event loop; creating and
+    closing loops per operation (as ``asyncio.run`` does) leaves Motor
+    bound to a closed loop.  We therefore keep one loop open for the
+    lifetime of the worker.
+    """
+    global _worker_loop
+    if _worker_loop is None or _worker_loop.is_closed():
+        _worker_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_worker_loop)
+    return _worker_loop
+
+
+def _run_async(coro: Any) -> Any:
+    """Run an async coroutine on the worker's persistent event loop."""
+    return _get_worker_loop().run_until_complete(coro)
 
 
 @worker_process_init.connect  # type: ignore[untyped-decorator]
@@ -49,8 +72,6 @@ def init_mongo_for_worker(**kwargs: object) -> None:
         logger.info("worker_using_memory_store")
         return
 
-    import asyncio
-
     from beanie import init_beanie
 
     from aicbc.core.models.db_documents import ALL_DOCUMENT_MODELS
@@ -67,10 +88,14 @@ def init_mongo_for_worker(**kwargs: object) -> None:
             database=_mongo_client[settings.database.mongodb_database],
             document_models=ALL_DOCUMENT_MODELS,
         )
-        logger.info("worker_mongodb_beanie_initialized")
 
+    loop = _get_worker_loop()
     try:
-        asyncio.run(_init())
+        loop.run_until_complete(_init())
+        from aicbc.core import store_mongo
+
+        store_mongo.set_worker_loop(loop)
+        logger.info("worker_mongodb_beanie_initialized")
     except Exception:
         logger.exception("worker_mongodb_init_failed")
         raise
@@ -102,8 +127,6 @@ def _save_dead_letter(
     exception: Exception,
 ) -> None:
     """Persist a dead-letter record for a failed task."""
-    import asyncio
-
     from aicbc.core.models.db_documents import DeadLetterDocument
 
     async def _insert() -> None:
@@ -116,7 +139,7 @@ def _save_dead_letter(
         await doc.insert()
 
     try:
-        asyncio.run(_insert())
+        _run_async(_insert())
     except Exception:
         logger.exception("dead_letter_insert_failed")
 

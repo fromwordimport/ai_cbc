@@ -14,7 +14,7 @@ import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from aicbc.analysis.models import (
     AnalysisJobStatus,
@@ -38,6 +38,30 @@ from aicbc.core.models.db_documents import (
 from aicbc.core.models.persona import PersonaProfile
 from aicbc.questionnaire.models import CBCQuestionnaire, CBCStudy
 from aicbc.questionnaire.response_models import CBCRawDataset, PersonaResponse
+
+T = TypeVar("T")
+
+_worker_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_worker_loop(loop: asyncio.AbstractEventLoop | None) -> None:
+    """Set the persistent event loop used by Celery worker processes.
+
+    Motor/Beanie require a single long-lived event loop.  In a Celery prefork
+    worker, ``asyncio.run`` would create and close a new loop per operation,
+    leaving Motor bound to a closed loop.  The worker initializer sets this
+    once per process; the API process leaves it unset and continues to use
+    ``asyncio.run``.
+    """
+    global _worker_loop
+    _worker_loop = loop
+
+
+def _run_coro(coro: asyncio.Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine on the worker loop if available, else ``asyncio.run``."""
+    if _worker_loop is not None and not _worker_loop.is_closed():
+        return _worker_loop.run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 class MongoPersonaStore:
@@ -74,7 +98,7 @@ class MongoPersonaStore:
 
     def is_duplicate(self, persona: PersonaProfile) -> bool:
         """Check whether a persona with the same content fingerprint exists."""
-        return asyncio.run(self.ais_duplicate(persona))
+        return _run_coro(self.ais_duplicate(persona))
 
     async def ais_duplicate(self, persona: PersonaProfile) -> bool:
         """Async version of :meth:`is_duplicate`."""
@@ -84,7 +108,7 @@ class MongoPersonaStore:
 
     def save(self, persona: PersonaProfile) -> bool:
         """Persist a persona (upsert). Returns True if stored, False if duplicate."""
-        return asyncio.run(self.asave(persona))
+        return _run_coro(self.asave(persona))
 
     async def asave(self, persona: PersonaProfile) -> bool:
         """Async version of :meth:`save`."""
@@ -107,7 +131,7 @@ class MongoPersonaStore:
 
     def get(self, persona_id: str) -> PersonaProfile | None:
         """Retrieve a persona by ID."""
-        return asyncio.run(self.aget(persona_id))
+        return _run_coro(self.aget(persona_id))
 
     async def aget(self, persona_id: str) -> PersonaProfile | None:
         """Async version of :meth:`get`."""
@@ -118,7 +142,7 @@ class MongoPersonaStore:
 
     def delete(self, persona_id: str) -> bool:
         """Delete a persona by ID."""
-        return asyncio.run(self.adelete(persona_id))
+        return _run_coro(self.adelete(persona_id))
 
     async def adelete(self, persona_id: str) -> bool:
         """Async version of :meth:`delete`."""
@@ -139,7 +163,7 @@ class MongoPersonaStore:
         page_size: int = 20,
     ) -> tuple[list[PersonaProfile], int]:
         """Query personas with optional filters and pagination."""
-        return asyncio.run(
+        return _run_coro(
             self.alist_all(
                 study_id=study_id,
                 segment=segment,
@@ -185,7 +209,7 @@ class MongoPersonaStore:
 
     def delete_by_study(self, study_id: str) -> int:
         """Delete all personas belonging to a study."""
-        return asyncio.run(self.adelete_by_study(study_id))
+        return _run_coro(self.adelete_by_study(study_id))
 
     async def adelete_by_study(self, study_id: str) -> int:
         """Async version of :meth:`delete_by_study`."""
@@ -197,7 +221,7 @@ class MongoPersonaStore:
 
     def count(self) -> int:
         """Total number of stored personas."""
-        return asyncio.run(self.acount())
+        return _run_coro(self.acount())
 
     async def acount(self) -> int:
         """Async total number of stored personas."""
@@ -213,7 +237,7 @@ class MongoQuestionnaireStore:
 
     def save_study(self, study: CBCStudy) -> None:
         """Persist a study (upsert)."""
-        asyncio.run(self.asave_study(study))
+        _run_coro(self.asave_study(study))
 
     async def asave_study(self, study: CBCStudy) -> None:
         """Async version of :meth:`save_study`."""
@@ -233,7 +257,7 @@ class MongoQuestionnaireStore:
 
     def get_study(self, study_id: str) -> CBCStudy | None:
         """Retrieve a study by ID."""
-        return asyncio.run(self.aget_study(study_id))
+        return _run_coro(self.aget_study(study_id))
 
     async def aget_study(self, study_id: str) -> CBCStudy | None:
         """Async version of :meth:`get_study`."""
@@ -244,7 +268,7 @@ class MongoQuestionnaireStore:
 
     def delete_study(self, study_id: str) -> bool:
         """Delete a study and its questionnaire."""
-        return asyncio.run(self.adelete_study(study_id))
+        return _run_coro(self.adelete_study(study_id))
 
     async def adelete_study(self, study_id: str) -> bool:
         """Async version of :meth:`delete_study`."""
@@ -267,7 +291,7 @@ class MongoQuestionnaireStore:
         page_size: int = 20,
     ) -> tuple[list[CBCStudy], int]:
         """Query studies with optional filters."""
-        return asyncio.run(
+        return _run_coro(
             self.alist_studies(product_category=product_category, page=page, page_size=page_size)
         )
 
@@ -292,7 +316,7 @@ class MongoQuestionnaireStore:
 
     def save_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
         """Persist a questionnaire keyed by study_id."""
-        asyncio.run(self.asave_questionnaire(questionnaire))
+        _run_coro(self.asave_questionnaire(questionnaire))
 
     async def asave_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
         """Async version of :meth:`save_questionnaire`."""
@@ -313,7 +337,7 @@ class MongoQuestionnaireStore:
 
     def get_questionnaire(self, study_id: str) -> CBCQuestionnaire | None:
         """Retrieve the questionnaire for a study."""
-        return asyncio.run(self.aget_questionnaire(study_id))
+        return _run_coro(self.aget_questionnaire(study_id))
 
     async def aget_questionnaire(self, study_id: str) -> CBCQuestionnaire | None:
         """Async version of :meth:`get_questionnaire`."""
@@ -333,7 +357,7 @@ class MongoResponseStore:
 
     def save_response(self, response: PersonaResponse) -> None:
         """Persist a single persona response."""
-        asyncio.run(self.asave_response(response))
+        _run_coro(self.asave_response(response))
 
     async def asave_response(self, response: PersonaResponse) -> None:
         """Async version of :meth:`save_response`."""
@@ -354,7 +378,7 @@ class MongoResponseStore:
 
     def get_response(self, response_id: str) -> PersonaResponse | None:
         """Retrieve a response by ID."""
-        return asyncio.run(self.aget_response(response_id))
+        return _run_coro(self.aget_response(response_id))
 
     async def aget_response(self, response_id: str) -> PersonaResponse | None:
         """Async version of :meth:`get_response`."""
@@ -370,7 +394,7 @@ class MongoResponseStore:
         page_size: int = 100,
     ) -> tuple[list[PersonaResponse], int]:
         """Query responses for a study."""
-        return asyncio.run(self.alist_responses_by_study(study_id, page=page, page_size=page_size))
+        return _run_coro(self.alist_responses_by_study(study_id, page=page, page_size=page_size))
 
     async def alist_responses_by_study(
         self,
@@ -388,7 +412,7 @@ class MongoResponseStore:
 
     def save_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
         """Persist a raw dataset for a study, replacing any existing dataset."""
-        asyncio.run(self.asave_dataset(study_id, dataset))
+        _run_coro(self.asave_dataset(study_id, dataset))
 
     async def asave_dataset(self, study_id: str, dataset: CBCRawDataset) -> None:
         """Async version of :meth:`save_dataset`."""
@@ -406,7 +430,7 @@ class MongoResponseStore:
 
     def get_dataset(self, study_id: str) -> CBCRawDataset | None:
         """Retrieve the raw dataset for a study."""
-        return asyncio.run(self.aget_dataset(study_id))
+        return _run_coro(self.aget_dataset(study_id))
 
     async def aget_dataset(self, study_id: str) -> CBCRawDataset | None:
         """Async version of :meth:`get_dataset`."""
@@ -417,7 +441,7 @@ class MongoResponseStore:
 
     def delete_response(self, response_id: str) -> bool:
         """Delete a single response by ID."""
-        return asyncio.run(self.adelete_response(response_id))
+        return _run_coro(self.adelete_response(response_id))
 
     async def adelete_response(self, response_id: str) -> bool:
         """Async version of :meth:`delete_response`."""
@@ -429,7 +453,7 @@ class MongoResponseStore:
 
     def delete_dataset(self, study_id: str) -> bool:
         """Delete the raw dataset for a study."""
-        return asyncio.run(self.adelete_dataset(study_id))
+        return _run_coro(self.adelete_dataset(study_id))
 
     async def adelete_dataset(self, study_id: str) -> bool:
         """Async version of :meth:`delete_dataset`."""
@@ -441,7 +465,7 @@ class MongoResponseStore:
 
     def delete_by_study(self, study_id: str) -> int:
         """Delete all responses and the dataset for a study."""
-        return asyncio.run(self.adelete_by_study(study_id))
+        return _run_coro(self.adelete_by_study(study_id))
 
     async def adelete_by_study(self, study_id: str) -> int:
         """Async version of :meth:`delete_by_study`."""
@@ -453,7 +477,7 @@ class MongoResponseStore:
 
     def delete_by_persona(self, persona_id: str) -> int:
         """Delete all responses belonging to a persona."""
-        return asyncio.run(self.adelete_by_persona(persona_id))
+        return _run_coro(self.adelete_by_persona(persona_id))
 
     async def adelete_by_persona(self, persona_id: str) -> int:
         """Async version of :meth:`delete_by_persona`."""
@@ -483,7 +507,7 @@ class MongoAnalysisStore:
 
     def save_job(self, job: AnalysisJobStatus) -> None:
         """Persist a job status (upsert)."""
-        asyncio.run(self.asave_job(job))
+        _run_coro(self.asave_job(job))
 
     async def asave_job(self, job: AnalysisJobStatus) -> None:
         """Async version of :meth:`save_job`."""
@@ -503,7 +527,7 @@ class MongoAnalysisStore:
 
     def get_job(self, analysis_id: str) -> AnalysisJobStatus | None:
         """Retrieve a job by ID."""
-        return asyncio.run(self.aget_job(analysis_id))
+        return _run_coro(self.aget_job(analysis_id))
 
     async def aget_job(self, analysis_id: str) -> AnalysisJobStatus | None:
         """Async version of :meth:`get_job`."""
@@ -519,7 +543,7 @@ class MongoAnalysisStore:
         progress: float | None = None,
     ) -> AnalysisJobStatus | None:
         """Update job status enforcing legal transitions."""
-        return asyncio.run(self.aupdate_job_status(analysis_id, status, progress))
+        return _run_coro(self.aupdate_job_status(analysis_id, status, progress))
 
     async def aupdate_job_status(
         self,
@@ -549,7 +573,7 @@ class MongoAnalysisStore:
         job.status = status
         if status == "RUNNING" and job.started_at is None:
             job.started_at = datetime.now(UTC)
-        if status == "COMPLETED":
+        if status in ("COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT") and job.completed_at is None:
             job.completed_at = datetime.now(UTC)
         if progress is not None:
             job.progress_percent = progress
@@ -561,7 +585,7 @@ class MongoAnalysisStore:
 
     def save_result(self, result: AnalysisResultResponse) -> None:
         """Persist a complete analysis result."""
-        asyncio.run(self.asave_result(result))
+        _run_coro(self.asave_result(result))
 
     async def asave_result(self, result: AnalysisResultResponse) -> None:
         """Async version of :meth:`save_result`."""
@@ -581,7 +605,7 @@ class MongoAnalysisStore:
 
     def get_result(self, analysis_id: str) -> AnalysisResultResponse | None:
         """Retrieve a complete analysis result."""
-        return asyncio.run(self.aget_result(analysis_id))
+        return _run_coro(self.aget_result(analysis_id))
 
     async def aget_result(self, analysis_id: str) -> AnalysisResultResponse | None:
         """Async version of :meth:`get_result`."""
@@ -594,7 +618,7 @@ class MongoAnalysisStore:
 
     def save_convergence(self, analysis_id: str, diag: ConvergenceDiagnostics) -> None:
         """Persist convergence diagnostics."""
-        asyncio.run(self.asave_convergence(analysis_id, diag))
+        _run_coro(self.asave_convergence(analysis_id, diag))
 
     async def asave_convergence(self, analysis_id: str, diag: ConvergenceDiagnostics) -> None:
         """Async version of :meth:`save_convergence`."""
@@ -602,7 +626,7 @@ class MongoAnalysisStore:
 
     def get_convergence(self, analysis_id: str) -> ConvergenceDiagnostics | None:
         """Retrieve convergence diagnostics."""
-        return asyncio.run(self.aget_convergence(analysis_id))
+        return _run_coro(self.aget_convergence(analysis_id))
 
     async def aget_convergence(self, analysis_id: str) -> ConvergenceDiagnostics | None:
         """Async version of :meth:`get_convergence`."""
@@ -613,7 +637,7 @@ class MongoAnalysisStore:
 
     def save_importance(self, analysis_id: str, importance: ImportanceResponse) -> None:
         """Persist attribute importance results."""
-        asyncio.run(self.asave_importance(analysis_id, importance))
+        _run_coro(self.asave_importance(analysis_id, importance))
 
     async def asave_importance(self, analysis_id: str, importance: ImportanceResponse) -> None:
         """Async version of :meth:`save_importance`."""
@@ -623,7 +647,7 @@ class MongoAnalysisStore:
 
     def get_importance(self, analysis_id: str) -> ImportanceResponse | None:
         """Retrieve attribute importance results."""
-        return asyncio.run(self.aget_importance(analysis_id))
+        return _run_coro(self.aget_importance(analysis_id))
 
     async def aget_importance(self, analysis_id: str) -> ImportanceResponse | None:
         """Async version of :meth:`get_importance`."""
@@ -634,7 +658,7 @@ class MongoAnalysisStore:
 
     def save_wtp(self, analysis_id: str, wtp: WTPResponse) -> None:
         """Persist WTP results."""
-        asyncio.run(self.asave_wtp(analysis_id, wtp))
+        _run_coro(self.asave_wtp(analysis_id, wtp))
 
     async def asave_wtp(self, analysis_id: str, wtp: WTPResponse) -> None:
         """Async version of :meth:`save_wtp`."""
@@ -642,7 +666,7 @@ class MongoAnalysisStore:
 
     def get_wtp(self, analysis_id: str) -> WTPResponse | None:
         """Retrieve WTP results."""
-        return asyncio.run(self.aget_wtp(analysis_id))
+        return _run_coro(self.aget_wtp(analysis_id))
 
     async def aget_wtp(self, analysis_id: str) -> WTPResponse | None:
         """Async version of :meth:`get_wtp`."""
@@ -653,7 +677,7 @@ class MongoAnalysisStore:
 
     def save_market_sim(self, analysis_id: str, sim_id: str, result: MarketSimResponse) -> None:
         """Persist market simulation result keyed by analysis_id + sim_id."""
-        asyncio.run(self.asave_market_sim(analysis_id, sim_id, result))
+        _run_coro(self.asave_market_sim(analysis_id, sim_id, result))
 
     async def asave_market_sim(
         self, analysis_id: str, sim_id: str, result: MarketSimResponse
@@ -668,7 +692,7 @@ class MongoAnalysisStore:
 
     def get_market_sim(self, analysis_id: str, sim_id: str) -> MarketSimResponse | None:
         """Retrieve market simulation result."""
-        return asyncio.run(self.aget_market_sim(analysis_id, sim_id))
+        return _run_coro(self.aget_market_sim(analysis_id, sim_id))
 
     async def aget_market_sim(self, analysis_id: str, sim_id: str) -> MarketSimResponse | None:
         """Async version of :meth:`get_market_sim`."""
@@ -679,7 +703,7 @@ class MongoAnalysisStore:
 
     def get_latest_market_sim(self, analysis_id: str) -> MarketSimResponse | None:
         """Return the most recent market simulation for an analysis."""
-        return asyncio.run(self.aget_latest_market_sim(analysis_id))
+        return _run_coro(self.aget_latest_market_sim(analysis_id))
 
     async def aget_latest_market_sim(self, analysis_id: str) -> MarketSimResponse | None:
         """Async version of :meth:`get_latest_market_sim`."""
@@ -699,7 +723,7 @@ class MongoAnalysisStore:
 
     def save_latent_class_result(self, analysis_id: str, result: dict[str, Any]) -> None:
         """Store a latent class model result."""
-        asyncio.run(self.asave_latent_class_result(analysis_id, result))
+        _run_coro(self.asave_latent_class_result(analysis_id, result))
 
     async def asave_latent_class_result(self, analysis_id: str, result: dict[str, Any]) -> None:
         """Async version of :meth:`save_latent_class_result`."""
@@ -712,7 +736,7 @@ class MongoAnalysisStore:
 
     def get_latent_class_result(self, analysis_id: str) -> dict[str, Any] | None:
         """Retrieve a latent class model result."""
-        return asyncio.run(self.aget_latent_class_result(analysis_id))
+        return _run_coro(self.aget_latent_class_result(analysis_id))
 
     async def aget_latent_class_result(self, analysis_id: str) -> dict[str, Any] | None:
         """Async version of :meth:`get_latent_class_result`."""
@@ -729,7 +753,7 @@ class MongoAnalysisStore:
         result: SegmentComparisonResponse,
     ) -> None:
         """Persist segment comparison result."""
-        asyncio.run(self.asave_segment_comparison(analysis_id, segment_a, segment_b, result))
+        _run_coro(self.asave_segment_comparison(analysis_id, segment_a, segment_b, result))
 
     async def asave_segment_comparison(
         self,
@@ -754,7 +778,7 @@ class MongoAnalysisStore:
         segment_b: str | None = None,
     ) -> SegmentComparisonResponse | None:
         """Retrieve segment comparison result."""
-        return asyncio.run(self.aget_segment_comparison(analysis_id, segment_a, segment_b))
+        return _run_coro(self.aget_segment_comparison(analysis_id, segment_a, segment_b))
 
     async def aget_segment_comparison(
         self,
@@ -787,7 +811,7 @@ class MongoAnalysisStore:
 
     def list_jobs_by_study(self, study_id: str) -> list[AnalysisJobStatus]:
         """Return all analysis jobs belonging to a study."""
-        return asyncio.run(self.alist_jobs_by_study(study_id))
+        return _run_coro(self.alist_jobs_by_study(study_id))
 
     async def alist_jobs_by_study(self, study_id: str) -> list[AnalysisJobStatus]:
         """Async version of :meth:`list_jobs_by_study`."""
@@ -796,7 +820,7 @@ class MongoAnalysisStore:
 
     def delete_analysis(self, analysis_id: str) -> bool:
         """Delete a job, its result, and all derivative artefacts."""
-        return asyncio.run(self.adelete_analysis(analysis_id))
+        return _run_coro(self.adelete_analysis(analysis_id))
 
     async def adelete_analysis(self, analysis_id: str) -> bool:
         """Async version of :meth:`delete_analysis`."""
@@ -857,7 +881,7 @@ class MongoAnalysisStore:
 
     def delete_by_study(self, study_id: str) -> int:
         """Delete all analyses belonging to a study."""
-        return asyncio.run(self.adelete_by_study(study_id))
+        return _run_coro(self.adelete_by_study(study_id))
 
     async def adelete_by_study(self, study_id: str) -> int:
         """Async version of :meth:`delete_by_study`."""

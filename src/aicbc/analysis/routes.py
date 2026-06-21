@@ -167,8 +167,10 @@ async def analyze_study(
             model_type=request.model_type,
             config_json=config_json,
         )
-    # Store Celery task_id for cross-process status tracking via AsyncResult
+    # Store Celery task_id for cross-process status tracking via AsyncResult.
+    # Persist the updated metadata so status polling can bridge Celery state.
     job.metadata = {"celery_task_id": result.id}
+    await analysis_store.asave_job(job)
 
     log.info("analysis_enqueued", analysis_id=analysis_id)
     return job
@@ -297,9 +299,56 @@ async def delete_analysis(
     await analysis_store.adelete_analysis(analysis_id)
 
 
-# ---------------------------------------------------------------------------
-# Diagnostics
-# ---------------------------------------------------------------------------
+@router.post(
+    "/studies/{study_id}/analysis/{analysis_id}/cancel",
+    response_model=AnalysisJobStatus,
+    summary="Cancel a running or queued analysis job",
+)
+async def cancel_analysis(
+    study_id: str,
+    analysis_id: str,
+    analysis_store: AnalysisStore = Depends(get_analysis_store),
+) -> AnalysisJobStatus:
+    """Cancel an analysis job that is PENDING, QUEUED, or RUNNING.
+
+    Revokes the Celery task and marks the job as CANCELLED.  Terminal
+    jobs cannot be cancelled.
+    """
+    job = await analysis_store.aget_job(analysis_id)
+    if job is None or job.study_id != study_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis '{analysis_id}' not found for study '{study_id}'",
+        )
+
+    if job.status not in ("PENDING", "QUEUED", "RUNNING"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Analysis '{analysis_id}' is already {job.status} and cannot be cancelled",
+        )
+
+    celery_task_id = job.metadata.get("celery_task_id")
+    if celery_task_id:
+        from aicbc.analysis.tasks import celery_app
+
+        try:
+            celery_app.control.revoke(
+                celery_task_id,
+                terminate=job.status == "RUNNING",
+                signal="SIGTERM",
+            )
+        except Exception:
+            logger.exception("celery_revoke_failed", analysis_id=analysis_id)
+
+    updated = await analysis_store.aupdate_job_status(
+        analysis_id, "CANCELLED", progress=job.progress_percent
+    )
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update analysis status",
+        )
+    return updated
 
 
 @router.get(
@@ -745,6 +794,7 @@ async def run_latent_class(
         config_json=config_json,
     )
     job.metadata = {"celery_task_id": celery_result.id}
+    await analysis_store.asave_job(job)
     return job
 
 
