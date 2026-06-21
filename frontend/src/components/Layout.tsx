@@ -1,6 +1,6 @@
 import React from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Layout as AntLayout, Menu, Typography, Badge, theme } from 'antd'
+import { Layout as AntLayout, Menu, Typography, Badge, theme, Dropdown, Avatar, Space } from 'antd'
 import {
   DashboardOutlined,
   BarChartOutlined,
@@ -14,8 +14,12 @@ import {
   SettingOutlined,
   ClockCircleOutlined,
   PlayCircleOutlined,
+  DownOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons'
 import { useAppStore } from '@/stores/appStore'
+import { logout } from '@/services/auth'
+import { getRole, isAdmin } from '@/services/token'
 
 const { Header, Sider, Content } = AntLayout
 const { Title } = Typography
@@ -82,13 +86,20 @@ const Layout: React.FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { runningJobs } = useAppStore()
+  const role = getRole()
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
 
+  // 系统设置只对 admin 显示
+  const visibleMenuItems = React.useMemo(
+    () => menuItems.filter((item) => item.key !== '/settings' || isAdmin()),
+    [],
+  )
+
   // Match exact or nested paths for menu highlighting
   const selectedKeys = React.useMemo(() => {
-    const exact = menuItems.find((item) => item.key === location.pathname)
+    const exact = visibleMenuItems.find((item) => item.key === location.pathname)
     if (exact) return [location.pathname]
     // For nested study routes, don't highlight any menu item
     return []
@@ -96,7 +107,7 @@ const Layout: React.FC = () => {
 
   // Determine page title for nested routes too
   const pageTitle = React.useMemo(() => {
-    const exact = menuItems.find((item) => item.key === location.pathname)
+    const exact = visibleMenuItems.find((item) => item.key === location.pathname)
     if (exact) return exact.label
     // Check if it's a study response simulator page
     if (location.pathname.match(/\/studies\/[^/]+\/responses/)) {
@@ -104,6 +115,12 @@ const Layout: React.FC = () => {
     }
     return 'AI_CBC'
   }, [location.pathname])
+
+  const userMenuItems = [
+    { key: 'role', label: `当前角色：${role || 'viewer'}`, disabled: true },
+    { type: 'divider' as const },
+    { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, onClick: logout },
+  ]
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
@@ -120,7 +137,7 @@ const Layout: React.FC = () => {
         <Menu
           mode="inline"
           selectedKeys={selectedKeys}
-          items={menuItems}
+          items={visibleMenuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderRight: 0 }}
         />
@@ -145,6 +162,13 @@ const Layout: React.FC = () => {
                 <Typography.Text type="secondary">分析任务运行中</Typography.Text>
               </Badge>
             )}
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <Space style={{ cursor: 'pointer' }}>
+                <Avatar icon={<UserOutlined />} />
+                <Typography.Text>{role || '访客'}</Typography.Text>
+                <DownOutlined />
+              </Space>
+            </Dropdown>
           </div>
         </Header>
         <Content

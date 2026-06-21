@@ -86,11 +86,22 @@ rootApi.interceptors.request.use(injectAuthToken, (error) => Promise.reject(erro
 // Response interceptor: unified error handling
 // ---------------------------------------------------------------------------
 
-export const handleError = (error: { response?: { status: number; data?: { detail?: string; error?: string } }; request?: unknown; message?: string }) => {
+export const handleError = (error: { response?: { status: number; data?: { detail?: string; error?: string } }; request?: unknown; message?: string; config?: { url?: string } }) => {
+  // Don't show global error toast or redirect for the login request itself;
+  // the Login page handles its own error display.
+  const url = error.config?.url || ''
+  if (url === '/auth/login' || url.endsWith('/auth/login')) {
+    return Promise.reject(error)
+  }
+
   if (error.response) {
     const status = error.response.status
     const detail = error.response.data?.detail || error.response.data?.error || '未知错误'
     if (status === 401) {
+      // Already on the login page; no need to redirect or show "session expired".
+      if (window.location.pathname === '/login') {
+        return Promise.reject(error)
+      }
       message.error('登录已过期，请重新登录')
       clearAuth()
       window.location.href = '/login'
