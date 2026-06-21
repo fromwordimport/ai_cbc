@@ -110,6 +110,7 @@ class MemoryAnalysisStore:
             job.status = status
             if status == "RUNNING" and job.started_at is None:
                 job.started_at = datetime.now(UTC)
+            # Capture completion time once for any terminal state.
             if (
                 status in ("COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT")
                 and job.completed_at is None
