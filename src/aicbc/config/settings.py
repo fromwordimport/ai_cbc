@@ -165,6 +165,21 @@ class Settings(BaseSettings):
         min_length=32,
         description="Secret key for JWT/session/CSRF signing (min 32 chars)",
     )
+    frontend_researcher_password_hash: str = Field(
+        default="",
+        alias="FRONTEND_RESEARCHER_PASSWORD_HASH",
+        description="Bcrypt hash of the frontend researcher login password",
+    )
+    frontend_admin_password_hash: str = Field(
+        default="",
+        alias="FRONTEND_ADMIN_PASSWORD_HASH",
+        description="Bcrypt hash of the frontend admin login password",
+    )
+    access_token_expire_minutes: int = Field(
+        default=1440,
+        alias="ACCESS_TOKEN_EXPIRE_MINUTES",
+        description="JWT access token lifetime in minutes",
+    )
 
     llm: LLMSettings = Field(default_factory=LLMSettings)
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
@@ -213,6 +228,22 @@ class Settings(BaseSettings):
                 pass  # dev default — production should override via env
             return key
         return "dev-secret-key-change-in-production-32chars"
+
+    @field_validator(
+        "frontend_researcher_password_hash", "frontend_admin_password_hash", mode="after"
+    )
+    @classmethod
+    def _require_frontend_passwords_in_production(cls, v: str, info) -> str:
+        """Require frontend login passwords in production."""
+        environment = info.data.get("environment", "")
+        is_production = isinstance(environment, str) and environment.lower() in (
+            "production",
+            "prod",
+            "staging",
+        )
+        if is_production and not v:
+            raise ValueError(f"{info.field_name} is required in production")
+        return v
 
     @field_validator("celery_broker_url", mode="before")
     @classmethod

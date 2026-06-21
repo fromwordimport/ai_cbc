@@ -3,12 +3,14 @@
 import os
 from contextlib import asynccontextmanager
 
+import jwt as pyjwt
 import structlog
 from beanie import init_beanie
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import ORJSONResponse
+from jwt import PyJWTError
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -16,7 +18,7 @@ from aicbc.analysis import routes as analysis_routes
 from aicbc.api.middleware.audit_log import AuditLogMiddleware
 from aicbc.api.middleware.rate_limit import RateLimitMiddleware
 from aicbc.api.middleware.rbac import RBACMiddleware
-from aicbc.api.routes import admin, personas, questionnaires, responses, simulations
+from aicbc.api.routes import admin, auth, personas, questionnaires, responses, simulations
 from aicbc.config.settings import get_settings
 from aicbc.core.models.db_documents import ALL_DOCUMENT_MODELS
 from aicbc.monitoring.health import router as health_router
@@ -81,15 +83,15 @@ if settings.debug:
     cors_origins.append("http://localhost:3000")
 
 
-class APIKeyMiddleware(BaseHTTPMiddleware):
-    """Simple API key authentication middleware.
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Unified authentication middleware: API key (service) or JWT (frontend).
 
-    Requires ``X-API-Key`` header for all routes except exempt paths.
-    Enforcement is skipped in debug mode to support local development
-    and test clients.
+    - Valid ``X-API-Key`` → service account; role from ``X-User-Role`` header.
+    - Valid ``Authorization: Bearer <jwt>`` → frontend user; role from JWT claim.
+    - In debug mode, auth is skipped to preserve local development ergonomics.
     """
 
-    EXEMPT_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/ready", "/metrics"}
+    EXEMPT_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/ready", "/metrics", "/api/v1/auth/login"}
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -103,20 +105,34 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if settings.debug:
             return await call_next(request)
 
+        # 1. Service account via API key
         api_key = request.headers.get("X-API-Key")
-        if not api_key or api_key != settings.api_key:
-            return ORJSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"error": "Unauthorized"},
-            )
-        return await call_next(request)
+        if api_key and api_key == settings.api_key:
+            request.state.role = request.headers.get("X-User-Role", "viewer")
+            return await call_next(request)
+
+        # 2. Frontend user via JWT
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            try:
+                payload = pyjwt.decode(token, settings.secret_key, algorithms=["HS256"])
+                request.state.role = payload.get("role", "viewer")
+                return await call_next(request)
+            except PyJWTError:
+                pass
+
+        return ORJSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"error": "Unauthorized"},
+        )
 
 
 # Add middleware (order matters: rate limit first, then metrics, then security headers, then auth, then RBAC, then audit)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(APIKeyMiddleware)
+app.add_middleware(AuthMiddleware)
 app.add_middleware(RBACMiddleware)
 app.add_middleware(AuditLogMiddleware)
 
@@ -135,6 +151,7 @@ app.add_middleware(
 
 # Register routes
 app.include_router(health_router, tags=["Health"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
 app.include_router(personas.router, prefix="/api/v1", tags=["Personas"])
 app.include_router(simulations.router, prefix="/api/v1", tags=["Simulations"])

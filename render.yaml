@@ -80,6 +80,12 @@ services:
       - key: SECRET_KEY
         generateValue: true
         length: 32
+      - key: FRONTEND_RESEARCHER_PASSWORD_HASH
+        sync: false
+      - key: FRONTEND_ADMIN_PASSWORD_HASH
+        sync: false
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
 
   # React + Vite static frontend
   - type: static
@@ -96,5 +102,5 @@ services:
         value: https://aicbc-api.fromworldimport.com/api/v1
       - key: VITE_ROOT_API_BASE_URL
         value: https://aicbc-api.fromworldimport.com
-      - key: VITE_API_KEY
-        value: dev-key-change-in-prod
+      - key: VITE_ROOT_API_BASE_URL
+        value: https://aicbc-api.fromworldimport.com
