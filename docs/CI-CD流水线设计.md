@@ -87,7 +87,7 @@ master (保护分支，仅接受PR合并)
 ```yaml
 # .github/settings.yml 或 GitLab CI 配置
 branch_protection:
-  main:
+  master:
     required_pull_request_reviews:
       required_approving_review_count: 2  # 至少2人审批
       dismiss_stale_reviews: true
@@ -98,7 +98,7 @@ branch_protection:
         - "quality-check"        # Stage 1 代码质量
         - "unit-test"            # Stage 3 单元测试
         - "security-scan"        # Stage 2 安全扫描
-        - "integration-test"     # Stage 4 集成测试（main分支PR）
+        - "integration-test"     # Stage 4 集成测试（master分支PR）
     restrictions:
       users: []  # 禁止直接push
       teams: ["maintainers"]
@@ -253,9 +253,9 @@ name: Security Scan
 
 on:
   push:
-    branches: [main, release/*]
+    branches: [master, release/*]
   pull_request:
-    branches: [main]
+    branches: [master]
   schedule:
     - cron: '0 2 * * 1'  # 每周一早2点
 
@@ -495,7 +495,7 @@ services:
     ▼                        ▼                         ▼
 ┌─────────┐            ┌─────────┐               ┌─────────┐
 │ 1台服务器│            │ 2台服务器│               │ 3+台服务器│
-│ 开发分支 │            │ main分支 │               │ release分支│
+│ 开发分支 │            │ master分支 │               │ release分支│
 │ 自动部署 │            │ 自动部署 │               │ 人工审批+自动│
 │ 无审批   │            │ 无审批   │               │ 需要审批   │
 │ 数据隔离 │            │ 生产-like数据│           │ 生产数据   │
@@ -507,7 +507,7 @@ services:
 | 环境 | 部署触发 | 审批 | 数据 | 可用性目标 |
 |------|---------|------|------|-----------|
 | `dev` | feature分支合并后自动 | 无需 | 模拟数据 | 无SLA |
-| `staging` | main分支合并后自动 | 无需 | 脱敏生产数据 | 99% |
+| `staging` | master分支合并后自动 | 无需 | 脱敏生产数据 | 99% |
 | `production` | release标签推送 | 小P审批 | 生产数据 | 99.5% |
 
 ### 5.2 蓝绿部署策略（MVP阶段 - Docker Compose）
@@ -1207,9 +1207,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, release/*, hotfix/*]
+    branches: [master, release/*, hotfix/*]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 env:
   REGISTRY: registry.example.com
@@ -1229,7 +1229,7 @@ jobs:
       - name: Check branch naming
         run: |
           BRANCH=${GITHUB_REF#refs/heads/}
-          if [[ ! "$BRANCH" =~ ^(main|release/.*|hotfix/.*|feature/.*)$ ]]; then
+          if [[ ! "$BRANCH" =~ ^(master|release/.*|hotfix/.*|feature/.*)$ ]]; then
             echo "❌ 分支命名不符合规范: $BRANCH"
             exit 1
           fi
@@ -1245,7 +1245,7 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
+          base: master
           head: HEAD
           extra_args: --debug --only-verified
 
@@ -1397,7 +1397,7 @@ jobs:
   bias-security-sample:
     runs-on: ubuntu-latest
     needs: integration-test
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v4
 
@@ -1423,7 +1423,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [integration-test, bias-security-sample]
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_digest: ${{ steps.build.outputs.digest }}
@@ -1448,7 +1448,7 @@ jobs:
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=ref,event=branch
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
       - name: Build and push
         id: build
@@ -1475,7 +1475,7 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     environment:
       name: staging
       url: https://staging.aicbc.example.com
