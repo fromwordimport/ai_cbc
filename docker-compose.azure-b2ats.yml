@@ -20,6 +20,9 @@ services:
       - API_WORKERS=1
       - METRICS_PATH=/metrics
       - SLOW_REQUEST_THRESHOLD=5.0
+      - HB_MAX_CHAINS=2
+      - HB_CORES=1
+      - HB_MAX_DRAWS=1000
     depends_on:
       mongo:
         condition: service_healthy
