@@ -12,6 +12,24 @@ DEFAULT_THRESHOLD = 0.95
 DEFAULT_XML_PATH = "test-results/redteam-fast.xml"
 
 
+def _get_testsuite(root: ET.Element) -> ET.Element | None:
+    """Return the relevant <testsuite> element from a JUnit XML root."""
+    if root.tag == "testsuite":
+        return root
+    if root.tag == "testsuites":
+        return root.find("testsuite")
+    return None
+
+
+def _int_attr(elem: ET.Element, name: str) -> int:
+    """Return an integer attribute value, raising ValueError on bad data."""
+    value = elem.get(name, "0")
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name}={value!r}") from exc
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Parse pytest JUnit XML and fail if red-team defense rate is below threshold."
@@ -50,14 +68,19 @@ def main() -> int:
         print(f"FAIL: Could not parse XML report: {exc}")
         return 1
 
-    if root.tag != "testsuite":
-        print(f"FAIL: Expected root tag <testsuite>, got <{root.tag}>")
+    suite = _get_testsuite(root)
+    if suite is None:
+        print(f"FAIL: Expected root tag <testsuite> or <testsuites>, got <{root.tag}>")
         return 1
 
-    total = int(root.get("tests", "0"))
-    failures = int(root.get("failures", "0"))
-    errors = int(root.get("errors", "0"))
-    skipped = int(root.get("skipped", "0"))
+    try:
+        total = _int_attr(suite, "tests")
+        failures = _int_attr(suite, "failures")
+        errors = _int_attr(suite, "errors")
+        skipped = _int_attr(suite, "skipped")
+    except ValueError as exc:
+        print(f"FAIL: Invalid numeric attribute in XML report: {exc}")
+        return 1
 
     effective_total = total - skipped
     if effective_total == 0:
