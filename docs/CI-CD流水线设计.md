@@ -290,17 +290,29 @@ jobs:
       - name: Build image
         run: docker build -t aicbc/api:${{ github.sha }} .
 
-      - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@master
+      - name: Scan with Trivy (blocking gate)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: 'aicbc/api:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: 'true'
+
+      - name: Scan with Trivy (SARIF upload only)
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'aicbc/api:${{ github.sha }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          exit-code: '0'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'  # 发现高危漏洞时阻断
+          ignore-unfixed: 'true'
 
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 ```
@@ -508,7 +520,9 @@ services:
 |------|---------|------|------|-----------|
 | `dev` | feature分支合并后自动 | 无需 | 模拟数据 | 无SLA |
 | `staging` | master分支合并后自动 | 无需 | 脱敏生产数据 | 99% |
-| `production` | release标签推送 | 小P审批 | 生产数据 | 99.5% |
+| `production` | push 到 `master` 自动触发（`cd-azure-b2ats.yml`），也可手动触发 | 当前为自动部署 | 生产数据 | 99.5% |
+
+> **当前实现说明**：生产环境实际部署在 Azure 云服务器（VM）上，由 `.github/workflows/cd-azure-b2ats.yml` 通过 SSH 执行 `docker compose` 部署。原基于 `kubectl` 的 `cd-production.yml` 已删除，因为项目当前未使用 Kubernetes 作为生产部署目标。K8s manifests 仍保留用于 CI 静态验证和本地 kind 测试。
 
 ### 5.2 蓝绿部署策略（MVP阶段 - Docker Compose）
 
@@ -1506,6 +1520,8 @@ jobs:
           sleep 10
           pytest tests/smoke/ --base-url=https://staging.aicbc.example.com -v
 
+  # 注：当前实际生产部署由 .github/workflows/cd-azure-b2ats.yml 处理（SSH 到 Azure VM）。
+  # 以下 deploy-production 为 Kubernetes 目标态示例，保留作为未来扩展参考。
   deploy-production:
     runs-on: ubuntu-latest
     needs: [build, deploy-staging]
@@ -1581,6 +1597,59 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.AUDIT_TOKEN }}" \
             -d @deploy-record.json
 ```
+
+### 9.2 Azure B2ats v2 双机部署流水线（已落地）
+
+针对用户自有 Azure B2ats v2（x64，1 GiB）+ ARM worker VM（1 GiB）场景，当前已实现独立的 CD workflow：`.github/workflows/cd-azure-b2ats.yml`。
+
+#### 架构
+
+| VM | 规格 | 运行服务 |
+|----|------|----------|
+| 主 VM | Azure B2ats v2，x64，1 GiB | API、MongoDB、Redis、nginx |
+| Worker VM | Azure ARM Linux，ARM64，1 GiB | Celery analysis worker |
+
+#### Workflow 结构
+
+```yaml
+jobs:
+  build-push:
+    # 构建多平台镜像 linux/amd64 + linux/arm64，推送到 GHCR
+  deploy:
+    # SSH 到主 VM，拉取代码，执行 scripts/deploy-to-azure-b2ats.sh
+  deploy-worker:
+    # SSH 到 worker VM，将 AZURE_VM_IP 作为 AZURE_MAIN_VM_IP 注入
+    # 执行 scripts/deploy-to-azure-worker.sh
+```
+
+#### 关键设计点
+
+1. **多平台镜像**：一次构建同时产出 `linux/amd64`（主 VM）与 `linux/arm64`（worker VM）镜像。
+2. **Supervisord 拆分**：
+   - 主 VM 使用 `docker/supervisord-api.conf`，仅运行 uvicorn。
+   - Worker VM 使用 `docker/supervisord-worker.conf`，仅运行 Celery worker。
+   - 保留 `docker/supervisord-b2ats.conf` 作为单 VM 回退。
+3. **跨机连接**：worker VM 通过主 VM 的 Redis（broker/backend）与 MongoDB（数据持久化）通信。
+4. **网络安全**：Redis/Mongo 跨机访问不启用密码，依靠 Azure NSG 源地址限制 + UFW 做访问控制。
+5. **AZURE_MAIN_VM_IP 注入**：CD workflow 将 `secrets.AZURE_VM_IP` 作为 `AZURE_MAIN_VM_IP` 环境变量传给 worker 部署脚本，worker `.env` 无需手工修改 IP。
+6. **Worker 健康检查**：由于镜像缺少 `pgrep`，使用 `supervisorctl status worker` 验证 worker 是否 RUNNING。
+
+#### 所需 GitHub Secrets
+
+| Secret | 用途 |
+|--------|------|
+| `AZURE_VM_IP` | 主 VM 公网 IP |
+| `AZURE_VM_USER` | 主 VM SSH 用户名 |
+| `AZURE_VM_SSH_KEY` | 主 VM SSH 私钥 |
+| `AZURE_WORKER_VM_IP` | Worker VM 公网 IP |
+| `AZURE_WORKER_VM_USER` | Worker VM SSH 用户名 |
+| `AZURE_WORKER_VM_SSH_KEY` | Worker VM SSH 私钥 |
+
+#### 验证
+
+- 主 VM：`curl https://<domain>/health` 返回 `{"status":"healthy",...}`。
+- Worker VM：`docker logs -f aicbc-worker` 显示 `Connected to redis://<main_ip>:6379/0` 与 `ready`。
+- 前端触发 MNL/HB 分析，确认 worker 处理并返回结果。
 
 ---
 
@@ -1723,6 +1792,7 @@ jobs:
 
 | 日期 | 版本 | 变更内容 | 负责人 |
 |------|------|---------|--------|
+| 2026-06-23 | v1.1 | 同步当前实现：生产部署由 `cd-azure-b2ats.yml` 负责；Trivy 扫描使用 table 作为阻断 gate、SARIF 仅用于上传；移除 `cd-production.yml` 相关描述 | 小维 |
 | 2026-06-09 | v1.0 | 初始版本，覆盖7大阶段完整流水线设计 | 小维 |
 
 ---
