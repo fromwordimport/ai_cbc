@@ -5,7 +5,11 @@ FROM python:3.11-slim-bookworm AS builder
 WORKDIR /app
 
 # Apply security updates and install build dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get dist-upgrade -y && \
+    apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,9 +28,17 @@ FROM python:3.11-slim-bookworm AS runtime
 WORKDIR /app
 
 # Apply security updates before installing runtime packages
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get dist-upgrade -y && \
+    apt-get install -y --no-install-recommends \
     supervisor \
     g++ \
+    libexpat1 \
+    libssl3 \
+    openssl \
+    zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
