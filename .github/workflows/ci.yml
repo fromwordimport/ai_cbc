@@ -207,6 +207,15 @@ jobs:
         run: |
           docker build -f docker/Dockerfile -t aicbc-scan:${{ github.sha }} .
 
+      - name: Scan with Trivy (diagnostic table)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: 'aicbc-scan:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: 'true'
+
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
