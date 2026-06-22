@@ -130,6 +130,7 @@ class HBEngine:
             pm.Model instance.
         """
         import pymc as pm
+        import pytensor.tensor as pt
 
         self._preprocess(data, feature_cols, resp_id_col, task_id_col, choice_col)
         assert self._resp_ids is not None
@@ -184,9 +185,9 @@ class HBEngine:
             # beta_per_task: (n_tasks, n_features)
             # utilities: (n_tasks, n_alts)
             beta_per_task = beta[resp_indices]
-            utilities = pm.math.sum(X_all * beta_per_task[:, None, :], axis=2)
-            log_probs = pm.math.log_softmax(utilities)
-            chosen_log_probs = log_probs[pm.math.arange(n_tasks), chosen_indices]
+            utilities = pt.sum(X_all * beta_per_task[:, None, :], axis=2)
+            log_probs = pt.log_softmax(utilities)
+            chosen_log_probs = log_probs[pt.arange(n_tasks), chosen_indices]
             pm.Potential("log_likelihood", chosen_log_probs.sum())
 
         return self.model

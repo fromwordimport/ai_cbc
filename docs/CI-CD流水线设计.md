@@ -1,6 +1,7 @@
 # CI/CD 流水线设计
 
 > **版本**：v1.0
+> **状态**：目标态设计文档，当前实现已拆分多个 workflow，部分章节（金丝雀、蓝绿、成本熔断、GitOps、Slack 通知）尚未落地，详见正文标注。
 > **定位**：AI_CBC 项目完整的持续集成/持续交付流水线方案，覆盖代码提交到生产部署的全生命周期
 > **负责人**：小维（DevOps/MLOps 工程师）
 > **汇报对象**：小P（项目负责人）
@@ -70,6 +71,8 @@ main (保护分支，仅接受PR合并)
          │
          └─── feature/persona-cache-opt (子任务分支)
 ```
+
+当前仓库主分支为 `master`，未来若迁移到 `main` 需同步更新 `.github/workflows/ci.yml` 触发分支。
 
 | 分支类型 | 命名规范 | 来源 | 合并目标 | 生命周期 |
 |---------|---------|------|---------|---------|
@@ -156,6 +159,8 @@ repos:
         stages: [commit-msg]
 ```
 
+当前已实现 `.pre-commit-config.yaml`（ruff、ruff-format、mypy、bandit、通用 hooks），与 CI 门禁保持一致。
+
 ### 2.4 Commit Message 规范
 
 ```
@@ -236,6 +241,8 @@ CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "
 | **层缓存优化** | 依赖层在前，代码层在后 | 所有服务 |
 | **SBOM生成** | 每次构建生成软件物料清单 | 生产镜像 |
 | **镜像签名** | 使用cosign对镜像进行签名 | 生产镜像 |
+
+当前状态：多阶段构建、非 root、层缓存已落实；SBOM 生成与镜像签名尚未实现，作为后续安全加固项。
 
 ### 3.3 依赖安全扫描
 
@@ -364,28 +371,25 @@ cosign attach sbom --sbom sbom.spdx.json "${IMAGE}"
 
 ### 4.3 单元测试配置
 
-```yaml
-# pytest.ini
-[pytest]
-minversion = 7.0
-testpaths = tests/unit
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts =
-    -v
-    --strict-markers
-    --cov=src
-    --cov-report=term-missing
-    --cov-report=xml:coverage.xml
-    --cov-fail-under=60
-    --tb=short
-markers =
-    slow: marks tests as slow (deselect with '-m "not slow"')
-    bias: marks bias-related tests
-    security: marks security-related tests
-    cost: marks cost-related tests
-    integration: marks integration tests
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v"
+# Coverage is CI-only. To run locally: uv run pytest --cov=src --cov-report=term-missing
+norecursedirs = [".git", ".tox", "dist", "build", "tests/performance", "tests/manual"]
+markers = [
+    "unit: pure unit tests with no external dependencies",
+    "integration: tests requiring DB/Redis/Celery/API",
+    "e2e: end-to-end full pipeline tests",
+    "slow: tests taking >30s (deselect with '-m \"not slow\"')",
+    "security: fast security validation tests",
+    "redteam: slow adversarial/penetration/bias tests",
+    "performance: load and regression tests",
+    "external: tests requiring real external services (LLM/Mongo/Redis)",
+]
 ```
 
 ### 4.4 集成测试配置
@@ -433,6 +437,8 @@ services:
       - ./test-results:/app/test-results
     command: pytest tests/integration/ -v --junitxml=/app/test-results/integration.xml
 ```
+
+当前状态：`docker-compose.test.yml` 尚未创建；集成测试与单元测试合并运行于 CI `fast-test` job，使用 `-m "(unit or integration) and not slow..."`。
 
 ### 4.5 测试报告归档
 
@@ -505,6 +511,8 @@ services:
 
 ### 5.2 蓝绿部署策略（MVP阶段 - Docker Compose）
 
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
+
 ```bash
 #!/bin/bash
 # scripts/blue-green-deploy.sh
@@ -563,6 +571,8 @@ echo "部署完成: $target"
 ```
 
 ### 5.3 金丝雀发布策略（生产阶段 - Kubernetes）
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 ```yaml
 # k8s/canary-deployment.yaml
@@ -623,6 +633,8 @@ spec:
 ```
 
 ### 5.4 回滚机制
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 | 回滚场景 | 触发条件 | 回滚方式 | 回滚时间 |
 |---------|---------|---------|---------|
@@ -703,6 +715,8 @@ echo "回滚完成"
 
 ### 6.2 Smoke Test
 
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
+
 ```python
 # tests/smoke/test_critical_paths.py
 import pytest
@@ -771,6 +785,8 @@ class TestCriticalPaths:
 ```
 
 ### 6.3 部署后告警规则
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 ```yaml
 # prometheus/alerting/deploy-alerts.yml
@@ -850,6 +866,8 @@ groups:
 ```
 
 ### 6.4 部署通知模板
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 ```json
 {
@@ -984,6 +1002,8 @@ rm secret.yaml
 
 ### 7.3 配置变更流程
 
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
+
 ```
 配置变更申请
     │
@@ -1028,6 +1048,8 @@ rm secret.yaml
 ## 八、成本熔断集成
 
 ### 8.1 部署前成本检查
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 ```yaml
 # .github/workflows/deploy.yml (成本检查步骤)
@@ -1077,6 +1099,8 @@ rm secret.yaml
 
 ### 8.2 成本熔断与部署的集成矩阵
 
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
+
 | 熔断级别 | 状态码 | 部署行为 | 通知对象 | 自动动作 |
 |---------|--------|---------|---------|---------|
 | `NORMAL` | 正常 | 允许部署 | — | 无 |
@@ -1086,6 +1110,8 @@ rm secret.yaml
 | `EMERGENCY` | 120%预算 | **阻断部署 + 锁定** | 管理层 | 启动费用审计 |
 
 ### 8.3 部署后成本监控
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 ```python
 # 部署后成本监控脚本 (scripts/post_deploy_cost_monitor.py)
@@ -1129,6 +1155,8 @@ print("部署后成本监控完成")
 ```
 
 ### 8.4 成本-部署闭环架构
+
+当前状态：本节描述目标态能力，尚未在当前 workflow 中实现。
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
