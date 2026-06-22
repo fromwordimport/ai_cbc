@@ -15,27 +15,38 @@ import sys
 from pathlib import Path
 
 VALID_TYPES = r"feat|fix|docs|test|refactor|perf|security|cost|chore|ci"
-PATTERN = rf"^({VALID_TYPES})\(.+\):\s.+"
+PATTERN = rf"^({VALID_TYPES})\(.+\):\s+\S.+"
 
 
 def get_message_from_file(path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"cannot read commit message file: {exc}") from exc
     return text.splitlines()[0] if text else ""
 
 
 def get_message_from_git() -> str:
-    result = subprocess.run(
-        ["git", "log", "--format=%s", "-n", "1", "HEAD"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "log", "--format=%s", "-n", "1", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"git log failed: {exc}") from exc
     return result.stdout.strip()
+
+
+WHITELIST_PREFIXES = ("Merge ", "Revert \"", "Squash ")
 
 
 def validate(message: str) -> tuple[bool, str]:
     if not message:
         return False, "commit message is empty"
+    if message.startswith(WHITELIST_PREFIXES):
+        return True, ""
     if not re.match(PATTERN, message):
         return (
             False,
@@ -51,13 +62,17 @@ def main() -> int:
     parser.add_argument("--from-git", action="store_true", help="read last commit from git")
     args = parser.parse_args()
 
-    if args.path:
-        message = get_message_from_file(Path(args.path))
-    elif args.from_git:
-        message = get_message_from_git()
-    else:
-        parser.print_help()
-        return 2
+    try:
+        if args.path:
+            message = get_message_from_file(Path(args.path))
+        elif args.from_git:
+            message = get_message_from_git()
+        else:
+            parser.print_help()
+            return 2
+    except RuntimeError as exc:
+        print(f"FAIL: {exc}")
+        return 1
 
     ok, error = validate(message)
     if not ok:

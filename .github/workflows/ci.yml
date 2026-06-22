@@ -207,21 +207,22 @@ jobs:
         run: |
           docker build -f docker/Dockerfile -t aicbc-scan:${{ github.sha }} .
 
-      - name: Scan with Trivy (diagnostic table output)
+      - name: Scan with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'aicbc-scan:${{ github.sha }}'
-          format: 'table'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
+          ignore-unfixed: 'true'
 
-      # SARIF upload disabled during diagnostic phase; re-enable after CVEs are fixed.
-      # - name: Upload Trivy results
-      #   uses: github/codeql-action/upload-sarif@v3
-      #   if: always() && hashFiles('trivy-results.sarif') != ''
-      #   continue-on-error: true
-      #   with:
-      #     sarif_file: 'trivy-results.sarif'
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   # ==========================================================================
   # Stage 3: Fast Tests
