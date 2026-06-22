@@ -186,7 +186,7 @@ class HBEngine:
             # utilities: (n_tasks, n_alts)
             beta_per_task = beta[resp_indices]
             utilities = pt.sum(X_all * beta_per_task[:, None, :], axis=2)
-            log_probs = pt.log_softmax(utilities)
+            log_probs = utilities - pt.logsumexp(utilities, axis=-1, keepdims=True)
             chosen_log_probs = log_probs[pt.arange(n_tasks), chosen_indices]
             pm.Potential("log_likelihood", chosen_log_probs.sum())
 
