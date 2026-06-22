@@ -30,11 +30,6 @@ if [ ! -f "$COMPOSE_FILE" ]; then
     exit 1
 fi
 
-if [ -z "${REDIS_PASSWORD:-}" ]; then
-    log "ERROR: 环境变量 REDIS_PASSWORD 未设置"
-    exit 1
-fi
-
 log "开始部署 AI_CBC 到 Azure B2ats v2..."
 
 # 3. 拉取最新镜像（不在服务器上构建）

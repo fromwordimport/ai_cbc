@@ -1,5 +1,6 @@
 # AI_CBC Azure Worker VM (ARM64) - 仅运行 Celery analysis worker
 # Worker 通过主 VM 的 Redis（broker/backend）与 MongoDB 进行跨机通信
+# AZURE_MAIN_VM_IP 由 CD workflow 或 .env 提供
 
 services:
   worker:
@@ -13,7 +14,7 @@ services:
       - LOG_LEVEL=INFO
       # Worker 跨机连接主 VM 的 MongoDB + Redis
       - MONGODB_URL=mongodb://${AZURE_MAIN_VM_IP}:27017/aicbc
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@${AZURE_MAIN_VM_IP}:6379/0
+      - REDIS_URL=redis://${AZURE_MAIN_VM_IP}:6379/0
       - HB_MAX_CHAINS=2
       - HB_CORES=1
       - HB_MAX_DRAWS=1250

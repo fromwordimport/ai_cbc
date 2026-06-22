@@ -36,11 +36,6 @@ if [ -z "${AZURE_MAIN_VM_IP:-}" ]; then
     exit 1
 fi
 
-if [ -z "${REDIS_PASSWORD:-}" ]; then
-    log "ERROR: 环境变量 REDIS_PASSWORD 未设置"
-    exit 1
-fi
-
 log "开始部署 AI_CBC Worker 到 Azure Worker VM..."
 
 # 4. 拉取最新镜像（ARM64 由多平台构建支持）

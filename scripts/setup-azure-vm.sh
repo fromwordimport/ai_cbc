@@ -44,16 +44,7 @@ sudo ufw --force enable
 sudo mkdir -p "$APP_DIR"/{logs,backups/mongo,ssl,certbot/{www,conf}}
 sudo chown -R "$(whoami):$(whoami)" "$APP_DIR"
 
-# 7. 生成 Redis 密码（若尚未生成）
-if [ ! -f "$APP_DIR/.redis_password" ]; then
-    REDIS_PASSWORD=$(openssl rand -base64 32)
-    echo "$REDIS_PASSWORD" > "$APP_DIR/.redis_password"
-    chmod 600 "$APP_DIR/.redis_password"
-    echo "Redis 密码已生成并保存到 $APP_DIR/.redis_password"
-    echo "请将其写入 .env：REDIS_PASSWORD=$REDIS_PASSWORD"
-fi
-
-# 8. 可选：若设置了 AZURE_WORKER_SUBNET，则允许 worker 子网访问 Redis 与 MongoDB
+# 7. 可选：若设置了 AZURE_WORKER_SUBNET，则允许 worker 子网访问 Redis 与 MongoDB
 if [ -n "${AZURE_WORKER_SUBNET:-}" ]; then
     sudo ufw allow from "$AZURE_WORKER_SUBNET" to any port 6379 proto tcp
     sudo ufw allow from "$AZURE_WORKER_SUBNET" to any port 27017 proto tcp

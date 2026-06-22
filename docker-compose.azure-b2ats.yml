@@ -14,8 +14,7 @@ services:
       - DEBUG=false
       - LOG_LEVEL=INFO
       - MONGODB_URL=mongodb://mongo:27017/aicbc
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://redis:6379/0
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - API_WORKERS=1
@@ -97,8 +96,6 @@ services:
       - "allkeys-lru"
       - "--appendonly"
       - "yes"
-      - "--requirepass"
-      - "${REDIS_PASSWORD}"
     ports:
       - "6379:6379"
     volumes:
@@ -113,7 +110,7 @@ services:
           memory: 32M
           cpus: '0.05'
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       start_period: 10s

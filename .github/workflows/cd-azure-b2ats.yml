@@ -112,11 +112,12 @@ jobs:
         env:
           IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AZURE_MAIN_VM_IP: ${{ secrets.AZURE_VM_IP }}
         with:
           host: ${{ secrets.AZURE_WORKER_VM_IP }}
           username: ${{ secrets.AZURE_WORKER_VM_USER }}
           key: ${{ secrets.AZURE_WORKER_VM_SSH_KEY }}
-          envs: IMAGE_TAG,GITHUB_TOKEN
+          envs: IMAGE_TAG,GITHUB_TOKEN,AZURE_MAIN_VM_IP
           script_stop: true
           script: |
             cd /opt/aicbc
@@ -124,6 +125,7 @@ jobs:
             git fetch origin master
             git reset --hard origin/master
             export IMAGE_TAG=${IMAGE_TAG}
+            export AZURE_MAIN_VM_IP=${AZURE_MAIN_VM_IP}
             bash scripts/deploy-to-azure-worker.sh
 
       - name: Verify worker health
