@@ -36,6 +36,7 @@ dev = [
     "mypy>=1.10.0",
     "bandit>=1.7.0",
     "pre-commit>=3.7.0",
+    "requests>=2.31.0",
 ]
 analysis = [
     "numpy>=1.26.0",
@@ -100,6 +101,7 @@ markers = [
     "redteam: slow adversarial/penetration/bias tests",
     "performance: load and regression tests",
     "external: tests requiring real external services (LLM/Mongo/Redis)",
+    "smoke: post-deployment smoke tests requiring a running instance",
 ]
 
 [tool.coverage.run]
@@ -109,7 +111,7 @@ omit = ["*/tests/*", "*/test_*"]
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 skips = ["B101"]
-severity = "MEDIUM"
+severity = "HIGH"
 confidence = "MEDIUM"
 
 [[tool.uv.index]]

@@ -8,7 +8,7 @@ resources:
   - ../../base
 
 images:
-  - name: ghcr.io/fromwordimport/aicbc
+  - name: ghcr.io/fromwordimport/ai_cbc
     newTag: 0.1.0
 
 labels:

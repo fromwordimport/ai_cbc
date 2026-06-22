@@ -1,6 +1,8 @@
 # AI_CBC Security Scan Workflow
-# Maintainer: 小安 (Security Engineer)
-# Version: 1.0
+# Maintainer: 小安（Security Engineer）
+# Version: 2.0
+# Scheduled / dependency-change triggered deep security scan.
+# CI push/PR fast gates are handled by ci.yml.
 
 name: Security Scan
 
@@ -141,49 +143,3 @@ jobs:
           name: trivy-results
           path: trivy-results.sarif
           retention-days: 30
-
-  # ==========================================================================
-  # Secret Scan
-  # ==========================================================================
-  secret-scan:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Scan for secrets with TruffleHog
-        uses: trufflesecurity/trufflehog@v3.95.5
-        with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --only-verified
-
-  # ==========================================================================
-  # K8s Manifest Security Validation
-  # ==========================================================================
-  k8s-manifest-security:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies
-        run: |
-          uv venv --clear
-          uv pip install pyyaml
-
-      - name: Validate K8s manifests
-        run: |
-          source .venv/bin/activate
-          python scripts/validate_k8s_manifests.py

@@ -93,11 +93,16 @@ jobs:
           echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
+      - name: Cost fuse check
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          python3 scripts/ci_cost_fuse_check.py http://aicbc-api.aicbc-staging.svc.cluster.local/cost-status
+
       - name: Update image tag in staging overlay
         if: steps.check-kubeconfig.outputs.skip != 'true'
         run: |
           cd k8s/overlays/staging
-          kustomize edit set image aicbc-api=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          kustomize edit set image ghcr.io/fromwordimport/ai_cbc=ghcr.io/${{ github.repository }}:${{ github.sha }}
 
       - name: Deploy to staging
         if: steps.check-kubeconfig.outputs.skip != 'true'
@@ -118,6 +123,13 @@ jobs:
             --namespace=aicbc-staging \
             --image=curlimages/curl:latest \
             -- http://aicbc-api.aicbc-staging.svc.cluster.local/health
+
+      - name: Run smoke tests
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          # Lightweight standalone smoke-test runner; does not use the project's uv environment by design.
+          python3 -m pip install pytest requests
+          python3 -m pytest tests/smoke/ --base-url=http://aicbc-api.aicbc-staging.svc.cluster.local
 
       - name: Report skip
         if: steps.check-kubeconfig.outputs.skip == 'true'

@@ -149,7 +149,8 @@ jobs:
           retention-days: 30
 
   # ==========================================================================
-  # Stage 2: Security Scan
+  # Stage 2: Security Scan (fast gate for PR/push)
+  # Deeper scheduled scans live in security-scan.yml.
   # ==========================================================================
   security:
     runs-on: ubuntu-22.04
@@ -261,7 +262,7 @@ jobs:
           source .venv/bin/activate
           pytest tests/ \
             -v \
-            -m "(unit or integration) and not slow and not redteam and not performance" \
+            -m "(unit or integration) and not slow and not redteam and not performance and not smoke" \
             --timeout=120 \
             --cov=src \
             --cov-report=xml \
@@ -325,6 +326,11 @@ jobs:
             -m "security and not slow" \
             --timeout=120 \
             --junitxml=test-results/redteam-fast.xml
+
+      - name: Check red-team defense rate
+        run: |
+          source .venv/bin/activate
+          python scripts/check_defense_rate.py test-results/redteam-fast.xml --threshold 0.95
 
       - name: Upload red team results
         if: always()

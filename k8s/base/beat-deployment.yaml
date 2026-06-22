@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: beat
-          image: ghcr.io/fromwordimport/aicbc:0.1.0
+          image: ghcr.io/fromwordimport/ai_cbc:0.1.0
           imagePullPolicy: IfNotPresent
           command:
             - celery

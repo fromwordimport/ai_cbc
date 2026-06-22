@@ -23,7 +23,7 @@ tests/
 
 ```bash
 # Default fast feedback (CI equivalent)
-uv run pytest -m "(unit or integration) and not slow and not redteam and not performance"
+uv run pytest -m "(unit or integration) and not slow and not redteam and not performance and not smoke"
 
 # Unit tests only
 uv run pytest -m unit
