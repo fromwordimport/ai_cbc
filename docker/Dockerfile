@@ -24,15 +24,13 @@ FROM python:3.11-slim-bookworm AS runtime
 WORKDIR /app
 
 # Apply security updates before installing runtime packages
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    supervisor \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN groupadd -r aicbc && useradd -r -g aicbc aicbc
-
-# Install supervisord for multi-process single container (Render free plan only supports one web service)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    supervisor \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages

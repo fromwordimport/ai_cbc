@@ -251,11 +251,19 @@ def run_analysis_task(
         # ── Fit model ────────────────────────────────────────────────
         log.info("analysis_fitting_model")
         if model_type == "hb":
+            requested_chains = config.get("n_chains", 4)
+            n_chains = min(requested_chains, settings.hb_max_chains)
+            n_cores = settings.hb_cores if settings.hb_cores is not None else config.get("n_cores", 1)
+            requested_draws = config.get("n_draws", 1000)
+            requested_tune = config.get("n_tune", 1000)
+            max_draws = settings.hb_max_draws
             hb_config = HBConfig(
-                n_draws=config.get("n_draws", 1000),
-                n_tune=config.get("n_tune", 1000),
-                n_chains=config.get("n_chains", 4),
+                n_draws=requested_draws,
+                n_tune=requested_tune,
+                n_chains=n_chains,
+                n_cores=n_cores,
                 target_accept=config.get("target_accept", 0.9),
+                max_draws=max_draws,
             )
             engine = HBEngine(hb_config)
             result = engine.fit(df_long, feature_cols)
@@ -432,7 +440,15 @@ def run_analysis_task(
 
     except Exception as exc:
         log.exception("analysis_task_failed")
-        analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+        import traceback
+
+        err_summary = f"{type(exc).__name__}: {exc}"
+        err_traceback = traceback.format_exc()
+        job = analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+        if job is not None:
+            job.metadata["error"] = err_summary
+            job.metadata["traceback"] = err_traceback[-2000:]
+            analysis_store.save_job(job)
         _save_dead_letter(
             task_name="aicbc.analysis.run_analysis_task",
             analysis_id=analysis_id,
