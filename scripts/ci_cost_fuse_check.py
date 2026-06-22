@@ -27,7 +27,7 @@ def check_cost_status(url: str) -> int:
             body = response.read().decode("utf-8")
     except Exception as exc:
         print(f"WARN: Could not reach cost-status endpoint: {exc}")
-        # Fail open only if endpoint is unreachable; production should require it.
+        # Fail open if the endpoint is unreachable or returns unexpected data.
         return 0
 
     try:
@@ -37,7 +37,7 @@ def check_cost_status(url: str) -> int:
         return 0
 
     fuse_status = data.get("fuse_status")
-    if fuse_status in ("DEGRADE", "FUSE", "EMERGENCY"):
+    if isinstance(fuse_status, str) and fuse_status in ("DEGRADE", "FUSE", "EMERGENCY"):
         print(f"FAIL: Cost fuse status is {fuse_status}, blocking deployment")
         return 1
 
