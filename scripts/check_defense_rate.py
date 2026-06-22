@@ -23,8 +23,8 @@ def parse_args() -> argparse.Namespace:
         help=f"Path to JUnit XML report (default: {DEFAULT_XML_PATH})",
     )
     parser.add_argument(
-        "threshold",
-        nargs="?",
+        "--threshold",
+        "-t",
         type=float,
         default=DEFAULT_THRESHOLD,
         help=f"Defense rate threshold (default: {DEFAULT_THRESHOLD})",
@@ -36,6 +36,9 @@ def main() -> int:
     args = parse_args()
     xml_path = Path(args.xml_path)
     threshold = args.threshold
+    if not (0.0 <= threshold <= 1.0):
+        print(f"FAIL: Threshold must be between 0.0 and 1.0, got {threshold}")
+        return 1
 
     if not xml_path.exists():
         print(f"FAIL: XML report not found: {xml_path}")
@@ -45,6 +48,10 @@ def main() -> int:
         root = ET.fromstring(xml_path.read_text(encoding="utf-8"))
     except ET.ParseError as exc:
         print(f"FAIL: Could not parse XML report: {exc}")
+        return 1
+
+    if root.tag != "testsuite":
+        print(f"FAIL: Expected root tag <testsuite>, got <{root.tag}>")
         return 1
 
     total = int(root.get("tests", "0"))

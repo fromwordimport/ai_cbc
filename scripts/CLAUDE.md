@@ -12,7 +12,7 @@ This directory contains **utility scripts** for development, verification, and b
 |------|---------|
 | `batch_simulate.py` | End-to-end batch simulation CLI (persona generation → bias audit → questionnaire → choice simulation → export) |
 | `verify_endpoints.py` | Endpoint verification using FastAPI `TestClient` with mocked LLM |
-| `check_defense_rate.py` | Parse pytest JUnit XML and fail if red-team defense rate is below threshold (95%) |
+| `check_defense_rate.py` | Parse pytest JUnit XML and fail if red-team defense rate is below threshold (95%). Usage: `python scripts/check_defense_rate.py [xml_path] [--threshold 0.95]` |
 | `setup-azure-vm.sh` | Initialize an Azure B2ats v2 VM: install Docker, certbot, ufw, git; configure swap and firewall |
 | `deploy-to-azure-b2ats.sh` | Pull latest images and restart the AI_CBC stack on Azure B2ats v2 |
 | `backup-mongodb-to-azure.sh` | Dump MongoDB and upload to Azure Blob; falls back to local storage if no Blob config |
