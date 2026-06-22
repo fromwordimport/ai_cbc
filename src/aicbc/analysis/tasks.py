@@ -440,7 +440,15 @@ def run_analysis_task(
 
     except Exception as exc:
         log.exception("analysis_task_failed")
-        analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+        import traceback
+
+        err_summary = f"{type(exc).__name__}: {exc}"
+        err_traceback = traceback.format_exc()
+        job = analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
+        if job is not None:
+            job.metadata["error"] = err_summary
+            job.metadata["traceback"] = err_traceback[-2000:]
+            analysis_store.save_job(job)
         _save_dead_letter(
             task_name="aicbc.analysis.run_analysis_task",
             analysis_id=analysis_id,
