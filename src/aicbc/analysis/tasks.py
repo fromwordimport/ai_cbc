@@ -253,7 +253,9 @@ def run_analysis_task(
         if model_type == "hb":
             requested_chains = config.get("n_chains", 4)
             n_chains = min(requested_chains, settings.hb_max_chains)
-            n_cores = settings.hb_cores if settings.hb_cores is not None else config.get("n_cores", 1)
+            n_cores = (
+                settings.hb_cores if settings.hb_cores is not None else config.get("n_cores", 1)
+            )
             requested_draws = config.get("n_draws", 1000)
             requested_tune = config.get("n_tune", 1000)
             max_draws = settings.hb_max_draws
