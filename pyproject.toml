@@ -24,6 +24,9 @@ dependencies = [
     "cryptography>=49.0.0",
     "pyjwt>=2.8.0",
     "bcrypt>=4.1.0",
+    # Pin build tooling to versions that fix HIGH CVEs in their vendored deps.
+    "setuptools>=82.0.1",
+    "wheel>=0.46.2",
 ]
 
 [project.optional-dependencies]
