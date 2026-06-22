@@ -105,6 +105,11 @@ jobs:
             --fail-with-body \
             -- http://aicbc-api.aicbc-prod.svc.cluster.local/health
 
+      - name: Run smoke tests
+        run: |
+          python3 -m pip install pytest requests
+          python3 -m pytest tests/smoke/ --base-url=http://aicbc-api.aicbc-prod.svc.cluster.local
+
       - name: Rollback instructions on failure
         if: failure()
         run: |

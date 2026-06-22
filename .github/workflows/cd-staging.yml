@@ -119,6 +119,12 @@ jobs:
             --image=curlimages/curl:latest \
             -- http://aicbc-api.aicbc-staging.svc.cluster.local/health
 
+      - name: Run smoke tests
+        if: steps.check-kubeconfig.outputs.skip != 'true'
+        run: |
+          python3 -m pip install pytest requests
+          python3 -m pytest tests/smoke/ --base-url=http://aicbc-api.aicbc-staging.svc.cluster.local
+
       - name: Report skip
         if: steps.check-kubeconfig.outputs.skip == 'true'
         run: echo "Staging deployment skipped because KUBECONFIG_STAGING is not set."
