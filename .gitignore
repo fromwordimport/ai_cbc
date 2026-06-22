@@ -47,11 +47,9 @@ Thumbs.db
 uv.lock
 node_modules
 
-# Local binaries
-kubectl.exe
-kubectl
-kustomize
-*.exe
+# Local CI/CD reports
+local-ci-reports/
+data/
 
 # Claude / local tooling
 .claude/
