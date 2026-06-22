@@ -122,6 +122,7 @@ jobs:
       - name: Run smoke tests
         if: steps.check-kubeconfig.outputs.skip != 'true'
         run: |
+          # Lightweight standalone smoke-test runner; does not use the project's uv environment by design.
           python3 -m pip install pytest requests
           python3 -m pytest tests/smoke/ --base-url=http://aicbc-api.aicbc-staging.svc.cluster.local
 
