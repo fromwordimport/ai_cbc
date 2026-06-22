@@ -22,43 +22,9 @@ ENV UV_NO_CACHE=1
 # Use uv for all package installs to avoid stale setuptools/wheel vendor
 # dist-info left behind by mixing pip upgrade with uv installs.
 RUN pip install --no-cache-dir --upgrade uv && \
-    uv pip uninstall --system setuptools wheel || true && \
-    rm -rf /usr/local/lib/python3.11/site-packages/setuptools* \
-           /usr/local/lib/python3.11/site-packages/wheel* && \
     uv pip install --system --no-cache --upgrade setuptools wheel && \
     uv pip install --system --no-cache -e ".[analysis]" && \
     uv pip install --system --no-cache supervisor
-
-# Defensive cleanup: transitive deps can still pull older setuptools/wheel
-# versions into site-packages. Remove any remaining vulnerable dist-info dirs.
-RUN python - <<'PY'
-import re
-import shutil
-from pathlib import Path
-
-def parse_version(v):
-    return tuple(int(x) for x in v.split('.'))
-
-def prune_distinfo(parent, prefixes, min_version):
-    min_v = parse_version(min_version)
-    for prefix in prefixes:
-        for p in Path(parent).glob(f'{prefix}-*.dist-info'):
-            m = re.match(re.escape(prefix) + r'-([0-9]+(?:\.[0-9]+)*)\.dist-info$', p.name)
-            if not m:
-                continue
-            if parse_version(m.group(1)) < min_v:
-                print(f'Removing {p}')
-                shutil.rmtree(p)
-
-site = Path('/usr/local/lib/python3.11/site-packages')
-prune_distinfo(site, ['setuptools'], '82.0.1')
-prune_distinfo(site, ['wheel'], '0.46.2')
-
-vendor = site / 'setuptools' / '_vendor'
-if vendor.exists():
-    prune_distinfo(vendor, ['jaraco.context', 'jaraco_context'], '6.1.0')
-    prune_distinfo(vendor, ['wheel'], '0.46.2')
-PY
 
 # Stage 2: Runtime — minimal image
 FROM python:3.11-slim-bookworm AS runtime
