@@ -61,7 +61,7 @@ services:
       - "--bind_ip"
       - "0.0.0.0"
       - "--wiredTigerCacheSizeGB"
-      - "0.125"
+      - "0.1875"
     volumes:
       - mongo_data:/data/db
       - ./backups/mongo:/backup
@@ -69,10 +69,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 192M
           cpus: '0.25'
         reservations:
-          memory: 64M
+          memory: 96M
           cpus: '0.1'
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
