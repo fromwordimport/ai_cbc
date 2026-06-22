@@ -198,6 +198,33 @@ class LocalCI:
             report_files=report_files,
         )
 
+    def stage_test(self) -> StageResult:
+        start = time.time()
+        stage_dir = self.stage_dir("test")
+        junit_path = stage_dir / "fast.xml"
+        coverage_xml = stage_dir / "coverage.xml"
+
+        cmd = [
+            "uv", "run", "pytest", "tests/",
+            "-m", "(unit or integration) and not slow and not redteam and not performance and not smoke",
+            "--timeout=120",
+            "--cov=src",
+            "--cov-report=xml:" + str(coverage_xml),
+            "--cov-report=html:" + str(stage_dir / "htmlcov"),
+            "--cov-fail-under=60",
+            f"--junitxml={junit_path}",
+        ]
+        res = self.run_command(cmd, timeout=600)
+
+        return StageResult(
+            name="test",
+            success=res.returncode == 0,
+            duration=time.time() - start,
+            stdout=res.stdout[-2000:] if len(res.stdout) > 2000 else res.stdout,
+            stderr=res.stderr[-2000:] if len(res.stderr) > 2000 else res.stderr,
+            report_files=[junit_path, coverage_xml],
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")
