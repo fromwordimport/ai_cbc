@@ -48,6 +48,17 @@ class LocalCI:
         if shutil.which("docker") is None:
             raise RuntimeError("docker is required for docker/trivy stages")
 
+    def stage_dir(self, name: str) -> Path:
+        d = self.report_dir / name
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def write_report(self, stage: str, filename: str, content: str) -> Path:
+        d = self.stage_dir(stage)
+        p = d / filename
+        p.write_text(content, encoding="utf-8")
+        return p
+
     def log(self, message: str) -> None:
         if self.verbose:
             print(message)
