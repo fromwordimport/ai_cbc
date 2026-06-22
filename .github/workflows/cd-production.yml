@@ -75,10 +75,24 @@ jobs:
           sudo mv kustomize /usr/local/bin/
 
       - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_PRODUCTION }}
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          if [ -z "$KUBECONFIG_B64" ]; then
+            echo "::error::KUBECONFIG_PRODUCTION secret is empty"
+            exit 1
+          fi
+          echo "$KUBECONFIG_B64" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
+          if [ ! -s $HOME/.kube/config ]; then
+            echo "::error::Decoded kubeconfig is empty"
+            exit 1
+          fi
+          export KUBECONFIG=$HOME/.kube/config
+          kubectl version --client
+          kubectl config current-context
+          kubectl cluster-info
 
       - name: Cost fuse check
         run: |
@@ -90,6 +104,8 @@ jobs:
           kustomize edit set image ghcr.io/fromwordimport/ai_cbc=ghcr.io/${{ github.repository }}:${{ needs.verify-image.outputs.image_tag }}
 
       - name: Deploy to production
+        env:
+          KUBECONFIG: ~/.kube/config
         run: |
           kubectl apply -k k8s/overlays/prod/
 
