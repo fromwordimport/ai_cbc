@@ -448,8 +448,10 @@ def run_analysis_task(
         err_traceback = traceback.format_exc()
         job = analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
         if job is not None:
-            job.metadata["error"] = err_summary
-            job.metadata["traceback"] = err_traceback[-2000:]
+            metadata = getattr(job, "metadata", None)
+            if metadata is not None:
+                metadata["error"] = err_summary
+                metadata["traceback"] = err_traceback[-2000:]
             analysis_store.save_job(job)
         _save_dead_letter(
             task_name="aicbc.analysis.run_analysis_task",
