@@ -19,8 +19,12 @@ RUN apt-get update && \
 COPY pyproject.toml ./
 COPY src/ ./src/
 ENV UV_NO_CACHE=1
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel uv && \
-    uv pip install --system --no-cache -e ".[analysis]"
+# Use uv for all package installs to avoid stale setuptools/wheel vendor
+# dist-info left behind by mixing pip upgrade with uv installs.
+RUN pip install --no-cache-dir --upgrade uv && \
+    uv pip install --system --no-cache --upgrade setuptools wheel && \
+    uv pip install --system --no-cache -e ".[analysis]" && \
+    uv pip install --system --no-cache supervisor
 
 # Stage 2: Runtime — minimal image
 FROM python:3.11-slim-bookworm AS runtime
@@ -33,8 +37,6 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
-    supervisor \
-    g++ \
     libexpat1 \
     libssl3 \
     openssl \
@@ -67,4 +69,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
