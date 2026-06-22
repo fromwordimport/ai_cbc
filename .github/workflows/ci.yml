@@ -327,6 +327,11 @@ jobs:
             --timeout=120 \
             --junitxml=test-results/redteam-fast.xml
 
+      - name: Check red-team defense rate
+        run: |
+          source .venv/bin/activate
+          python scripts/check_defense_rate.py test-results/redteam-fast.xml 0.95
+
       - name: Upload red team results
         if: always()
         uses: actions/upload-artifact@v4
