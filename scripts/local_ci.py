@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -113,6 +114,50 @@ class LocalCI:
                     break
         self.print_summary(results)
         return overall
+
+    def stage_preflight(self) -> StageResult:
+        start = time.time()
+        errors: list[str] = []
+        report_files: list[Path] = []
+
+        # branch naming
+        branch_res = self.run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        branch = branch_res.stdout.strip()
+        if not re.match(r"^(master|release/.*|hotfix/.*|feature/.*|worktree/.*|worktree-.*)$", branch):
+            errors.append(f"branch naming violation: {branch}")
+
+        # commit message
+        commit_res = self.run_command(["git", "log", "--format=%s", "-n", "1", "HEAD"])
+        message = commit_res.stdout.strip()
+        cm_res = self.run_command(
+            [sys.executable, str(REPO_ROOT / "scripts" / "check_commit_msg.py"), "--from-git"]
+        )
+        if cm_res.returncode != 0:
+            errors.append("commit message format violation")
+
+        # secrets scan
+        if shutil.which("trufflehog"):
+            out_path = self.write_report("preflight", "trufflehog.json", "")
+            res = self.run_command(
+                ["trufflehog", "git", "file://.", "--only-verified", "--json"],
+                timeout=120,
+            )
+            out_path.write_text(res.stdout, encoding="utf-8")
+            report_files.append(out_path)
+            if res.returncode != 0:
+                errors.append("TruffleHog found verified secrets")
+        else:
+            errors.append("trufflehog not installed; skipping secrets scan")
+
+        duration = time.time() - start
+        return StageResult(
+            name="preflight",
+            success=len(errors) == 0,
+            duration=duration,
+            stdout=f"branch: {branch}\nmessage: {message}",
+            stderr="\n".join(errors),
+            report_files=report_files,
+        )
 
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
