@@ -347,6 +347,62 @@ class LocalCI:
             report_files=[log_path],
         )
 
+    def stage_docker(self) -> StageResult:
+        start = time.time()
+        self.require_docker()
+        stage_dir = self.stage_dir("docker")
+        log_path = stage_dir / "build.log"
+
+        res = self.run_command(
+            ["docker", "build", "-f", "docker/Dockerfile", "-t", "aicbc-scan:local", "."],
+            timeout=600,
+        )
+        log_path.write_text(res.stdout + res.stderr, encoding="utf-8")
+
+        return StageResult(
+            name="docker",
+            success=res.returncode == 0,
+            duration=time.time() - start,
+            stdout=res.stdout[-1000:] if len(res.stdout) > 1000 else res.stdout,
+            stderr=res.stderr[-1000:] if len(res.stderr) > 1000 else res.stderr,
+            report_files=[log_path],
+        )
+
+    def stage_trivy(self) -> StageResult:
+        start = time.time()
+        self.require_docker()
+        stage_dir = self.stage_dir("trivy")
+        sarif_path = stage_dir / "trivy-results.sarif"
+
+        if shutil.which("trivy") is None:
+            return StageResult(
+                name="trivy",
+                success=False,
+                duration=0.0,
+                stderr="trivy not installed. Install from https://aquasecurity.github.io/trivy/",
+            )
+
+        res = self.run_command(
+            [
+                "trivy", "image",
+                "--severity", "CRITICAL,HIGH",
+                "--exit-code", "1",
+                "--format", "sarif",
+                "--output", str(sarif_path),
+                "aicbc-scan:local",
+            ],
+            timeout=600,
+        )
+
+        return StageResult(
+            name="trivy",
+            success=res.returncode == 0,
+            duration=time.time() - start,
+            stdout=res.stdout[-1000:] if len(res.stdout) > 1000 else res.stdout,
+            stderr=res.stderr[-1000:] if len(res.stderr) > 1000 else res.stderr,
+            report_files=[sarif_path],
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")
