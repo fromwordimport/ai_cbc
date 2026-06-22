@@ -159,6 +159,45 @@ class LocalCI:
             report_files=report_files,
         )
 
+    def stage_lint(self) -> StageResult:
+        start = time.time()
+        errors: list[str] = []
+        report_files: list[Path] = []
+        stage_dir = self.stage_dir("lint")
+
+        res = self.run_command(["uv", "run", "ruff", "check", "src/", "--output-format=github"])
+        if res.returncode != 0:
+            errors.append("ruff check failed")
+
+        res = self.run_command(["uv", "run", "ruff", "format", "--check", "src/"])
+        if res.returncode != 0:
+            errors.append("ruff format check failed")
+
+        res = self.run_command(["uv", "run", "mypy", "src/", "--ignore-missing-imports"])
+        mypy_path = stage_dir / "mypy-report.txt"
+        mypy_path.write_text(res.stdout + res.stderr, encoding="utf-8")
+        report_files.append(mypy_path)
+        if res.returncode != 0:
+            errors.append("mypy found issues (non-blocking in CI, but reported locally)")
+
+        bandit_path = stage_dir / "bandit-report.json"
+        res = self.run_command(
+            ["uv", "run", "bandit", "-r", "src/", "-f", "json", "-o", str(bandit_path), "--severity-level", "high"]
+        )
+        report_files.append(bandit_path)
+        if res.returncode != 0:
+            errors.append("bandit found HIGH severity issues")
+
+        duration = time.time() - start
+        return StageResult(
+            name="lint",
+            success=len(errors) == 0,
+            duration=duration,
+            stdout="",
+            stderr="\n".join(errors),
+            report_files=report_files,
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")
