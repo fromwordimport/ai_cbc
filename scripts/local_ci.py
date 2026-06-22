@@ -256,6 +256,54 @@ class LocalCI:
             report_files=[junit_path],
         )
 
+    def stage_frontend(self) -> StageResult:
+        start = time.time()
+        self.require_npm()
+        errors: list[str] = []
+        report_files: list[Path] = []
+        stage_dir = self.stage_dir("frontend")
+        frontend_dir = REPO_ROOT / "frontend"
+
+        res = self.run_command(["npm", "ci"], cwd=frontend_dir, timeout=300)
+        if res.returncode != 0:
+            errors.append("npm ci failed")
+
+        res = self.run_command(["npx", "tsc", "--noEmit"], cwd=frontend_dir, timeout=120)
+        if res.returncode != 0:
+            errors.append("tsc type check failed")
+
+        res = self.run_command(["npm", "run", "test:coverage"], cwd=frontend_dir, timeout=300)
+        if res.returncode != 0:
+            errors.append("frontend tests failed")
+
+        res = self.run_command(["npm", "run", "build"], cwd=frontend_dir, timeout=300)
+        if res.returncode != 0:
+            errors.append("frontend build failed")
+
+        audit_path = stage_dir / "npm-audit.json"
+        res = self.run_command(["npm", "audit", "--audit-level=high", "--json"], cwd=frontend_dir)
+        audit_path.write_text(res.stdout if res.stdout else "{}", encoding="utf-8")
+        report_files.append(audit_path)
+        if res.returncode != 0:
+            errors.append("npm audit found HIGH/CRITICAL vulnerabilities")
+
+        cov_src = frontend_dir / "coverage"
+        cov_dst = stage_dir / "coverage"
+        if cov_src.exists():
+            import shutil as _shutil
+            _shutil.copytree(cov_src, cov_dst, dirs_exist_ok=True)
+            report_files.append(cov_dst)
+
+        duration = time.time() - start
+        return StageResult(
+            name="frontend",
+            success=len(errors) == 0,
+            duration=duration,
+            stdout="",
+            stderr="\n".join(errors),
+            report_files=report_files,
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")
