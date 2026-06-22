@@ -330,6 +330,23 @@ class LocalCI:
             report_files=[audit_path],
         )
 
+    def stage_k8s(self) -> StageResult:
+        start = time.time()
+        stage_dir = self.stage_dir("k8s")
+        log_path = stage_dir / "k8s-validation.log"
+
+        res = self.run_command(["uv", "run", "python", "scripts/validate_k8s_manifests.py"])
+        log_path.write_text(res.stdout + res.stderr, encoding="utf-8")
+
+        return StageResult(
+            name="k8s",
+            success=res.returncode == 0,
+            duration=time.time() - start,
+            stdout=res.stdout,
+            stderr=res.stderr,
+            report_files=[log_path],
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")

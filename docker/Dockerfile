@@ -29,22 +29,35 @@ RUN pip install --no-cache-dir --upgrade uv && \
     uv pip install --system --no-cache -e ".[analysis]" && \
     uv pip install --system --no-cache supervisor
 
-# Defensive cleanup: remove any remaining stale vendored dist-info directories
-# that older setuptools may have left behind before being force-reinstalled.
+# Defensive cleanup: transitive deps can still pull older setuptools/wheel
+# versions into site-packages. Remove any remaining vulnerable dist-info dirs.
 RUN python - <<'PY'
+import re
 import shutil
 from pathlib import Path
-base = Path('/usr/local/lib/python3.11/site-packages/setuptools/_vendor')
-for stale in [
-    base / 'jaraco.context-5.3.0.dist-info',
-    base / 'jaraco.context-6.0.0.dist-info',
-    base / 'wheel-0.45.1.dist-info',
-    base / 'wheel-0.46.0.dist-info',
-    base / 'wheel-0.46.1.dist-info',
-]:
-    if stale.exists():
-        shutil.rmtree(stale)
-        print(f'Removed {stale}')
+
+def parse_version(v):
+    return tuple(int(x) for x in v.split('.'))
+
+def prune_distinfo(parent, prefixes, min_version):
+    min_v = parse_version(min_version)
+    for prefix in prefixes:
+        for p in Path(parent).glob(f'{prefix}-*.dist-info'):
+            m = re.match(re.escape(prefix) + r'-([0-9]+(?:\.[0-9]+)*)\.dist-info$', p.name)
+            if not m:
+                continue
+            if parse_version(m.group(1)) < min_v:
+                print(f'Removing {p}')
+                shutil.rmtree(p)
+
+site = Path('/usr/local/lib/python3.11/site-packages')
+prune_distinfo(site, ['setuptools'], '82.0.1')
+prune_distinfo(site, ['wheel'], '0.46.2')
+
+vendor = site / 'setuptools' / '_vendor'
+if vendor.exists():
+    prune_distinfo(vendor, ['jaraco.context', 'jaraco_context'], '6.1.0')
+    prune_distinfo(vendor, ['wheel'], '0.46.2')
 PY
 
 # Stage 2: Runtime — minimal image
