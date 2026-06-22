@@ -80,6 +80,10 @@ jobs:
           echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
+      - name: Cost fuse check
+        run: |
+          python3 scripts/ci_cost_fuse_check.py http://aicbc-api.aicbc-prod.svc.cluster.local/cost-status
+
       - name: Update image tag in production overlay
         run: |
           cd k8s/overlays/prod
