@@ -253,7 +253,9 @@ def run_analysis_task(
         if model_type == "hb":
             requested_chains = config.get("n_chains", 4)
             n_chains = min(requested_chains, settings.hb_max_chains)
-            n_cores = settings.hb_cores if settings.hb_cores is not None else config.get("n_cores", 1)
+            n_cores = (
+                settings.hb_cores if settings.hb_cores is not None else config.get("n_cores", 1)
+            )
             requested_draws = config.get("n_draws", 1000)
             requested_tune = config.get("n_tune", 1000)
             max_draws = settings.hb_max_draws
@@ -446,8 +448,10 @@ def run_analysis_task(
         err_traceback = traceback.format_exc()
         job = analysis_store.update_job_status(analysis_id, "FAILED", progress=0.0)
         if job is not None:
-            job.metadata["error"] = err_summary
-            job.metadata["traceback"] = err_traceback[-2000:]
+            metadata = getattr(job, "metadata", None)
+            if metadata is not None:
+                metadata["error"] = err_summary
+                metadata["traceback"] = err_traceback[-2000:]
             analysis_store.save_job(job)
         _save_dead_letter(
             task_name="aicbc.analysis.run_analysis_task",
