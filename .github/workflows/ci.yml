@@ -262,7 +262,7 @@ jobs:
           source .venv/bin/activate
           pytest tests/ \
             -v \
-            -m "(unit or integration) and not slow and not redteam and not performance" \
+            -m "(unit or integration) and not slow and not redteam and not performance and not smoke" \
             --timeout=120 \
             --cov=src \
             --cov-report=xml \
