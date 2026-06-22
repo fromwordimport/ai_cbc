@@ -36,6 +36,18 @@ class LocalCI:
         self.verbose = verbose
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
+    def require_uv(self) -> None:
+        if shutil.which("uv") is None:
+            raise RuntimeError("uv is required. Install from https://docs.astral.sh/uv/")
+
+    def require_npm(self) -> None:
+        if shutil.which("npm") is None:
+            raise RuntimeError("npm is required for frontend stage")
+
+    def require_docker(self) -> None:
+        if shutil.which("docker") is None:
+            raise RuntimeError("docker is required for docker/trivy stages")
+
     def log(self, message: str) -> None:
         if self.verbose:
             print(message)
@@ -124,6 +136,8 @@ def main() -> int:
     parser.add_argument("--skip-redteam", action="store_true")
     parser.add_argument("--skip-secrets", action="store_true")
     args = parser.parse_args()
+
+    LocalCI(report_dir=args.report_dir, verbose=args.verbose).require_uv()
 
     if args.command == "all":
         stages = FAST_STAGES.copy()
