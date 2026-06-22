@@ -304,6 +304,32 @@ class LocalCI:
             report_files=report_files,
         )
 
+    def stage_security(self) -> StageResult:
+        start = time.time()
+        stage_dir = self.stage_dir("security")
+        audit_path = stage_dir / "pip-audit.json"
+
+        res = self.run_command(["uv", "run", "pip", "install", "pip-audit"], timeout=120)
+        res = self.run_command(
+            ["uv", "run", "pip-audit", "--desc", "--format=json", "-o", str(audit_path)],
+            timeout=300,
+        )
+        audit_path.write_text(audit_path.read_text(encoding="utf-8") if audit_path.exists() else "[]", encoding="utf-8")
+
+        check = self.run_command(
+            [sys.executable, str(REPO_ROOT / "scripts" / "ci_check_pip_audit.py")],
+            cwd=stage_dir,
+        )
+
+        return StageResult(
+            name="security",
+            success=check.returncode == 0,
+            duration=time.time() - start,
+            stdout=res.stdout[-2000:] if len(res.stdout) > 2000 else res.stdout,
+            stderr=res.stderr[-2000:] if len(res.stderr) > 2000 else res.stderr,
+            report_files=[audit_path],
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")
