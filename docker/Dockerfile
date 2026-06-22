@@ -84,6 +84,36 @@ RUN groupadd -r aicbc && useradd -r -g aicbc aicbc
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# Re-run cleanup in runtime in case any stale dist-info was carried over
+RUN python - <<'PY'
+import re
+import shutil
+from pathlib import Path
+
+def parse_version(v):
+    return tuple(int(x) for x in v.split('.'))
+
+def prune_distinfo(parent, prefixes, min_version):
+    min_v = parse_version(min_version)
+    for prefix in prefixes:
+        for p in Path(parent).glob(f'{prefix}-*.dist-info'):
+            m = re.match(re.escape(prefix) + r'-([0-9]+(?:\.[0-9]+)*)\.dist-info$', p.name)
+            if not m:
+                continue
+            if parse_version(m.group(1)) < min_v:
+                print(f'Removing {p}')
+                shutil.rmtree(p)
+
+site = Path('/usr/local/lib/python3.11/site-packages')
+prune_distinfo(site, ['setuptools'], '82.0.1')
+prune_distinfo(site, ['wheel'], '0.46.2')
+
+vendor = site / 'setuptools' / '_vendor'
+if vendor.exists():
+    prune_distinfo(vendor, ['jaraco.context', 'jaraco_context'], '6.1.0')
+    prune_distinfo(vendor, ['wheel'], '0.46.2')
+PY
+
 # Copy application code
 COPY --chown=aicbc:aicbc src/ ./src/
 COPY --chown=aicbc:aicbc configs/ ./configs/
