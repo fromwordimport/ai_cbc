@@ -43,6 +43,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}
@@ -97,4 +98,50 @@ jobs:
               sleep 2
             done
             echo "ERROR: 部署后健康检查失败" >&2
+            exit 1
+
+  deploy-worker:
+    runs-on: ubuntu-22.04
+    needs: build-push
+    environment: azure-b2ats
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy worker via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.AZURE_WORKER_VM_IP }}
+          username: ${{ secrets.AZURE_WORKER_VM_USER }}
+          key: ${{ secrets.AZURE_WORKER_VM_SSH_KEY }}
+          envs: IMAGE_TAG,GITHUB_TOKEN
+          script_stop: true
+          script: |
+            cd /opt/aicbc
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/fromwordimport/ai_cbc.git
+            git fetch origin master
+            git reset --hard origin/master
+            export IMAGE_TAG=${IMAGE_TAG}
+            bash scripts/deploy-to-azure-worker.sh
+
+      - name: Verify worker health
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AZURE_WORKER_VM_IP }}
+          username: ${{ secrets.AZURE_WORKER_VM_USER }}
+          key: ${{ secrets.AZURE_WORKER_VM_SSH_KEY }}
+          script_stop: true
+          script: |
+            cd /opt/aicbc
+            for i in {1..30}; do
+              if docker compose -f docker-compose.azure-worker.yml exec -T worker pgrep -f "celery worker" > /dev/null 2>&1; then
+                echo "Worker 健康检查通过"
+                exit 0
+              fi
+              echo "等待 Worker... ($i/30)"
+              sleep 2
+            done
+            echo "ERROR: Worker 健康检查失败" >&2
             exit 1

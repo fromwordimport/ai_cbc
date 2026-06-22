@@ -5,7 +5,7 @@
 set -euo pipefail
 
 APP_DIR="/opt/aicbc"
-COMPOSE_FILE="$APP_DIR/docker-compose.azure-b2ats.yml"
+COMPOSE_FILE="${COMPOSE_FILE:-$APP_DIR/docker-compose.azure-b2ats.yml}"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -27,6 +27,11 @@ fi
 
 if [ ! -f "$COMPOSE_FILE" ]; then
     log "ERROR: Compose 文件不存在：$COMPOSE_FILE"
+    exit 1
+fi
+
+if [ -z "${REDIS_PASSWORD:-}" ]; then
+    log "ERROR: 环境变量 REDIS_PASSWORD 未设置"
     exit 1
 fi
 

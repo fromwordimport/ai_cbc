@@ -14,7 +14,8 @@ services:
       - DEBUG=false
       - LOG_LEVEL=INFO
       - MONGODB_URL=mongodb://mongo:27017/aicbc
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - API_WORKERS=1
@@ -30,15 +31,15 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
-      - ./docker/supervisord-b2ats.conf:/etc/supervisor/conf.d/supervisord.conf:ro
+      - ./docker/supervisord-api.conf:/etc/supervisor/conf.d/supervisord.conf:ro
     restart: unless-stopped
-    # B2ats v2 1GiB 主机：api 容器同时跑 uvicorn + Celery worker，需要更多资源。
-    # memswap_limit 允许容器在 512M RAM 之外使用 swap，避免硬 OOM；实际 RSS 尽量压在 640M 内。
+    # B2ats v2 1GiB 主机：api 容器只跑 uvicorn，worker 拆到独立 ARM VM。
+    # memswap_limit 允许容器在 512M RAM 之外使用 swap，避免硬 OOM。
     deploy:
       resources:
         limits:
-          memory: 640M
-          cpus: '1.5'
+          memory: 512M
+          cpus: '1.0'
         reservations:
           memory: 128M
           cpus: '0.5'
@@ -62,6 +63,8 @@ services:
       - "0.0.0.0"
       - "--wiredTigerCacheSizeGB"
       - "0.25"
+    ports:
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
       - ./backups/mongo:/backup
@@ -94,6 +97,10 @@ services:
       - "allkeys-lru"
       - "--appendonly"
       - "yes"
+      - "--requirepass"
+      - "${REDIS_PASSWORD}"
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -106,7 +113,7 @@ services:
           memory: 32M
           cpus: '0.05'
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       start_period: 10s

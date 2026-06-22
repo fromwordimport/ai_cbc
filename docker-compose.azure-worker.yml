@@ -1,0 +1,39 @@
+# AI_CBC Azure Worker VM (ARM64) - 仅运行 Celery analysis worker
+# Worker 通过主 VM 的 Redis（broker/backend）与 MongoDB 进行跨机通信
+
+services:
+  worker:
+    image: ghcr.io/fromwordimport/ai_cbc:latest
+    container_name: aicbc-worker
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      # Worker 跨机连接主 VM 的 MongoDB + Redis
+      - MONGODB_URL=mongodb://${AZURE_MAIN_VM_IP}:27017/aicbc
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${AZURE_MAIN_VM_IP}:6379/0
+      - HB_MAX_CHAINS=2
+      - HB_CORES=1
+      - HB_MAX_DRAWS=1250
+    volumes:
+      - ./logs:/app/logs
+      - ./docker/supervisord-worker.conf:/etc/supervisor/conf.d/supervisord.conf:ro
+    restart: unless-stopped
+    # Worker VM：1 GiB RAM / 2 vCPU，把大部分资源给 worker
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '1.8'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    memswap_limit: 1536M
+    networks:
+      - aicbc-worker-network
+
+networks:
+  aicbc-worker-network:
+    driver: bridge
