@@ -33,7 +33,7 @@ services:
           cpus: '0.5'
     memswap_limit: 1536M
     healthcheck:
-      test: ["CMD", "supervisorctl", "status", "worker"]
+      test: ["CMD", "supervisorctl", "-c", "/etc/supervisor/conf.d/supervisord.conf", "status", "worker"]
       interval: 30s
       timeout: 5s
       start_period: 15s
