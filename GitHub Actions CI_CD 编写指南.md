@@ -52,7 +52,7 @@
 | ------------------- | -------------------------- | ---------------------------------- | -------------------------------------------------------- |
 | `ci.yml`            | `push`、`pull_request`     | lint、test、安全扫描               | **质量内建**：让 Bug 根本不流向用户；加速 PR 评审        |
 | `cd-staging.yml`    | 推送到 `develop` 分支      | 构建制品，部署到测试环境           | **快速预览**：产品/QA 能立刻体验最新功能，提供反馈       |
-| `cd-production.yml` | 创建 `release/*` 标签      | 构建、部署到生产，人工审批         | **安全发布**：业务方控制上线节奏，满足审批合规           |
+| `cd-azure-b2ats.yml`| push 到 `master` / 手动触发 | 构建镜像，SSH 部署到 Azure VM 生产环境 | **生产交付**：将验证后的版本发布到生产环境               |
 | `feature-switch.yml`| 手动触发，或特定标签      | 管理特性开关（Feature Flag）配置   | **产品实验**：按需开启/关闭功能，灰度发布，A/B 测试      |
 | `data-pipeline.yml` | 跟随功能分支或定时        | 验证埋点数据管道，同步数据产品定义 | **数据闭环**：保证功能上线时埋点就绪，支持产品决策       |
 | `security-scan.yml` | 定时 (`cron`) 或 PR 上     | 依赖漏洞、容器安全深度扫描         | **合规与风险控制**：持续监控第三方风险                   |
@@ -155,9 +155,85 @@ jobs:
 
 **价值**：产品团队可立即体验新功能，缩短“开发-反馈”循环，避免到预发布才第一次看到效果。
 
-### 4.2 部署到生产（带审批、灰度、自动回滚）
+### 4.2 部署到生产（Azure VM + Docker Compose）
 
-**前提**：在 GitHub 仓库 Settings → Environments → production 配置 Required reviewers（至少一人审批）。
+> **当前项目实际使用**：`.github/workflows/cd-azure-b2ats.yml` 负责构建镜像并通过 SSH 部署到 Azure VM。原基于 `kubectl` 的 `cd-production.yml` 已删除，因为生产环境未使用 Kubernetes。
+
+**前提**：在 GitHub 仓库 Settings → Environments → `azure-b2ats` 配置好 `AZURE_VM_IP`、`AZURE_VM_USER`、`AZURE_VM_SSH_KEY` 等 Secrets。
+
+```yaml
+name: CD Azure B2ats v2
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-push
+    environment: azure-b2ats
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          envs: IMAGE_TAG,GITHUB_TOKEN
+          script_stop: true
+          script: |
+            cd /opt/aicbc
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+            git fetch origin master
+            git reset --hard origin/master
+            export IMAGE_TAG=${IMAGE_TAG}
+            bash scripts/deploy-to-azure-b2ats.sh
+
+      - name: Verify deployment health
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script_stop: true
+          script: |
+            cd /opt/aicbc
+            for i in {1..30}; do
+              if docker compose -f docker-compose.azure-b2ats.yml exec -T api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" > /dev/null 2>&1; then
+                echo "Health check passed"
+                exit 0
+              fi
+              echo "Waiting for API health... ($i/30)"
+              sleep 2
+            done
+            echo "ERROR: Health check failed" >&2
+            exit 1
+```
+
+以下为历史 Kubernetes 生产部署示例，保留作为参考：
+
+<details>
+<summary>Kubernetes 生产部署示例（参考）</summary>
 
 ```yaml
 name: CD Production
@@ -200,6 +276,8 @@ jobs:
 - **审批门禁**确保业务负责人知情并同意发布。
 - **金丝雀发布**先让 10% 真实用户验证，一旦健康检查失败自动回滚，对绝大多数用户毫无影响，完全满足“无感发布”的产品要求。
 - 部署结果实时回传至业务仪表盘，支持**交付指标（Deployment Frequency, Change Failure Rate）** 的自动化统计。
+
+</details>
 
 ### 4.3 特性开关管理（单独工作流，支撑产品实验）
 

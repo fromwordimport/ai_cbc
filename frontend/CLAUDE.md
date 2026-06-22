@@ -57,6 +57,7 @@ npm run test:coverage    # runs vitest with 60% coverage thresholds
 
 - Vitest with `jsdom` environment.
 - `src/test/setup.ts` mocks `window.matchMedia` and `echarts-for-react`.
+- `testTimeout` is set to `10000` ms in `vite.config.ts` to accommodate slower CI runners.
 - Coverage thresholds are 60% (statements/branches/functions/lines), configured in `vite.config.ts`.
 
 ## Cross-References

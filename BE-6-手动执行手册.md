@@ -285,7 +285,7 @@ CI/CD 将自动执行：
 3. 等待 rollout
 4. 执行 `/health` 冒烟测试
 
-> 生产部署请使用 `CD Production` workflow（手动触发，需 environment 审批）。
+> 生产部署请使用 `CD Azure B2ats v2` workflow（push 到 `master` 自动触发，也可手动触发）。原 `CD Production` workflow（基于 kubectl）已删除。
 
 ### 4.3 查看部署结果
 
@@ -325,7 +325,7 @@ kubectl rollout status deployment/aicbc-beat --namespace=aicbc-staging --timeout
 | `reports/2026-06-16-BE6-k8s-security-re-review.md` | 安全复审报告 |
 | `.github/workflows/ci.yml` | CI 流水线定义（质量门禁、测试、前端构建、K8s 校验） |
 | `.github/workflows/cd-staging.yml` | Staging 部署流水线 |
-| `.github/workflows/cd-production.yml` | Production 部署流水线（手动审批） |
+| `.github/workflows/cd-azure-b2ats.yml` | 生产部署流水线（SSH 到 Azure VM） |
 
 ---
 

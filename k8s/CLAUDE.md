@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 
 ## Purpose
 
-This directory contains **Kubernetes manifests** for deploying AI_CBC to production-like environments.
+This directory contains **Kubernetes manifests** for AI_CBC. They are currently used for **CI static validation** (`validate-k8s` job) and **local kind/minikube testing**, not for the live production deployment. Production currently runs on Azure VM via `.github/workflows/cd-azure-b2ats.yml`.
 
 ## Layout
 
@@ -93,8 +93,8 @@ The template includes:
 - `../docker/CLAUDE.md` — container build assets.
 - `../docker-compose.yml` — local compose stack.
 - `../.github/workflows/ci.yml` — continuous integration (quality gates, tests, frontend, K8s validation)
-- `../.github/workflows/cd-staging.yml` — staging build and deployment
-- `../.github/workflows/cd-production.yml` — production deployment (manual approval)
+- `../.github/workflows/cd-staging.yml` — staging build and deployment (skipped if `KUBECONFIG_STAGING` is absent)
+- `../.github/workflows/cd-azure-b2ats.yml` — current production deployment via SSH to Azure VM
 - `../.github/workflows/security-scan.yml` — scheduled security scans
 - `../.github/workflows/nightly.yml` — scheduled full tests and performance checks
 - `../CLAUDE.md` — global repository guidance and team roles.
