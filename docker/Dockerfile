@@ -22,19 +22,25 @@ ENV UV_NO_CACHE=1
 # Use uv for all package installs to avoid stale setuptools/wheel vendor
 # dist-info left behind by mixing pip upgrade with uv installs.
 RUN pip install --no-cache-dir --upgrade uv && \
-    uv pip install --system --no-cache --force-reinstall --upgrade setuptools wheel && \
+    uv pip uninstall --system setuptools wheel || true && \
+    rm -rf /usr/local/lib/python3.11/site-packages/setuptools* \
+           /usr/local/lib/python3.11/site-packages/wheel* && \
+    uv pip install --system --no-cache --upgrade setuptools wheel && \
     uv pip install --system --no-cache -e ".[analysis]" && \
     uv pip install --system --no-cache supervisor
 
-# Remove stale setuptools vendor dist-info directories that uv may leave behind
-# after force-reinstalling setuptools (older vendored jaraco.context/wheel).
+# Defensive cleanup: remove any remaining stale vendored dist-info directories
+# that older setuptools may have left behind before being force-reinstalled.
 RUN python - <<'PY'
 import shutil
 from pathlib import Path
 base = Path('/usr/local/lib/python3.11/site-packages/setuptools/_vendor')
 for stale in [
     base / 'jaraco.context-5.3.0.dist-info',
+    base / 'jaraco.context-6.0.0.dist-info',
     base / 'wheel-0.45.1.dist-info',
+    base / 'wheel-0.46.0.dist-info',
+    base / 'wheel-0.46.1.dist-info',
 ]:
     if stale.exists():
         shutil.rmtree(stale)
