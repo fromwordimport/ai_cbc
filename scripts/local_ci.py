@@ -404,16 +404,25 @@ class LocalCI:
         )
 
     def print_summary(self, results: list[StageResult]) -> None:
-        print("\n" + "=" * 40)
+        print("\n" + "=" * 50)
         print("Local CI Summary")
-        print("=" * 40)
+        print("=" * 50)
         for r in results:
             icon = "OK" if r.success else "FAIL"
-            extra = f" ({r.returncode})" if not r.success else ""
-            print(f"[{icon:4}] {r.name:12} {r.duration:6.1f}s{extra}")
-        print("-" * 40)
-        print(f"Result: {'PASSED' if all(r.success for r in results) else 'FAILED'}")
+            print(f"{icon} {r.name:12} {r.duration:6.1f}s")
+        print("-" * 50)
+        all_ok = all(r.success for r in results)
+        print(f"Result: {'PASSED' if all_ok else 'FAILED'}")
         print(f"Report dir: {self.report_dir}")
+        if not all_ok:
+            print("\nFailed stages details:")
+            for r in results:
+                if not r.success:
+                    print(f"\n--- {r.name} ---")
+                    if r.stderr:
+                        print(r.stderr)
+                    if r.stdout:
+                        print(r.stdout)
 
 
 def main() -> int:
