@@ -52,7 +52,7 @@ docker compose -f "$COMPOSE_FILE" up -d
 # 6. 等待 worker 进程启动（最多 60 秒）
 log "等待 worker 健康检查..."
 for i in {1..30}; do
-    if docker compose -f "$COMPOSE_FILE" exec -T worker pgrep -f "celery worker" >/dev/null 2>&1; then
+    if docker compose -f "$COMPOSE_FILE" exec -T worker supervisorctl status worker | grep -q "RUNNING"; then
         log "Worker health check passed"
         break
     fi
@@ -60,7 +60,7 @@ for i in {1..30}; do
     sleep 2
 done
 
-if ! docker compose -f "$COMPOSE_FILE" exec -T worker pgrep -f "celery worker" >/dev/null 2>&1; then
+if ! docker compose -f "$COMPOSE_FILE" exec -T worker supervisorctl status worker | grep -q "RUNNING"; then
     log "ERROR: Worker health check failed after 60 seconds"
     exit 1
 fi

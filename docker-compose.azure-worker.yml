@@ -32,6 +32,12 @@ services:
           memory: 256M
           cpus: '0.5'
     memswap_limit: 1536M
+    healthcheck:
+      test: ["CMD", "supervisorctl", "status", "worker"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     networks:
       - aicbc-worker-network
 

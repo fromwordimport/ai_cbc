@@ -138,7 +138,7 @@ jobs:
           script: |
             cd /opt/aicbc
             for i in {1..30}; do
-              if docker compose -f docker-compose.azure-worker.yml exec -T worker pgrep -f "celery worker" > /dev/null 2>&1; then
+              if docker compose -f docker-compose.azure-worker.yml exec -T worker supervisorctl status worker | grep -q "RUNNING"; then
                 echo "Worker 健康检查通过"
                 exit 0
               fi
