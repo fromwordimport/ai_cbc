@@ -225,6 +225,37 @@ class LocalCI:
             report_files=[junit_path, coverage_xml],
         )
 
+    def stage_redteam(self) -> StageResult:
+        start = time.time()
+        stage_dir = self.stage_dir("redteam")
+        junit_path = stage_dir / "redteam-fast.xml"
+
+        cmd = [
+            "uv", "run", "pytest", "tests/redteam/",
+            "-v",
+            "-m", "security and not slow",
+            "--timeout=120",
+            f"--junitxml={junit_path}",
+        ]
+        res = self.run_command(cmd, timeout=600)
+
+        if res.returncode == 0:
+            defense = self.run_command(
+                [sys.executable, str(REPO_ROOT / "scripts" / "check_defense_rate.py"), str(junit_path), "--threshold", "0.95"]
+            )
+            success = defense.returncode == 0
+        else:
+            success = False
+
+        return StageResult(
+            name="redteam",
+            success=success,
+            duration=time.time() - start,
+            stdout=res.stdout[-2000:] if len(res.stdout) > 2000 else res.stdout,
+            stderr=res.stderr[-2000:] if len(res.stderr) > 2000 else res.stderr,
+            report_files=[junit_path],
+        )
+
     def print_summary(self, results: list[StageResult]) -> None:
         print("\n" + "=" * 40)
         print("Local CI Summary")
