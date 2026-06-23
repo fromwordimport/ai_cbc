@@ -24,7 +24,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -46,7 +46,7 @@ def _request_json(base_url: str, path: str, api_key: str) -> Any:
 def _parse_date(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC)
+    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
 
 def _in_date_range(study: dict[str, Any], start: datetime | None, end: datetime | None) -> bool:
@@ -98,7 +98,7 @@ def export_all(
             print(f"WARN: failed to export {study_id}: {exc.code}", file=sys.stderr)
 
     summary = {
-        "exported_at": datetime.now(UTC).isoformat(),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "host": host,
         "date_range": {"start": start_date, "end": end_date},
         "n_studies_total": len(studies),

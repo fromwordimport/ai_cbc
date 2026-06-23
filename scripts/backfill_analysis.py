@@ -18,7 +18,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -84,7 +84,7 @@ def backfill(host: str, api_key: str, model_type: str = "hb") -> int:
             print(f"WARN: failed to enqueue {study_id}: {exc.code}", file=sys.stderr)
 
     report = {
-        "backfilled_at": datetime.now(UTC).isoformat(),
+        "backfilled_at": datetime.now(timezone.utc).isoformat(),
         "host": host,
         "model_type": model_type,
         "n_enqueued": len(enqueued),
@@ -92,7 +92,7 @@ def backfill(host: str, api_key: str, model_type: str = "hb") -> int:
     }
     reports_dir = Path("reports")
     reports_dir.mkdir(exist_ok=True)
-    report_file = reports_dir / f"backfill-{datetime.now(UTC):%Y%m%d%H%M%S}.json"
+    report_file = reports_dir / f"backfill-{datetime.now(timezone.utc):%Y%m%d%H%M%S}.json"
     report_file.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Wrote {report_file}")
     return 0
