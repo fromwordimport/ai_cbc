@@ -75,6 +75,35 @@ jobs:
           # and must not block deployment or data pipeline execution.
           curl -sf "${HOST}/cost-status" > /dev/null || echo "/cost-status not reachable"
 
+      - name: Export responses to data warehouse
+        if: github.event.inputs.action == 'export' || github.event.inputs.action == 'verify'
+        env:
+          API_HOST: ${{ steps.host.outputs.host }}
+          API_KEY: ${{ secrets.API_KEY }}
+          DATA_WAREHOUSE_URL: ${{ secrets.DATA_WAREHOUSE_URL }}
+          EXPORT_DEST_FILE: reports/export-${{ github.run_id }}.json
+          START_DATE: ${{ github.event.inputs.start_date }}
+          END_DATE: ${{ github.event.inputs.end_date }}
+        run: |
+          if [ -z "$API_HOST" ]; then
+            echo "No API host configured, skipping export."
+            exit 0
+          fi
+          python3 scripts/export_responses.py
+
+      - name: Backfill analysis results
+        if: github.event.inputs.action == 'backfill' || github.event.inputs.action == 'verify'
+        env:
+          API_HOST: ${{ steps.host.outputs.host }}
+          API_KEY: ${{ secrets.API_KEY }}
+          MODEL_TYPE: hb
+        run: |
+          if [ -z "$API_HOST" ]; then
+            echo "No API host configured, skipping backfill."
+            exit 0
+          fi
+          python3 scripts/backfill_analysis.py
+
       - name: Record verification result
         if: always()
         run: |
@@ -95,6 +124,15 @@ jobs:
           name: data-pipeline-verify-${{ github.run_id }}
           path: reports/data-pipeline-verify-${{ github.run_id }}.json
           retention-days: 30
+
+      - name: Upload export/backfill reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-pipeline-reports-${{ github.run_id }}
+          path: reports/
+          retention-days: 30
+          if-no-files-found: ignore
 
       # ------------------------------------------------------------------------
       # Future integration points (enable once data warehouse / ETL exists):

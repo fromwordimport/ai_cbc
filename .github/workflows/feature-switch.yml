@@ -66,6 +66,21 @@ jobs:
           path: reports/feature-flag-change-${{ github.run_id }}.json
           retention-days: 90
 
+      - name: Update flag via Feature Flag Service API
+        env:
+          API_HOST: ${{ github.event.inputs.environment == 'production' && secrets.PROD_API_HOST || secrets.STAGING_API_HOST }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          if [ -z "$API_HOST" ]; then
+            echo "No API host configured, skipping flag update."
+            exit 0
+          fi
+          curl -sf -X PUT \
+            "${API_HOST}/api/v1/admin/flags/${{ github.event.inputs.flag_name }}?action=${{ github.event.inputs.action }}&environment=${{ github.event.inputs.environment }}&requested_by=${{ github.actor }}" \
+            -H "X-API-Key: ${API_KEY}" \
+            -H "X-User-Role: admin" \
+            -H "Accept: application/json"
+
       # ------------------------------------------------------------------------
       # Future integration points (enable once a Feature Flag Service exists):
       # ------------------------------------------------------------------------
@@ -85,4 +100,4 @@ jobs:
 
       - name: Notify completion
         run: |
-          echo "Feature flag change recorded. No active flag service is configured yet."
+          echo "Feature flag change recorded."

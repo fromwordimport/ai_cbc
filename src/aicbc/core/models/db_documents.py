@@ -149,6 +149,22 @@ class SettingsDocument(Document):
         name = "settings"
 
 
+class FeatureFlagDocument(Document):
+    """Persistent storage for feature flags, keyed by name + environment."""
+
+    name: Indexed(str)
+    environment: Indexed(str)
+    enabled: bool
+    updated_by: str
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    class Settings:
+        name = "feature_flags"
+        indexes = [
+            IndexModel([("name", 1), ("environment", 1)], unique=True),
+        ]
+
+
 class AuditLogDocument(Document):
     """Persistent audit log entries."""
 
@@ -196,6 +212,7 @@ ALL_DOCUMENT_MODELS: list[type[Document]] = [
     AnalysisResultDocument,
     AnalysisDerivativeDocument,
     SettingsDocument,
+    FeatureFlagDocument,
     AuditLogDocument,
     DeadLetterDocument,
 ]
