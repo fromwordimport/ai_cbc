@@ -55,6 +55,13 @@ jobs:
             COMMIT_SHA="HEAD"
           fi
           COMMIT_MSG=$(git log --format=%s -n 1 "$COMMIT_SHA")
+          # GitHub merge commits have a non-conventional title; validate the
+          # merged feature-branch tip (second parent) instead.
+          if [[ "$COMMIT_MSG" =~ ^Merge[[:space:]]pull[[:space:]]request[[:space:]]#[0-9]+[[:space:]]from[[:space:]] ]]; then
+            echo "Merge commit detected: $COMMIT_MSG"
+            COMMIT_MSG=$(git log --format=%s -n 1 "$COMMIT_SHA^2")
+            echo "Checking merged branch head: $COMMIT_MSG"
+          fi
           if [[ ! "$COMMIT_MSG" =~ ^(feat|fix|docs|test|refactor|perf|security|cost|chore|ci)\(.+\):\ .+ ]]; then
             echo "Commit message format violation: $COMMIT_MSG"
             echo "Expected format: type(scope): description"
