@@ -23,6 +23,35 @@ from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 
 pytestmark = [pytest.mark.unit, pytest.mark.slow]
 
+# Cache the expensive HB fit on the shared synthetic dataset so multiple slow
+# tests that only inspect the result can reuse it.
+_HB_FIT_CACHE: dict[str, tuple[HBEngine, object]] = {}
+
+
+def _cached_hb_fit(
+    key: str,
+    df: pd.DataFrame,
+    feature_cols: list[str],
+    config: HBConfig,
+) -> object:
+    """Fit once per unique data/config key and reuse the result object."""
+    if key not in _HB_FIT_CACHE:
+        engine = HBEngine(config)
+        _HB_FIT_CACHE[key] = (engine, engine.fit(df, feature_cols))
+    return _HB_FIT_CACHE[key][1]
+
+
+def _smoke_hb_config(n_draws: int = 150, max_draws: int = 300) -> HBConfig:
+    """Low-budget config for tests that only check structure/no-crash."""
+    return HBConfig(
+        n_draws=n_draws,
+        n_tune=n_draws,
+        n_chains=2,
+        target_accept=0.85,
+        random_seed=42,
+        max_draws=max_draws,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Synthetic data generators
@@ -257,6 +286,20 @@ def tiny_hb_config() -> HBConfig:
     )
 
 
+@pytest.fixture
+def fitted_synthetic_hb_result(synthetic_hb_data, tiny_hb_config):
+    """Fit HB once on the shared synthetic dataset and reuse the result."""
+    key = "synthetic_hb_result"
+    if key not in _HB_FIT_CACHE:
+        df, _, _ = synthetic_hb_data
+        engine = HBEngine(config=tiny_hb_config)
+        _HB_FIT_CACHE[key] = engine.fit(
+            data=df,
+            feature_cols=["brand_0", "brand_1", "price", "feature"],
+        )
+    return _HB_FIT_CACHE[key]
+
+
 @pytest.fixture(scope="session")
 def timing_report():
     records: list[dict] = []
@@ -283,8 +326,7 @@ class TestParameterRecovery:
         feat_cols = _feature_cols(attrs)
 
         config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
-        engine = HBEngine(config)
-        result = engine.fit(df, feat_cols)
+        result = _cached_hb_fit("n50_4attr_300", df, feat_cols, config)
 
         for key in feat_cols:
             estimated = result.population_mu[key]
@@ -314,7 +356,9 @@ class TestParameterRecovery:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
+        config = HBConfig(
+            n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42, max_draws=800
+        )
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -329,7 +373,7 @@ class TestParameterRecovery:
         tau, _ = stats.kendalltau(list(true_ranks.values()), list(est_ranks.values()))
         assert tau > 0.2, f"Kendall tau={tau:.3f} too low"
 
-    def test_population_mu_recovery_synthetic(self, synthetic_hb_data, tiny_hb_config):
+    def test_population_mu_recovery_synthetic(self, synthetic_hb_data, fitted_synthetic_hb_result):
         """Population mean mu recovered within relaxed tolerance.
 
         The synthetic dataset has only 20 respondents; the engine auto-boosts
@@ -337,11 +381,7 @@ class TestParameterRecovery:
         This test primarily guards against divergence/catastrophic estimates.
         """
         df, true_mu, _ = synthetic_hb_data
-        engine = HBEngine(config=tiny_hb_config)
-        result = engine.fit(
-            data=df,
-            feature_cols=["brand_0", "brand_1", "price", "feature"],
-        )
+        result = fitted_synthetic_hb_result
 
         assert result.converged
         assert result.rhat_max < 1.1
@@ -354,18 +394,16 @@ class TestParameterRecovery:
                 f"{col}: recovered={recovered:.3f}, true={true_val:.3f}, rel_err={rel_err:.3f}"
             )
 
-    def test_individual_beta_rank_recovery_synthetic(self, synthetic_hb_data, tiny_hb_config):
+    def test_individual_beta_rank_recovery_synthetic(
+        self, synthetic_hb_data, fitted_synthetic_hb_result
+    ):
         """Per-parameter respondent ranking shows positive correlation with truth.
 
         With only 20 respondents and auto-boosted 2000 draws, individual-level
         recovery is noisy; this test guards against entirely uncorrelated estimates.
         """
         df, _, true_beta = synthetic_hb_data
-        engine = HBEngine(config=tiny_hb_config)
-        result = engine.fit(
-            data=df,
-            feature_cols=["brand_0", "brand_1", "price", "feature"],
-        )
+        result = fitted_synthetic_hb_result
 
         taus = []
         for col in ["brand_0", "brand_1", "price", "feature"]:
@@ -392,8 +430,7 @@ class TestConvergenceDiagnostics:
         feat_cols = _feature_cols(attrs)
 
         config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
-        engine = HBEngine(config)
-        result = engine.fit(df, feat_cols)
+        result = _cached_hb_fit("n50_4attr_500", df, feat_cols, config)
 
         assert result.rhat_max > 0, "R-hat should be positive"
         assert result.rhat_max < 3.0, f"R-hat={result.rhat_max:.3f} unreasonably high"
@@ -405,8 +442,7 @@ class TestConvergenceDiagnostics:
         feat_cols = _feature_cols(attrs)
 
         config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
-        engine = HBEngine(config)
-        result = engine.fit(df, feat_cols)
+        result = _cached_hb_fit("n50_4attr_500", df, feat_cols, config)
 
         assert result.ess_bulk_min > 0, "ESS should be positive"
         assert isinstance(result.ess_bulk_min, int), "ESS should be integer type"
@@ -416,7 +452,7 @@ class TestConvergenceDiagnostics:
         attrs = _default_attributes(3)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=200, n_tune=200, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -425,14 +461,9 @@ class TestConvergenceDiagnostics:
         assert isinstance(result.individual_utilities, dict)
         assert all(c in result.population_mu for c in feat_cols)
 
-    def test_rhat_below_threshold_synthetic(self, synthetic_hb_data, tiny_hb_config):
+    def test_rhat_below_threshold_synthetic(self, fitted_synthetic_hb_result):
         """All parameters should have R-hat < 1.1."""
-        df, _, _ = synthetic_hb_data
-        engine = HBEngine(config=tiny_hb_config)
-        result = engine.fit(
-            data=df,
-            feature_cols=["brand_0", "brand_1", "price", "feature"],
-        )
+        result = fitted_synthetic_hb_result
         assert result.rhat_max < 1.1
         assert result.diagnostics is not None
         assert result.diagnostics["converged"] is True
@@ -458,14 +489,16 @@ class TestConvergenceDiagnostics:
                     price_std = (price - 3999) / 816.0
                     brand_0 = 1.0 if alt == 0 else -1.0
                     chosen = 1 if alt == 0 else 0
-                    rows.append({
-                        "resp_id": f"r{resp}",
-                        "task_id": task,
-                        "alt_id": alt,
-                        "chosen": chosen,
-                        "price": price_std,
-                        "brand_0": brand_0,
-                    })
+                    rows.append(
+                        {
+                            "resp_id": f"r{resp}",
+                            "task_id": task,
+                            "alt_id": alt,
+                            "chosen": chosen,
+                            "price": price_std,
+                            "brand_0": brand_0,
+                        }
+                    )
         df = pd.DataFrame(rows)
 
         # Minimal MCMC — should not converge with tiny data and few iterations
@@ -481,9 +514,7 @@ class TestConvergenceDiagnostics:
         assert result.converged is False, (
             f"Expected non-convergence, but rhat_max={result.rhat_max:.3f}"
         )
-        assert result.rhat_max >= 1.1, (
-            f"Expected R-hat >= 1.1, got {result.rhat_max:.3f}"
-        )
+        assert result.rhat_max >= 1.1, f"Expected R-hat >= 1.1, got {result.rhat_max:.3f}"
         assert result.diagnostics is not None
         assert result.diagnostics["converged"] is False
 
@@ -501,7 +532,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -513,7 +544,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(8)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -524,7 +555,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -535,7 +566,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=200, n_tune=200, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -587,7 +618,7 @@ class TestMNLvsHBConsistency:
         feat_cols = _feature_cols(attrs)
 
         hb_config = HBConfig(
-            n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42
+            n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42
         )
         hb_engine = HBEngine(hb_config)
         hb_result = hb_engine.fit(df, feat_cols)

@@ -16,9 +16,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.slow]
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from aicbc.analysis.engines.hb_engine import HBConfig, HBEngine
+
+# Cache the expensive HB fit so multiple slow tests on the same data can reuse it.
+_HB_ENGINE_CACHE: dict[str, HBEngine] = {}
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -105,6 +107,26 @@ def small_config() -> HBConfig:
     )
 
 
+@pytest.fixture
+def fitted_hb_engine(synthetic_choice_data: pd.DataFrame, small_config: HBConfig) -> HBEngine:
+    """Fit the HB model once and reuse the engine across slow tests."""
+    key = "hb_engine_small"
+    if key not in _HB_ENGINE_CACHE:
+        engine = HBEngine(config=small_config)
+        result = engine.fit(
+            data=synthetic_choice_data,
+            feature_cols=["price", "brand_0", "brand_1"],
+        )
+        _HB_ENGINE_CACHE[key] = (engine, result)
+    return _HB_ENGINE_CACHE[key][0]
+
+
+@pytest.fixture
+def fitted_hb_result(fitted_hb_engine: HBEngine):
+    """Return the cached HB result paired with ``fitted_hb_engine``."""
+    return _HB_ENGINE_CACHE["hb_engine_small"][1]
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -147,12 +169,8 @@ class TestHBEngineFit:
     """Test model fitting."""
 
     @pytest.mark.slow
-    def test_fit_returns_result(self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig):
-        engine = HBEngine(config=small_config)
-        result = engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+    def test_fit_returns_result(self, fitted_hb_result):
+        result = fitted_hb_result
         from aicbc.analysis.engines.hb_engine import HBResult
 
         assert isinstance(result, HBResult)
@@ -161,52 +179,30 @@ class TestHBEngineFit:
         assert hasattr(result, "individual_utilities")
 
     @pytest.mark.slow
-    def test_population_mu_has_correct_keys(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
-    ):
-        engine = HBEngine(config=small_config)
-        result = engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+    def test_population_mu_has_correct_keys(self, fitted_hb_result):
+        result = fitted_hb_result
         assert set(result.population_mu.keys()) == {"price", "brand_0", "brand_1"}
 
     @pytest.mark.slow
     def test_individual_utilities_has_all_respondents(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
+        self, synthetic_choice_data: pd.DataFrame, fitted_hb_result
     ):
-        engine = HBEngine(config=small_config)
-        result = engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+        result = fitted_hb_result
         resp_ids = synthetic_choice_data["resp_id"].unique()
         assert len(result.individual_utilities) == len(resp_ids)
         for resp_id in resp_ids:
             assert resp_id in result.individual_utilities
 
     @pytest.mark.slow
-    def test_price_coefficient_is_negative(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
-    ):
+    def test_price_coefficient_is_negative(self, fitted_hb_result):
         """Price coefficient should be negative (higher price = lower utility)."""
-        engine = HBEngine(config=small_config)
-        result = engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+        result = fitted_hb_result
         # Population mean should be negative
         assert result.population_mu["price"] < 0
 
     @pytest.mark.slow
-    def test_convergence_diagnostics_structure(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
-    ):
-        engine = HBEngine(config=small_config)
-        result = engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+    def test_convergence_diagnostics_structure(self, fitted_hb_result):
+        result = fitted_hb_result
         diag = result.diagnostics
         assert diag is not None
         assert "rhat_max" in diag
@@ -224,26 +220,16 @@ class TestHBEngineTrace:
     """Test trace and posterior extraction."""
 
     @pytest.mark.slow
-    def test_trace_has_posterior(self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig):
-        engine = HBEngine(config=small_config)
-        engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+    def test_trace_has_posterior(self, fitted_hb_engine: HBEngine):
+        engine = fitted_hb_engine
         # ArviZ 1.x uses DataTree; check for posterior group
         assert hasattr(engine.trace, "posterior")
         assert "mu" in engine.trace.posterior.data_vars
         assert "beta" in engine.trace.posterior.data_vars
 
     @pytest.mark.slow
-    def test_individual_distribution_returns_dataframe(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
-    ):
-        engine = HBEngine(config=small_config)
-        engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+    def test_individual_distribution_returns_dataframe(self, fitted_hb_engine: HBEngine):
+        engine = fitted_hb_engine
         df = engine.get_individual_distribution(resp_id="resp_000")
         assert isinstance(df, pd.DataFrame)
         assert "beta" in df.columns
@@ -271,14 +257,8 @@ class TestHBEnginePredict:
     """Test prediction methods."""
 
     @pytest.mark.slow
-    def test_predict_probabilities_sum_to_one(
-        self, synthetic_choice_data: pd.DataFrame, small_config: HBConfig
-    ):
-        engine = HBEngine(config=small_config)
-        engine.fit(
-            data=synthetic_choice_data,
-            feature_cols=["price", "brand_0", "brand_1"],
-        )
+    def test_predict_probabilities_sum_to_one(self, fitted_hb_engine: HBEngine):
+        engine = fitted_hb_engine
         scenarios = [
             {"price": 0.0, "brand_0": 1.0, "brand_1": 0.0},
             {"price": 0.0, "brand_0": 0.0, "brand_1": 1.0},
