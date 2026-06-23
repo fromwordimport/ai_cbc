@@ -67,6 +67,24 @@ def _in_date_range(study: dict[str, Any], start: datetime | None, end: datetime 
     return True
 
 
+def _list_all_studies(host: str, api_key: str) -> list[dict[str, Any]]:
+    """Fetch all studies across pages (API caps page_size at 100)."""
+    all_studies: list[dict[str, Any]] = []
+    page = 1
+    page_size = 100
+    while True:
+        resp = _request_json(host, f"/api/v1/studies?page={page}&page_size={page_size}", api_key)
+        if not isinstance(resp, dict):
+            break
+        studies = resp.get("studies", [])
+        all_studies.extend(studies)
+        total = resp.get("total", len(all_studies))
+        if len(all_studies) >= total or not studies:
+            break
+        page += 1
+    return all_studies
+
+
 def export_all(
     host: str,
     api_key: str,
@@ -78,8 +96,7 @@ def export_all(
     start_dt = _parse_date(start_date)
     end_dt = _parse_date(end_date)
 
-    studies_resp = _request_json(host, "/api/v1/studies?page=1&page_size=1000", api_key)
-    studies = studies_resp.get("studies", []) if isinstance(studies_resp, dict) else []
+    studies = _list_all_studies(host, api_key)
 
     exported: list[dict[str, Any]] = []
     skipped = 0
