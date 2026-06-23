@@ -23,6 +23,10 @@ from aicbc.questionnaire.models import Attribute, AttributeLevel, AttributeType
 
 pytestmark = [pytest.mark.unit, pytest.mark.slow]
 
+# Cache the expensive HB fit on the shared synthetic dataset so multiple slow
+# tests that only inspect the result can reuse it.
+_HB_FIT_CACHE: dict[str, object] = {}
+
 
 # ---------------------------------------------------------------------------
 # Synthetic data generators
@@ -257,6 +261,20 @@ def tiny_hb_config() -> HBConfig:
     )
 
 
+@pytest.fixture
+def fitted_synthetic_hb_result(synthetic_hb_data, tiny_hb_config):
+    """Fit HB once on the shared synthetic dataset and reuse the result."""
+    key = "synthetic_hb_result"
+    if key not in _HB_FIT_CACHE:
+        df, _, _ = synthetic_hb_data
+        engine = HBEngine(config=tiny_hb_config)
+        _HB_FIT_CACHE[key] = engine.fit(
+            data=df,
+            feature_cols=["brand_0", "brand_1", "price", "feature"],
+        )
+    return _HB_FIT_CACHE[key]
+
+
 @pytest.fixture(scope="session")
 def timing_report():
     records: list[dict] = []
@@ -329,7 +347,7 @@ class TestParameterRecovery:
         tau, _ = stats.kendalltau(list(true_ranks.values()), list(est_ranks.values()))
         assert tau > 0.2, f"Kendall tau={tau:.3f} too low"
 
-    def test_population_mu_recovery_synthetic(self, synthetic_hb_data, tiny_hb_config):
+    def test_population_mu_recovery_synthetic(self, synthetic_hb_data, fitted_synthetic_hb_result):
         """Population mean mu recovered within relaxed tolerance.
 
         The synthetic dataset has only 20 respondents; the engine auto-boosts
@@ -337,11 +355,7 @@ class TestParameterRecovery:
         This test primarily guards against divergence/catastrophic estimates.
         """
         df, true_mu, _ = synthetic_hb_data
-        engine = HBEngine(config=tiny_hb_config)
-        result = engine.fit(
-            data=df,
-            feature_cols=["brand_0", "brand_1", "price", "feature"],
-        )
+        result = fitted_synthetic_hb_result
 
         assert result.converged
         assert result.rhat_max < 1.1
@@ -354,18 +368,16 @@ class TestParameterRecovery:
                 f"{col}: recovered={recovered:.3f}, true={true_val:.3f}, rel_err={rel_err:.3f}"
             )
 
-    def test_individual_beta_rank_recovery_synthetic(self, synthetic_hb_data, tiny_hb_config):
+    def test_individual_beta_rank_recovery_synthetic(
+        self, synthetic_hb_data, fitted_synthetic_hb_result
+    ):
         """Per-parameter respondent ranking shows positive correlation with truth.
 
         With only 20 respondents and auto-boosted 2000 draws, individual-level
         recovery is noisy; this test guards against entirely uncorrelated estimates.
         """
         df, _, true_beta = synthetic_hb_data
-        engine = HBEngine(config=tiny_hb_config)
-        result = engine.fit(
-            data=df,
-            feature_cols=["brand_0", "brand_1", "price", "feature"],
-        )
+        result = fitted_synthetic_hb_result
 
         taus = []
         for col in ["brand_0", "brand_1", "price", "feature"]:
@@ -425,14 +437,9 @@ class TestConvergenceDiagnostics:
         assert isinstance(result.individual_utilities, dict)
         assert all(c in result.population_mu for c in feat_cols)
 
-    def test_rhat_below_threshold_synthetic(self, synthetic_hb_data, tiny_hb_config):
+    def test_rhat_below_threshold_synthetic(self, fitted_synthetic_hb_result):
         """All parameters should have R-hat < 1.1."""
-        df, _, _ = synthetic_hb_data
-        engine = HBEngine(config=tiny_hb_config)
-        result = engine.fit(
-            data=df,
-            feature_cols=["brand_0", "brand_1", "price", "feature"],
-        )
+        result = fitted_synthetic_hb_result
         assert result.rhat_max < 1.1
         assert result.diagnostics is not None
         assert result.diagnostics["converged"] is True
@@ -458,14 +465,16 @@ class TestConvergenceDiagnostics:
                     price_std = (price - 3999) / 816.0
                     brand_0 = 1.0 if alt == 0 else -1.0
                     chosen = 1 if alt == 0 else 0
-                    rows.append({
-                        "resp_id": f"r{resp}",
-                        "task_id": task,
-                        "alt_id": alt,
-                        "chosen": chosen,
-                        "price": price_std,
-                        "brand_0": brand_0,
-                    })
+                    rows.append(
+                        {
+                            "resp_id": f"r{resp}",
+                            "task_id": task,
+                            "alt_id": alt,
+                            "chosen": chosen,
+                            "price": price_std,
+                            "brand_0": brand_0,
+                        }
+                    )
         df = pd.DataFrame(rows)
 
         # Minimal MCMC — should not converge with tiny data and few iterations
@@ -481,9 +490,7 @@ class TestConvergenceDiagnostics:
         assert result.converged is False, (
             f"Expected non-convergence, but rhat_max={result.rhat_max:.3f}"
         )
-        assert result.rhat_max >= 1.1, (
-            f"Expected R-hat >= 1.1, got {result.rhat_max:.3f}"
-        )
+        assert result.rhat_max >= 1.1, f"Expected R-hat >= 1.1, got {result.rhat_max:.3f}"
         assert result.diagnostics is not None
         assert result.diagnostics["converged"] is False
 

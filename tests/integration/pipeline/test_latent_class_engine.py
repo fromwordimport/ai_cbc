@@ -9,6 +9,11 @@ from aicbc.analysis.engines.latent_class_engine import (
     LatentClassEngine,
 )
 
+# Reuse a single latent-class fit across slow tests that operate on the same
+# synthetic data. Each MCMC run is expensive; the assertions below only inspect
+# the fitted result, so re-fitting is pure overhead.
+_LC_FIT_CACHE: dict[str, object] = {}
+
 
 def _make_synthetic_data(n_resp: int = 30, n_tasks: int = 6, n_alts: int = 3) -> pd.DataFrame:
     """Create a tiny synthetic CBC dataset with two latent classes."""
@@ -54,6 +59,21 @@ def synthetic_data():
     return _make_synthetic_data()
 
 
+@pytest.fixture
+def fitted_latent_class_result(synthetic_data):
+    """Fit a latent-class model once and share it across slow tests."""
+    key = "lc_result"
+    if key not in _LC_FIT_CACHE:
+        engine = LatentClassEngine(
+            LatentClassConfig(n_classes=2, n_draws=300, n_tune=300, n_chains=2)
+        )
+        _LC_FIT_CACHE[key] = engine.fit(
+            synthetic_data,
+            feature_cols=["price", "brand_1", "brand_2"],
+        )
+    return _LC_FIT_CACHE[key]
+
+
 def test_latent_class_model_builds(synthetic_data):
     engine = LatentClassEngine(LatentClassConfig(n_classes=2, n_draws=50, n_tune=50, n_chains=2))
     model = engine.build_model(
@@ -66,12 +86,8 @@ def test_latent_class_model_builds(synthetic_data):
 
 
 @pytest.mark.slow
-def test_latent_class_model_fits(synthetic_data):
-    engine = LatentClassEngine(LatentClassConfig(n_classes=2, n_draws=200, n_tune=200, n_chains=2))
-    result = engine.fit(
-        synthetic_data,
-        feature_cols=["price", "brand_1", "brand_2"],
-    )
+def test_latent_class_model_fits(synthetic_data, fitted_latent_class_result):
+    result = fitted_latent_class_result
     assert result is not None
     assert len(result.class_probs) == 2
     assert sum(result.class_probs.values()) == pytest.approx(1.0, abs=0.01)
@@ -83,13 +99,9 @@ def test_latent_class_model_fits(synthetic_data):
 
 
 @pytest.mark.slow
-def test_latent_class_recovers_two_segments(synthetic_data):
+def test_latent_class_recovers_two_segments(fitted_latent_class_result):
     """Smoke test: LCM should assign respondents to two classes roughly 50/50."""
-    engine = LatentClassEngine(LatentClassConfig(n_classes=2, n_draws=300, n_tune=300, n_chains=2))
-    result = engine.fit(
-        synthetic_data,
-        feature_cols=["price", "brand_1", "brand_2"],
-    )
+    result = fitted_latent_class_result
     class_counts: dict[str, int] = {}
     for cls in result.assigned_class.values():
         class_counts[cls] = class_counts.get(cls, 0) + 1
