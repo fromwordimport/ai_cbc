@@ -4,6 +4,7 @@ Public read endpoints allow the application (and clients) to query flag state.
 Admin write endpoints allow the CI/CD ``feature-switch.yml`` workflow to toggle
 flags without redeploying.
 """
+
 from __future__ import annotations
 
 from typing import Any

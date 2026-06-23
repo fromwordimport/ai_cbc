@@ -4,6 +4,7 @@ The memory store is used for local development/tests; MongoDB is used in
 staging/production when ``MONGODB_URL`` is configured.  Flags are scoped by
 ``(name, environment)`` so the same workflow can target staging or production.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -86,7 +87,9 @@ class MongoFeatureFlagStore:
             FeatureFlagDocument.name == flag.name,
             FeatureFlagDocument.environment == flag.environment,
         )
-        updated_at = datetime.fromisoformat(flag.updated_at) if flag.updated_at else datetime.now(UTC)
+        updated_at = (
+            datetime.fromisoformat(flag.updated_at) if flag.updated_at else datetime.now(UTC)
+        )
         if existing is not None:
             existing.enabled = flag.enabled
             existing.updated_by = flag.updated_by
