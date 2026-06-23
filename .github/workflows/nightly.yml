@@ -32,14 +32,21 @@ jobs:
           python-version: '3.11'
 
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.x"
+          enable-cache: true
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/nightly.yml') }}
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopenblas-dev
+          sudo apt-get install -y libopenblas-dev build-essential
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -100,7 +107,6 @@ jobs:
   # ==========================================================================
   redteam-full:
     runs-on: ubuntu-22.04
-    needs: full-test
     steps:
       - uses: actions/checkout@v4
 
@@ -110,14 +116,21 @@ jobs:
           python-version: '3.11'
 
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.x"
+          enable-cache: true
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/nightly.yml') }}
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libopenblas-dev
+          sudo apt-get install -y libopenblas-dev build-essential
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -159,7 +172,6 @@ jobs:
   # ==========================================================================
   performance:
     runs-on: ubuntu-22.04
-    needs: full-test
     steps:
       - uses: actions/checkout@v4
 
@@ -169,16 +181,33 @@ jobs:
           python-version: '3.11'
 
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.x"
+          enable-cache: true
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/nightly.yml') }}
 
       - name: Install dependencies
         run: |
           uv venv --clear
           uv pip install locust
 
+      - name: Check staging reachability
+        id: staging-check
+        run: |
+          if curl -sf --max-time 5 http://staging.aicbc.example.com/health >/dev/null; then
+            echo "reachable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "reachable=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Locust performance baseline
+        if: steps.staging-check.outputs.reachable == 'true'
         continue-on-error: true
         run: |
           source .venv/bin/activate
