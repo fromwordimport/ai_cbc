@@ -64,6 +64,10 @@ def _run_coro(coro: asyncio.Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coro)
 
 
+# Backward-compatible alias used by older tests that patch _run.
+_run = _run_coro
+
+
 class MongoPersonaStore:
     """MongoDB-backed persona store."""
 
