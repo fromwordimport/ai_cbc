@@ -36,25 +36,18 @@ jobs:
         with:
           version: "0.5.x"
           enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
+          path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/nightly.yml') }}
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libopenblas-dev build-essential
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
 
       - name: Install dependencies
         run: |
@@ -120,25 +113,18 @@ jobs:
         with:
           version: "0.5.x"
           enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
+          path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/nightly.yml') }}
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libopenblas-dev build-essential
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
 
       - name: Install dependencies
         run: |
@@ -185,11 +171,12 @@ jobs:
         with:
           version: "0.5.x"
           enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
 
       - name: Cache apt packages
         uses: actions/cache@v4
         with:
-          path: /var/cache/apt
+          path: /var/cache/apt/archives
           key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/nightly.yml') }}
 
       - name: Install dependencies
