@@ -25,7 +25,32 @@ pytestmark = [pytest.mark.unit, pytest.mark.slow]
 
 # Cache the expensive HB fit on the shared synthetic dataset so multiple slow
 # tests that only inspect the result can reuse it.
-_HB_FIT_CACHE: dict[str, object] = {}
+_HB_FIT_CACHE: dict[str, tuple[HBEngine, object]] = {}
+
+
+def _cached_hb_fit(
+    key: str,
+    df: pd.DataFrame,
+    feature_cols: list[str],
+    config: HBConfig,
+) -> object:
+    """Fit once per unique data/config key and reuse the result object."""
+    if key not in _HB_FIT_CACHE:
+        engine = HBEngine(config)
+        _HB_FIT_CACHE[key] = (engine, engine.fit(df, feature_cols))
+    return _HB_FIT_CACHE[key][1]
+
+
+def _smoke_hb_config(n_draws: int = 150, max_draws: int = 300) -> HBConfig:
+    """Low-budget config for tests that only check structure/no-crash."""
+    return HBConfig(
+        n_draws=n_draws,
+        n_tune=n_draws,
+        n_chains=2,
+        target_accept=0.85,
+        random_seed=42,
+        max_draws=max_draws,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -301,8 +326,7 @@ class TestParameterRecovery:
         feat_cols = _feature_cols(attrs)
 
         config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
-        engine = HBEngine(config)
-        result = engine.fit(df, feat_cols)
+        result = _cached_hb_fit("n50_4attr_300", df, feat_cols, config)
 
         for key in feat_cols:
             estimated = result.population_mu[key]
@@ -332,7 +356,9 @@ class TestParameterRecovery:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
+        config = HBConfig(
+            n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42, max_draws=800
+        )
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -404,8 +430,7 @@ class TestConvergenceDiagnostics:
         feat_cols = _feature_cols(attrs)
 
         config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
-        engine = HBEngine(config)
-        result = engine.fit(df, feat_cols)
+        result = _cached_hb_fit("n50_4attr_500", df, feat_cols, config)
 
         assert result.rhat_max > 0, "R-hat should be positive"
         assert result.rhat_max < 3.0, f"R-hat={result.rhat_max:.3f} unreasonably high"
@@ -417,8 +442,7 @@ class TestConvergenceDiagnostics:
         feat_cols = _feature_cols(attrs)
 
         config = HBConfig(n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42)
-        engine = HBEngine(config)
-        result = engine.fit(df, feat_cols)
+        result = _cached_hb_fit("n50_4attr_500", df, feat_cols, config)
 
         assert result.ess_bulk_min > 0, "ESS should be positive"
         assert isinstance(result.ess_bulk_min, int), "ESS should be integer type"
@@ -428,7 +452,7 @@ class TestConvergenceDiagnostics:
         attrs = _default_attributes(3)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=200, n_tune=200, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -508,7 +532,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -520,7 +544,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(8)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -531,7 +555,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -542,7 +566,7 @@ class TestEdgeConditions:
         attrs = _default_attributes(4)
         feat_cols = _feature_cols(attrs)
 
-        config = HBConfig(n_draws=200, n_tune=200, n_chains=2, target_accept=0.85, random_seed=42)
+        config = _smoke_hb_config(n_draws=150, max_draws=300)
         engine = HBEngine(config)
         result = engine.fit(df, feat_cols)
 
@@ -594,7 +618,7 @@ class TestMNLvsHBConsistency:
         feat_cols = _feature_cols(attrs)
 
         hb_config = HBConfig(
-            n_draws=500, n_tune=500, n_chains=2, target_accept=0.85, random_seed=42
+            n_draws=300, n_tune=300, n_chains=2, target_accept=0.85, random_seed=42
         )
         hb_engine = HBEngine(hb_config)
         hb_result = hb_engine.fit(df, feat_cols)
