@@ -53,21 +53,36 @@ jobs:
         run: |
           uv venv --clear
           uv pip install -e ".[dev,analysis]"
-          uv pip install mongomock-motor
+          uv pip install mongomock-motor pytest-xdist
 
-      - name: Run full test suite
+      - name: Run parallel test suite (unit/integration)
         env:
           PYTENSOR_FLAGS: "blas__ldflags=-lopenblas -L/usr/lib/x86_64-linux-gnu"
         run: |
           source .venv/bin/activate
-          pytest tests/ \
+          pytest tests/unit tests/integration \
             -v \
-            -m "not performance and not smoke" \
+            --ignore=tests/unit/analysis \
+            -m "not performance and not smoke and not redteam" \
+            -n auto \
+            --timeout=300 \
+            --cov=src \
+            --cov-report=term
+
+      - name: Run serial analysis and e2e tests
+        env:
+          PYTENSOR_FLAGS: "blas__ldflags=-lopenblas -L/usr/lib/x86_64-linux-gnu"
+        run: |
+          source .venv/bin/activate
+          pytest tests/unit/analysis tests/e2e \
+            -v \
+            -m "not performance and not smoke and not redteam" \
             --timeout=600 \
             --cov=src \
+            --cov-append \
             --cov-report=xml \
             --cov-report=html \
-            --junitxml=test-results/full.xml
+            --junitxml=test-results/full-serial.xml
 
       - name: Upload full test results
         if: always()
@@ -116,7 +131,7 @@ jobs:
         run: |
           uv venv --clear
           uv pip install -e ".[dev,analysis]"
-          uv pip install mongomock-motor
+          uv pip install mongomock-motor pytest-xdist
 
       - name: Run complete red-team tests
         env:
@@ -125,6 +140,7 @@ jobs:
           source .venv/bin/activate
           pytest tests/redteam/ \
             -v \
+            -n auto \
             --timeout=600 \
             --junitxml=test-results/redteam-full.xml
 
