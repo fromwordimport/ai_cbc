@@ -63,18 +63,20 @@ jobs:
           pytest tests/unit tests/integration \
             -v \
             --ignore=tests/unit/analysis \
+            --ignore=tests/integration/pipeline \
             -m "not performance and not smoke and not redteam" \
             -n auto \
+            --dist=loadfile \
             --timeout=300 \
             --cov=src \
             --cov-report=term
 
-      - name: Run serial analysis and e2e tests
+      - name: Run serial analysis, pipeline and e2e tests
         env:
           PYTENSOR_FLAGS: "blas__ldflags=-lopenblas -L/usr/lib/x86_64-linux-gnu"
         run: |
           source .venv/bin/activate
-          pytest tests/unit/analysis tests/e2e \
+          pytest tests/unit/analysis tests/integration/pipeline tests/e2e \
             -v \
             -m "not performance and not smoke and not redteam" \
             --timeout=600 \
@@ -140,6 +142,7 @@ jobs:
           pytest tests/redteam/ \
             -v \
             -n auto \
+            --dist=loadfile \
             --timeout=600 \
             --junitxml=test-results/redteam-full.xml
 
@@ -182,6 +185,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv --clear
+          uv pip install -e ".[dev,analysis]"
           uv pip install locust
 
       - name: Check staging reachability
