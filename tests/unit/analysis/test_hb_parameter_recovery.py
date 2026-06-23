@@ -253,6 +253,7 @@ def tiny_hb_config() -> HBConfig:
         n_chains=2,
         target_accept=0.9,
         random_seed=42,
+        max_draws=1500,  # cap small-sample auto-boost to keep nightly runtime reasonable
     )
 
 
