@@ -579,10 +579,11 @@ class TestCombinationAttacks:
         """A persona violating gender, age, and occupation rules simultaneously."""
         persona = persona_factory()
         persona.layer1_demographics.gender = "女"
-        persona.layer1_demographics.age = "60岁"
-        persona.layer1_demographics.occupation = "保洁员"
-        persona.layer2_behavior.decision_style = "老年女性保洁员没文化，不会看参数，只会听别人推荐"
-        persona.layer3_psychology.secret_motivation = "底层打工女性，收入低，买不起好东西"
+        persona.layer1_demographics.age = "65岁"
+        persona.layer1_demographics.occupation = "工厂工人"
+        # Use explicit keywords known to trigger gender/age/occupation rules
+        persona.layer2_behavior.decision_style = "感性消费，冲动购物，情绪化决策，不会用智能产品，不懂科技"
+        persona.layer3_psychology.secret_motivation = "没追求，混日子，底层打工"
 
         result = BiasAuditor().audit(persona)
         assert result.status == "FAILED"

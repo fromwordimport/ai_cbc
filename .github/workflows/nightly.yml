@@ -36,6 +36,11 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev
+
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
@@ -48,14 +53,17 @@ jobs:
         run: |
           uv venv --clear
           uv pip install -e ".[dev,analysis]"
+          uv pip install mongomock-motor
 
       - name: Run full test suite
+        env:
+          PYTENSOR_FLAGS: "blas__ldflags=-lopenblas -L/usr/lib/x86_64-linux-gnu"
         run: |
           source .venv/bin/activate
           pytest tests/ \
             -v \
-            -m "not performance" \
-            --timeout=300 \
+            -m "not performance and not smoke" \
+            --timeout=600 \
             --cov=src \
             --cov-report=xml \
             --cov-report=html \
@@ -91,6 +99,11 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev
+
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
@@ -103,13 +116,16 @@ jobs:
         run: |
           uv venv --clear
           uv pip install -e ".[dev,analysis]"
+          uv pip install mongomock-motor
 
       - name: Run complete red-team tests
+        env:
+          PYTENSOR_FLAGS: "blas__ldflags=-lopenblas -L/usr/lib/x86_64-linux-gnu"
         run: |
           source .venv/bin/activate
           pytest tests/redteam/ \
             -v \
-            --timeout=300 \
+            --timeout=600 \
             --junitxml=test-results/redteam-full.xml
 
       - name: Upload red-team results

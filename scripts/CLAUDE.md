@@ -10,6 +10,7 @@ This directory contains **utility scripts** for development, verification, and b
 
 | File | Purpose |
 |------|---------|
+| `check_commit_msg.py` | Validate conventional commit messages for commit-msg hooks and local CI |
 | `batch_simulate.py` | End-to-end batch simulation CLI (persona generation → bias audit → questionnaire → choice simulation → export) |
 | `verify_endpoints.py` | Endpoint verification using FastAPI `TestClient` with mocked LLM |
 | `check_defense_rate.py` | Parse pytest JUnit XML and fail if red-team defense rate is below threshold (95%). Usage: `python scripts/check_defense_rate.py [xml_path] [--threshold 0.95]` |
