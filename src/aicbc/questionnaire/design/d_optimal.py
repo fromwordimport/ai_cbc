@@ -9,7 +9,6 @@ Performance optimisations:
   * Uses the matrix determinant lemma for rank-3 delta updates,
     reducing per-candidate evaluation from O(N*P^2 + P^3) to O(P^2).
   * Uses ``np.linalg.slogdet`` to avoid numerical overflow and for speed.
-  * Optionally applies @numba.jit if numba is installed on hot helpers.
 """
 
 from __future__ import annotations
@@ -38,26 +37,6 @@ from aicbc.questionnaire.models import (
 )
 
 # ---------------------------------------------------------------------------
-# Optional numba JIT
-# ---------------------------------------------------------------------------
-
-_numba_available = False
-try:
-    import numba  # type: ignore[import-untyped]
-
-    _numba_available = True
-except ImportError:
-    pass
-
-
-def _jit(fn):
-    """Apply numba JIT (nopython=True, fastmath=True) if numba is available."""
-    if _numba_available:
-        return numba.jit(nopython=True, fastmath=True, cache=True)(fn)
-    return fn
-
-
-# ---------------------------------------------------------------------------
 # Candidate generation (unchanged public API)
 # ---------------------------------------------------------------------------
 
@@ -79,17 +58,6 @@ def _is_prohibited(profile: dict[str, Any], prohibited_pairs: list[ProhibitedPai
     for pair in prohibited_pairs:
         if all(profile.get(cond.attribute_id) == cond.level_value for cond in pair.conditions):
             return True
-    return False
-
-
-def _has_duplicates_in_set(profiles: list[dict[str, Any]], set_start: int, set_end: int) -> bool:
-    """Check for duplicate profiles within a choice set range."""
-    seen: set[tuple[tuple[str, Any], ...]] = set()
-    for i in range(set_start, set_end):
-        key = tuple(sorted(profiles[i].items()))
-        if key in seen:
-            return True
-        seen.add(key)
     return False
 
 
@@ -194,7 +162,6 @@ def d_optimal_design(
     design_parameters: DesignParameters,
     prohibited_pairs: list[ProhibitedPair] | None = None,
     max_iterations: int = 1000,
-    convergence_threshold: float = 1e-9,
     seed: int | None = None,
 ) -> dict[str, Any]:
     """Run Fedorov exchange algorithm for D-optimal design.
@@ -204,7 +171,6 @@ def d_optimal_design(
         design_parameters: Design control parameters.
         prohibited_pairs: Optional prohibited attribute-level pairs.
         max_iterations: Maximum exchange iterations.
-        convergence_threshold: Stop when no improvement exceeds this.
         seed: Random seed for reproducibility.
 
     Returns:

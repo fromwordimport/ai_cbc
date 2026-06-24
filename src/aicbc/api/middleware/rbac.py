@@ -35,12 +35,6 @@ from starlette.responses import JSONResponse
 logger = structlog.get_logger("aicbc.api.middleware.rbac")
 
 
-class RBACError(ValueError):
-    """Raised when a request violates RBAC rules."""
-
-    pass
-
-
 class RBACMiddleware(BaseHTTPMiddleware):
     """Enforce role-based access control on incoming requests."""
 
