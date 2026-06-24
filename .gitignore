@@ -50,6 +50,7 @@ node_modules
 # Local CI/CD reports
 local-ci-reports/
 data/
+outputs/
 
 # Claude / local tooling
 .claude/

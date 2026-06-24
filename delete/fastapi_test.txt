@@ -1,3 +1,0 @@
-step 1: import FastAPI
-step 2: create app
-step 3: app created
