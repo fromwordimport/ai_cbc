@@ -2,16 +2,13 @@
 
 Previously LLMClient._COST_PER_1K and ModelRouter.DEFAULT_MODELS each
 maintained independent pricing data.  This module consolidates them so
-that cost tracking, model routing, and fuse decisions all use consistent
-per-model pricing.
+that cost tracking and model routing all use consistent per-model pricing.
 
-Update this file when provider pricing changes; all consumers pick up
-the change automatically.
+Update this file when provider pricing changes; all consumers pick up the
+change automatically.
 """
 
 from __future__ import annotations
-
-from typing import Literal
 
 import structlog
 
@@ -36,50 +33,6 @@ PRICE_TABLE: dict[str, tuple[float, float]] = {
     "glm-4": (0.50, 1.00),
 }
 
-# Provider mapping (model_id → provider)
-PROVIDER_MAP: dict[str, str] = {
-    "claude-opus-4-6": "anthropic",
-    "claude-sonnet-4-6": "anthropic",
-    "claude-haiku-4-5": "anthropic",
-    "gpt-4o": "openai",
-    "gpt-4o-mini": "openai",
-    "gpt-4-turbo": "openai",
-    "deepseek-chat": "deepseek",
-    "deepseek-reasoner": "deepseek",
-    "qwen-max": "qwen",
-    "glm-4": "glm",
-}
-
-# Quality tier — used by ModelRouter for degradation decisions
-QualityTier = Literal["highest", "high", "medium", "fallback"]
-
-QUALITY_TIER: dict[str, QualityTier] = {
-    "claude-opus-4-6": "highest",
-    "claude-sonnet-4-6": "high",
-    "gpt-4o": "high",
-    "claude-haiku-4-5": "medium",
-    "gpt-4o-mini": "medium",
-    "gpt-4-turbo": "medium",
-    "deepseek-chat": "high",
-    "deepseek-reasoner": "high",
-    "qwen-max": "high",
-    "glm-4": "high",
-}
-
-# Maximum context window (tokens) — used for routing decisions
-MAX_CONTEXT: dict[str, int] = {
-    "claude-opus-4-6": 200_000,
-    "claude-sonnet-4-6": 200_000,
-    "claude-haiku-4-5": 200_000,
-    "gpt-4o": 128_000,
-    "gpt-4o-mini": 128_000,
-    "gpt-4-turbo": 128_000,
-    "deepseek-chat": 64_000,
-    "deepseek-reasoner": 64_000,
-    "qwen-max": 32_000,
-    "glm-4": 128_000,
-}
-
 # ── convenience helpers ─────────────────────────────────────────────────
 
 
@@ -102,10 +55,3 @@ def estimate_cost_usd(model: str, prompt_tokens: int, completion_tokens: int) ->
         logger.warning("unknown_model_price", model=model, fallback=0.0)
         return 0.0
     return (prompt_tokens * inp + completion_tokens * out) / 1000.0
-
-
-def get_provider(model: str) -> str:
-    """Return provider name for *model*."""
-    if model not in PROVIDER_MAP:
-        raise KeyError(f"Unknown model '{model}'")
-    return PROVIDER_MAP[model]

@@ -74,10 +74,3 @@ def invalidate_studies_list() -> None:
 
 def invalidate_personas_list() -> None:
     _personas_list_cache.clear()
-
-
-def invalidate_all_read_caches() -> None:
-    """Invalidate every read cache; useful after bulk imports or admin ops."""
-    _dashboard_summary_cache.clear()
-    _studies_list_cache.clear()
-    _personas_list_cache.clear()
