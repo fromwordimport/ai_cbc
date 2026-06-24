@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import structlog
 
-from aicbc.config.settings import Settings, get_settings
+from aicbc.config.settings import get_settings
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
 from aicbc.core.simulation.behavior_simulator import BehaviorSimulator
@@ -99,21 +99,6 @@ def get_behavior_simulator() -> BehaviorSimulator:
     if _behavior_simulator is None:
         _behavior_simulator = BehaviorSimulator(llm_client=get_llm_client())
     return _behavior_simulator
-
-
-def get_settings_dep() -> Settings:
-    """Return application settings (FastAPI dependency wrapper)."""
-    return get_settings()
-
-
-def get_cost_tracker_summary() -> dict:
-    """Return current cost tracker summary for health/monitoring endpoints."""
-    fuse = get_cost_fuse()
-    status, details = fuse.tracker.check_fuse_status()
-    return {
-        "fuse_status": status.value,
-        "details": details,
-    }
 
 
 def reset_dependencies() -> None:
