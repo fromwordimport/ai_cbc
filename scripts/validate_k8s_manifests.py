@@ -33,13 +33,6 @@ def load_yaml(path: Path) -> Any:
         return list(yaml.safe_load_all(f))
 
 
-def get_doc(docs: list[Any], kind: str, name: str) -> Any:
-    for doc in docs:
-        if doc and doc.get("kind") == kind and doc.get("metadata", {}).get("name") == name:
-            return doc
-    return None
-
-
 def validate_kustomization(base: Path) -> None:
     kustomization_path = base / "kustomization.yaml"
     if not kustomization_path.exists():
