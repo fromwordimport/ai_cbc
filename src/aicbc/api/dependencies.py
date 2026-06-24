@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import structlog
 
-from aicbc.config.settings import get_settings
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
 from aicbc.core.simulation.behavior_simulator import BehaviorSimulator
