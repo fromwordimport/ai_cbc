@@ -164,7 +164,7 @@ class HBEngine:
                 sd_dist = pm.Exponential.dist(lam=1, shape=n_features)
 
             # Correlation matrix via LKJ Cholesky decomposition
-            chol, corr, stds = pm.LKJCholeskyCov(
+            chol, _, stds = pm.LKJCholeskyCov(
                 "chol",
                 n=n_features,
                 eta=self.config.lkj_eta,

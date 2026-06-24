@@ -70,7 +70,6 @@ class CostSummary:
     total_cny: float = 0.0
     total_calls: int = 0
     total_tokens: int = 0
-    avg_cost_per_call: float = 0.0
     records: list[CostRecord] = field(default_factory=list)
 
 

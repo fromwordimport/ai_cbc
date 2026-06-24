@@ -6,7 +6,6 @@ local development and tests.
 
 from __future__ import annotations
 
-import asyncio
 import os
 import threading
 from datetime import UTC, datetime
@@ -385,28 +384,8 @@ def get_analysis_store() -> AnalysisStore:
     return _analysis_store
 
 
-def reset_analysis_store() -> None:
-    """Reset the global AnalysisStore singleton.
-
-    When called from an async context, callers should use
-    :func:`areset_analysis_store` instead.  This sync wrapper dispatches to
-    ``aclear()`` for Mongo-backed stores and ``clear()`` for memory stores,
-    using ``asyncio.run`` only when no event loop is running.
-    """
-    global _analysis_store
-    _analysis_store = None
-    try:
-        asyncio.get_running_loop()
-        # Called from an async context — caller should use areset_analysis_store().
-        get_analysis_store().clear()
-    except RuntimeError:
-        # No event loop running — safe to use asyncio.run for Mongo stores.
-        asyncio.run(areset_analysis_store())
-    _analysis_store = None
-
-
 async def areset_analysis_store() -> None:
-    """Async version of :func:`reset_analysis_store`.
+    """Reset the global AnalysisStore singleton.
 
     Awaits the store's ``aclear()`` so Mongo-backed stores are cleaned
     without blocking the event loop.
