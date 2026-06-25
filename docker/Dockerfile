@@ -133,4 +133,10 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
+# Stage 3: Worker target — same image, but labelled for future split
+FROM runtime AS worker
+CMD ["celery", "-A", "src.aicbc.analysis.tasks", "worker", "--loglevel=info", "--concurrency=2", "-Q", "analysis,persona_generation"]
+
+# Stage 4: API target (default, backwards-compatible)
+FROM runtime AS api
 CMD ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
