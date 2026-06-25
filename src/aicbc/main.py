@@ -150,7 +150,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         )
 
 
-# Add middleware (order matters: rate limit first, then metrics, then security headers, then auth, then RBAC, then audit)
+# Add middleware (order matters: metrics outermost so limited requests are still counted)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -159,7 +159,7 @@ app.add_middleware(RBACMiddleware)
 app.add_middleware(AuditLogMiddleware)
 
 # Compress JSON responses above 1 KB. Placed before CORS so CORS remains outermost.
-app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 # CORS must be the outermost middleware so OPTIONS preflight responses are returned
 # before any auth/RBAC checks can reject them without CORS headers.

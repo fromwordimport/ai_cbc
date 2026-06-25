@@ -27,7 +27,7 @@ services:
       - API_PORT=8000
       - API_WORKERS=4
       - METRICS_PATH=/metrics
-      - SLOW_REQUEST_THRESHOLD=5.0
+      - SLOW_REQUEST_THRESHOLD=2.0
       # LLM API keys should be injected via .env or secrets
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
