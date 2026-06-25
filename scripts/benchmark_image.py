@@ -9,8 +9,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
-
 
 def run(cmd: list[str]) -> str:
     return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
@@ -25,7 +23,14 @@ def main() -> None:
     # Build image
     print(f"Building {args.tag} ...")
     start = time.perf_counter()
-    run(["docker", "build", "-f", "docker/Dockerfile", "-t", args.tag, "."])
+    try:
+        run(["docker", "build", "-f", "docker/Dockerfile", "-t", args.tag, "."])
+    except subprocess.CalledProcessError:
+        print(
+            "Docker build failed; ensure docker daemon is running and Dockerfile exists",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     build_time = time.perf_counter() - start
 
     # Inspect image size (bytes)
@@ -34,28 +39,34 @@ def main() -> None:
 
     # Cold-start test: run container and time to /health
     print("Measuring cold-start time ...")
-    container = subprocess.run(
-        ["docker", "run", "-d", "-p", "8000:8000", "--name", "aicbc-benchmark", args.tag],
+    subprocess.run(
+        ["docker", "run", "-d", "-p", "0:8000", "--name", "aicbc-benchmark", args.tag],
         capture_output=True,
         text=True,
         check=True,
-    ).stdout.strip()
+    )
 
-    health_url = "http://localhost:8000/health"
-    start = time.perf_counter()
-    while time.perf_counter() - start < 120:
-        probe = subprocess.run(
-            ["curl", "-sf", health_url],
-            capture_output=True,
-            text=True,
-        )
-        if probe.returncode == 0:
-            break
-        time.sleep(0.5)
-    cold_start = time.perf_counter() - start
+    try:
+        # Read mapped host port
+        port_output = run(["docker", "port", "aicbc-benchmark", "8000"]).strip()
+        # Format: "0.0.0.0:xxxxx" or ":::xxxxx"
+        host_port = port_output.split(":")[-1]
 
-    subprocess.run(["docker", "stop", "aicbc-benchmark"], check=False)
-    subprocess.run(["docker", "rm", "aicbc-benchmark"], check=False)
+        health_url = f"http://localhost:{host_port}/health"
+        start = time.perf_counter()
+        while time.perf_counter() - start < 120:
+            probe = subprocess.run(
+                ["curl", "-sf", health_url],
+                capture_output=True,
+                text=True,
+            )
+            if probe.returncode == 0:
+                break
+            time.sleep(0.5)
+        cold_start = time.perf_counter() - start
+    finally:
+        subprocess.run(["docker", "stop", "aicbc-benchmark"], check=False)
+        subprocess.run(["docker", "rm", "aicbc-benchmark"], check=False)
 
     report = {
         "image_tag": args.tag,

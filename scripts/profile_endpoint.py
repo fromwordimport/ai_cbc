@@ -8,8 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
-
 import httpx
 
 
@@ -19,6 +17,7 @@ def main() -> None:
     parser.add_argument("--endpoint", default="/dashboard/summary")
     parser.add_argument("--duration", type=int, default=30)
     parser.add_argument("--output", default="reports/performance/flamegraph.svg")
+    parser.add_argument("--rate", type=int, default=100)
     args = parser.parse_args()
 
     output_path = Path(args.output)
@@ -47,21 +46,32 @@ def main() -> None:
         "-d",
         str(args.duration),
         "--rate",
-        "100",
+        str(args.rate),
     ]
     spy_proc = subprocess.Popen(spy_cmd)
 
     # Generate load concurrently
+    errors = 0
     start = time.perf_counter()
-    with httpx.Client() as client:
-        while time.perf_counter() - start < args.duration:
+    try:
+        with httpx.Client() as client:
+            while time.perf_counter() - start < args.duration:
+                try:
+                    client.get(f"{args.base_url}{args.endpoint}", timeout=10.0)
+                except Exception:
+                    errors += 1
+                time.sleep(0.1)
+    finally:
+        if spy_proc.poll() is None:
+            spy_proc.terminate()
             try:
-                client.get(f"{args.base_url}{args.endpoint}", timeout=10.0)
-            except Exception:
-                pass
-            time.sleep(0.1)
+                spy_proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                spy_proc.kill()
+                spy_proc.wait()
+        if errors:
+            print(f"Load generation encountered {errors} error(s)", file=sys.stderr)
 
-    spy_proc.wait()
     print(f"Flamegraph saved to {output_path}")
 
 
