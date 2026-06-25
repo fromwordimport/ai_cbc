@@ -17,11 +17,11 @@ groups:
       - record: aicbc:llm_cache_hit_ratio
         expr: |
           (
-            sum(aicbc_llm_cache_hits_total) by (job, instance)
+            sum(rate(aicbc_llm_cache_hits_total[5m])) by (job, instance)
             /
             clamp_min(
-              sum(aicbc_llm_cache_hits_total) by (job, instance)
-              + sum(aicbc_llm_cache_misses_total) by (job, instance),
+              sum(rate(aicbc_llm_cache_hits_total[5m])) by (job, instance)
+              + sum(rate(aicbc_llm_cache_misses_total[5m])) by (job, instance),
               1
             )
           )
