@@ -89,6 +89,14 @@ class TestAsyncPersonaGeneration:
         expected_study_id = "test-study"
         expected_status = "RUNNING"
         expected_requested = 10
+        expected_generated = 5
+        expected_failed = 0
+        expected_total_cost_cny = 1.23
+        expected_progress = 0.5
+        expected_bias_failed_count = 1
+        expected_bias_warning = None
+        expected_created_at = "2026-06-25T00:00:00Z"
+        expected_updated_at = "2026-06-25T01:00:00Z"
 
         mock_doc = type(
             "MockDoc",
@@ -98,14 +106,14 @@ class TestAsyncPersonaGeneration:
                 "study_id": expected_study_id,
                 "status": expected_status,
                 "requested": expected_requested,
-                "generated": 5,
-                "failed": 0,
-                "total_cost_cny": 1.23,
-                "progress": 0.5,
-                "bias_failed_count": 1,
-                "bias_warning": None,
-                "created_at": "2026-06-25T00:00:00Z",
-                "updated_at": "2026-06-25T01:00:00Z",
+                "generated": expected_generated,
+                "failed": expected_failed,
+                "total_cost_cny": expected_total_cost_cny,
+                "progress": expected_progress,
+                "bias_failed_count": expected_bias_failed_count,
+                "bias_warning": expected_bias_warning,
+                "created_at": expected_created_at,
+                "updated_at": expected_updated_at,
             },
         )()
 
@@ -122,6 +130,15 @@ class TestAsyncPersonaGeneration:
             assert data["job_id"] == expected_job_id
             assert data["study_id"] == expected_study_id
             assert data["status"] == expected_status
+            assert data["requested"] == expected_requested
+            assert data["generated"] == expected_generated
+            assert data["failed"] == expected_failed
+            assert data["total_cost_cny"] == expected_total_cost_cny
+            assert data["progress"] == expected_progress
+            assert data["bias_failed_count"] == expected_bias_failed_count
+            assert data["bias_warning"] == expected_bias_warning
+            assert data["created_at"] == expected_created_at
+            assert data["updated_at"] == expected_updated_at
 
     async def test_get_persona_generation_status_404(self, client: AsyncClient):
         with patch(

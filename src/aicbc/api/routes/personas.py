@@ -108,11 +108,6 @@ async def generate_personas_batch(
             detail=str(exc),
         ) from exc
 
-    # Fast path: small batches run synchronously to avoid task overhead.
-    if request.count <= 5:
-        log.info("batch_fast_path", count=request.count)
-        # ... existing full logic continues below unchanged
-
     # P0-001: Pass study_id to ProfileGenerator for per-study cost tracking.
     # Use the DI-injected profile_gen's llm_client so that test overrides apply.
     if safe_study_id:
@@ -275,6 +270,12 @@ async def generate_personas_async(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+    if request.count <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="count must be positive",
+        )
 
     job_id = f"pg-{safe_study_id}-{uuid.uuid4().hex[:8]}"
 
