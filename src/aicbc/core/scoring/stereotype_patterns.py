@@ -719,21 +719,3 @@ STEREOTYPE_PATTERNS: list[dict] = [
         "demographic_match": None,
     },
 ]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def get_patterns_by_category(category: str) -> list[dict]:
-    """Return all patterns belonging to a given category."""
-    return [p for p in STEREOTYPE_PATTERNS if p["category"] == category]
-
-
-def get_pattern(pattern_id: str) -> dict | None:
-    """Return a pattern by its ID, or None."""
-    for p in STEREOTYPE_PATTERNS:
-        if p["id"] == pattern_id:
-            return p
-    return None

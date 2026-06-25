@@ -4,7 +4,6 @@ Provides:
   - BaseAgent: three-layer prompt architecture (system → rules → examples)
   - ConsumerGeneratorAgent: persona generation with self-correction
   - AnalysisAgent: orchestrates full analysis workflow
-  - EvaluationChain: assesses virtual consumer response quality
 """
 
 from aicbc.agents.analysis_agent import AnalysisAgent, AnalysisAgentConfig
@@ -17,13 +16,6 @@ from aicbc.agents.base import (
     ToolSpec,
 )
 from aicbc.agents.consumer_generator import ConsumerGeneratorAgent
-from aicbc.agents.evaluation_chain import (
-    ChoicePattern,
-    ContradictionFinding,
-    CorrectionRecord,
-    EvaluationChain,
-    EvaluationReport,
-)
 
 __all__ = [
     "AgentState",
@@ -32,11 +24,6 @@ __all__ = [
     "BaseAgent",
     "ConsumerGeneratorAgent",
     "DynamicExample",
-    "EvaluationChain",
-    "EvaluationReport",
-    "ChoicePattern",
-    "ContradictionFinding",
-    "CorrectionRecord",
     "RuleInjection",
     "SystemInstruction",
     "ToolSpec",

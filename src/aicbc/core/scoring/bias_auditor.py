@@ -68,15 +68,6 @@ _CATEGORY_TO_OLD_RULE_PREFIX: dict[str, str] = {
 }
 
 
-def _make_rule_id(category: str, counter: int) -> str:
-    """Generate a rule_id with backward-compatible naming."""
-    prefix = _CATEGORY_TO_OLD_RULE_PREFIX.get(category)
-    if prefix is not None:
-        return f"{prefix}-{counter:03d}"
-    # New categories use SP-xxx pattern id (handled by caller)
-    return ""
-
-
 # ---------------------------------------------------------------------------
 # Auditor
 # ---------------------------------------------------------------------------

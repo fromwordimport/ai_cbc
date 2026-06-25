@@ -18,7 +18,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -39,9 +39,26 @@ def _request_json(base_url: str, path: str, api_key: str, method: str = "GET", d
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _list_all_studies(host: str, api_key: str) -> list[dict[str, Any]]:
+    """Fetch all studies across pages (API caps page_size at 100)."""
+    all_studies: list[dict[str, Any]] = []
+    page = 1
+    page_size = 100
+    while True:
+        resp = _request_json(host, f"/api/v1/studies?page={page}&page_size={page_size}", api_key)
+        if not isinstance(resp, dict):
+            break
+        studies = resp.get("studies", [])
+        all_studies.extend(studies)
+        total = resp.get("total", len(all_studies))
+        if len(all_studies) >= total or not studies:
+            break
+        page += 1
+    return all_studies
+
+
 def backfill(host: str, api_key: str, model_type: str = "hb") -> int:
-    studies_resp = _request_json(host, "/api/v1/studies?page=1&page_size=1000", api_key)
-    studies = studies_resp.get("studies", []) if isinstance(studies_resp, dict) else []
+    studies = _list_all_studies(host, api_key)
 
     enqueued: list[dict[str, str]] = []
 
@@ -84,7 +101,7 @@ def backfill(host: str, api_key: str, model_type: str = "hb") -> int:
             print(f"WARN: failed to enqueue {study_id}: {exc.code}", file=sys.stderr)
 
     report = {
-        "backfilled_at": datetime.now(UTC).isoformat(),
+        "backfilled_at": datetime.now(timezone.utc).isoformat(),
         "host": host,
         "model_type": model_type,
         "n_enqueued": len(enqueued),
@@ -92,7 +109,7 @@ def backfill(host: str, api_key: str, model_type: str = "hb") -> int:
     }
     reports_dir = Path("reports")
     reports_dir.mkdir(exist_ok=True)
-    report_file = reports_dir / f"backfill-{datetime.now(UTC):%Y%m%d%H%M%S}.json"
+    report_file = reports_dir / f"backfill-{datetime.now(timezone.utc):%Y%m%d%H%M%S}.json"
     report_file.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Wrote {report_file}")
     return 0

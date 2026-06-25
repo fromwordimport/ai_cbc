@@ -24,7 +24,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -46,7 +46,7 @@ def _request_json(base_url: str, path: str, api_key: str) -> Any:
 def _parse_date(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC)
+    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
 
 def _in_date_range(study: dict[str, Any], start: datetime | None, end: datetime | None) -> bool:
@@ -67,6 +67,24 @@ def _in_date_range(study: dict[str, Any], start: datetime | None, end: datetime 
     return True
 
 
+def _list_all_studies(host: str, api_key: str) -> list[dict[str, Any]]:
+    """Fetch all studies across pages (API caps page_size at 100)."""
+    all_studies: list[dict[str, Any]] = []
+    page = 1
+    page_size = 100
+    while True:
+        resp = _request_json(host, f"/api/v1/studies?page={page}&page_size={page_size}", api_key)
+        if not isinstance(resp, dict):
+            break
+        studies = resp.get("studies", [])
+        all_studies.extend(studies)
+        total = resp.get("total", len(all_studies))
+        if len(all_studies) >= total or not studies:
+            break
+        page += 1
+    return all_studies
+
+
 def export_all(
     host: str,
     api_key: str,
@@ -78,8 +96,7 @@ def export_all(
     start_dt = _parse_date(start_date)
     end_dt = _parse_date(end_date)
 
-    studies_resp = _request_json(host, "/api/v1/studies?page=1&page_size=1000", api_key)
-    studies = studies_resp.get("studies", []) if isinstance(studies_resp, dict) else []
+    studies = _list_all_studies(host, api_key)
 
     exported: list[dict[str, Any]] = []
     skipped = 0
@@ -98,7 +115,7 @@ def export_all(
             print(f"WARN: failed to export {study_id}: {exc.code}", file=sys.stderr)
 
     summary = {
-        "exported_at": datetime.now(UTC).isoformat(),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "host": host,
         "date_range": {"start": start_date, "end": end_date},
         "n_studies_total": len(studies),

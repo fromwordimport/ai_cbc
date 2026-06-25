@@ -1,9 +1,0 @@
-{
-  "total_audited": 1,
-  "passed": 1,
-  "failed": 0,
-  "pass_rate": 1.0,
-  "total_findings": 0,
-  "findings_by_category": {},
-  "high_severity_findings": 0
-}

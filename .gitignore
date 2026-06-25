@@ -50,6 +50,7 @@ node_modules
 # Local CI/CD reports
 local-ci-reports/
 data/
+outputs/
 
 # Claude / local tooling
 .claude/
@@ -72,3 +73,6 @@ tests/manual/screenshots/*.jpg
 
 # Root package-lock (frontend has its own)
 /package-lock.json
+
+# Worktrees
+.worktrees/

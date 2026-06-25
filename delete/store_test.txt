@@ -1,3 +1,0 @@
-step 1: import store
-step 2: call get_store()
-step 3: store OK

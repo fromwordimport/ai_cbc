@@ -302,10 +302,5 @@ class LatentClassResponse(BaseModel):
 # Error responses
 # ---------------------------------------------------------------------------
 
-
-class AnalysisError(BaseModel):
-    """Standardized analysis error response."""
-
-    error_code: str
-    message: str
-    detail: dict[str, Any] = Field(default_factory=dict)
+# Standardized error models are defined alongside their route schemas in
+# ``aicbc.api.schemas`` so that OpenAPI generation stays consistent.
