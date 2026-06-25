@@ -20,7 +20,8 @@ This directory contains **utility scripts** for development, verification, and b
 | `deploy-to-azure-b2ats.sh` | Pull latest images and restart the AI_CBC stack on Azure B2ats v2 |
 | `backup-mongodb-to-azure.sh` | Dump MongoDB and upload to Azure Blob; falls back to local storage if no Blob config |
 | `restore-mongodb.sh` | Restore MongoDB from a local `mongodump` tar.gz archive |
-| `generate_password_hash.py` | Generate bcrypt hashes for frontend login passwords |
+| `profile_endpoint.py` | Profile a single endpoint with py-spy and output a flamegraph |
+| `benchmark_image.py` | Measure Docker image size and cold-start time to /health |
 
 ## Conventions
 
