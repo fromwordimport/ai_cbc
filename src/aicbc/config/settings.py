@@ -21,8 +21,8 @@ class LLMSettings(BaseSettings):
     max_tokens: int = 4096
     timeout_seconds: int = 120
     max_retries: int = 3
-    http_max_connections: int = Field(default=20, alias="HTTP_MAX_CONNECTIONS")
-    http_max_keepalive: int = Field(default=10, alias="HTTP_MAX_KEEPALIVE")
+    http_max_connections: int = Field(default=20)
+    http_max_keepalive: int = Field(default=10)
 
 
 class AnthropicSettings(BaseSettings):
@@ -208,7 +208,7 @@ class Settings(BaseSettings):
 
     # Monitoring
     metrics_path: str = "/metrics"
-    slow_request_threshold: float = 2.0
+    slow_request_threshold: float = Field(default=2.0, alias="SLOW_REQUEST_THRESHOLD")
 
     # Caching
     use_redis_cache: bool = Field(default=False, alias="USE_REDIS_CACHE")
