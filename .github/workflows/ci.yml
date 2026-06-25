@@ -449,3 +449,61 @@ jobs:
         run: |
           source .venv/bin/activate
           uv run python scripts/validate_k8s_manifests.py
+
+  # ==========================================================================
+  # Stage 5: Performance Baseline (lightweight regression gate)
+  # ==========================================================================
+  performance-baseline:
+    runs-on: ubuntu-22.04
+    needs: quality
+    if: github.event_name == 'pull_request'
+    services:
+      mongo:
+        image: mongo:6
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+
+      - name: Install dependencies
+        run: |
+          uv venv --clear
+          uv pip install -e ".[dev,analysis]"
+
+      - name: Start API server in background
+        run: |
+          source .venv/bin/activate
+          ENVIRONMENT=testing MONGODB_URL=mongodb://localhost:27017/aicbc REDIS_URL=redis://localhost:6379/0 API_WORKERS=1 uvicorn src.aicbc.main:app --host 127.0.0.1 --port 8000 &
+          sleep 10
+
+      - name: Run lightweight API benchmark
+        run: |
+          source .venv/bin/activate
+          uv run python scripts/benchmark_api.py --base-url http://127.0.0.1:8000 --duration 10 --output /tmp/benchmark_current.json
+
+      - name: Compare against baseline
+        run: |
+          source .venv/bin/activate
+          python scripts/ci_compare_baseline.py /tmp/benchmark_current.json reports/performance/latest-baseline.json 0.15 0.30
