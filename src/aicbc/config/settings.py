@@ -21,6 +21,8 @@ class LLMSettings(BaseSettings):
     max_tokens: int = 4096
     timeout_seconds: int = 120
     max_retries: int = 3
+    http_max_connections: int = Field(default=20, alias="HTTP_MAX_CONNECTIONS")
+    http_max_keepalive: int = Field(default=10, alias="HTTP_MAX_KEEPALIVE")
 
 
 class AnthropicSettings(BaseSettings):
@@ -86,6 +88,10 @@ class DatabaseSettings(BaseSettings):
     mongodb_url: str = Field(default="mongodb://localhost:27017", alias="MONGODB_URL")
     mongodb_database: str = Field(default="aicbc", alias="MONGODB_DATABASE")
     mongodb_max_connections: int = Field(default=50, alias="MONGODB_MAX_CONNECTIONS")
+    mongodb_min_connections: int = Field(default=10, alias="MONGODB_MIN_CONNECTIONS")
+    mongodb_max_idle_time_ms: int = Field(default=60000, alias="MONGODB_MAX_IDLE_TIME_MS")
+    mongodb_wait_queue_timeout_ms: int = Field(default=5000, alias="MONGODB_WAIT_QUEUE_TIMEOUT_MS")
+    mongodb_server_selection_timeout_ms: int = Field(default=5000, alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     redis_password: str = Field(default="", alias="REDIS_PASSWORD")
 
@@ -202,7 +208,14 @@ class Settings(BaseSettings):
 
     # Monitoring
     metrics_path: str = "/metrics"
-    slow_request_threshold: float = 5.0
+    slow_request_threshold: float = 2.0
+
+    # Caching
+    use_redis_cache: bool = Field(default=False, alias="USE_REDIS_CACHE")
+    dashboard_cache_ttl: int = Field(default=30, alias="DASHBOARD_CACHE_TTL")
+
+    # Graceful shutdown
+    api_graceful_shutdown_timeout: int = Field(default=30, alias="API_GRACEFUL_SHUTDOWN_TIMEOUT")
 
     # CORS
     frontend_origins: str = Field(
