@@ -322,16 +322,21 @@ class TestMongoQuestionnaireStoreOptimizations:
         store.save_study(sample_study)
         counts = store.count_studies_by_status()
         assert isinstance(counts, dict)
+        # The fixture study has status "INIT" (default for CBCStudy).
+        assert counts.get("INIT", 0) >= 1
 
     def test_alist_recent_studies_projection(self, clean_db, sample_study):
         store = MongoQuestionnaireStore()
         store.save_study(sample_study)
         since = datetime.now(UTC) - timedelta(days=30)
         docs, total = store.list_recent_studies(since, limit=10)
+        assert total >= 1
+        assert len(docs) >= 1
         for doc in docs:
             assert "data" not in doc
             assert "study_id" in doc
             assert "status" in doc
+            assert "created_at" in doc
 
 
 class TestMongoResponseStore:

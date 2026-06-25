@@ -299,6 +299,37 @@ class MongoQuestionnaireStore:
             self.alist_studies(product_category=product_category, page=page, page_size=page_size)
         )
 
+    def list_studies(
+        self,
+        *,
+        product_category: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[CBCStudy], int]:
+        """Query studies with optional filters."""
+        return _run_coro(
+            self.alist_studies(product_category=product_category, page=page, page_size=page_size)
+        )
+
+    async def alist_studies(
+        self,
+        *,
+        product_category: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[CBCStudy], int]:
+        """Query studies with optional filters (async, Motor-loop safe)."""
+        query: Any = {}
+        if product_category is not None:
+            query["product_category"] = product_category
+
+        mongo_query = StudyDocument.find(query)
+        total = await mongo_query.count()
+        start = (page - 1) * page_size
+        docs = await mongo_query.skip(start).limit(page_size).to_list()
+        items = [CBCStudy.model_validate(d.data) for d in docs]
+        return items, total
+
     async def acount_studies_by_status(self) -> dict[str, int]:
         """Return study counts grouped by status using MongoDB aggregation."""
         pipeline: list[dict[str, Any]] = [
