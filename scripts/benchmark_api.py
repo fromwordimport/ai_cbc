@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import statistics
+import json
+import sys
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 import httpx
 
@@ -18,6 +22,7 @@ class BenchmarkResult:
     status_codes: list[int] = field(default_factory=list)
     latencies: list[float] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    duration: float = 0.0
 
     @property
     def total(self) -> int:
@@ -25,10 +30,9 @@ class BenchmarkResult:
 
     @property
     def rps(self) -> float:
-        if not self.latencies:
+        if not self.latencies or self.duration <= 0:
             return 0.0
-        duration = max(self.latencies) - min(self.latencies) if len(self.latencies) > 1 else self.latencies[0]
-        return len(self.latencies) / max(duration, 0.001)
+        return len(self.latencies) / self.duration
 
     def percentile(self, p: float) -> float:
         if not self.latencies:
@@ -72,6 +76,7 @@ async def run_benchmark(
     requests_per_worker: int,
 ) -> BenchmarkResult:
     results = BenchmarkResult(endpoint=endpoint)
+    start_time = time.perf_counter()
     async with httpx.AsyncClient(limits=httpx.Limits(max_connections=concurrency * 2)) as client:
         await asyncio.gather(
             *[
@@ -79,6 +84,7 @@ async def run_benchmark(
                 for _ in range(concurrency)
             ]
         )
+    results.duration = time.perf_counter() - start_time
     return results
 
 
@@ -95,7 +101,7 @@ def print_report(results: list[BenchmarkResult]) -> None:
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark AI_CBC API endpoints")
     parser.add_argument("--base-url", default="http://localhost:8000", help="API base URL")
-    parser.add_argument("--duration", type=int, default=60, help="Duration per scenario in seconds")
+    parser.add_argument("--requests", type=int, default=60, help="Total requests per scenario")
     parser.add_argument("--output", default="reports/performance/benchmark_api.json", help="Output JSON path")
     args = parser.parse_args()
 
@@ -109,15 +115,12 @@ async def main() -> None:
 
     results: list[BenchmarkResult] = []
     for name, method, path, body, concurrency in scenarios:
-        requests_per_worker = max(1, args.duration * concurrency // 10)
+        requests_per_worker = max(1, args.requests // concurrency)
         print(f"Running {name}: concurrency={concurrency}, total_requests={requests_per_worker * concurrency}")
         result = await run_benchmark(args.base_url, name, method, path, body, concurrency, requests_per_worker)
         results.append(result)
 
     print_report(results)
-
-    import json
-    from pathlib import Path
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
