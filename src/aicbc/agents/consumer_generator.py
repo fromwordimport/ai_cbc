@@ -280,7 +280,9 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
         Standalone entry point that creates its own event loop.
         """
         raw_results = asyncio.run(self._batch_core(study_id, count, life_stages, seed, max_concurrency))
-        return self._assemble_batch_results(raw_results, max_concurrency)
+        profiles, states, summary = self._assemble_batch_results(raw_results)
+        summary["concurrency"] = max(1, max_concurrency)
+        return profiles, states, summary
 
     def generate_batch_on_loop(
         self,
@@ -295,12 +297,13 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
         raw_results = loop.run_until_complete(
             self._batch_core(study_id, count, life_stages, seed, max_concurrency)
         )
-        return self._assemble_batch_results(raw_results, max_concurrency)
+        profiles, states, summary = self._assemble_batch_results(raw_results)
+        summary["concurrency"] = max(1, max_concurrency)
+        return profiles, states, summary
 
     def _assemble_batch_results(
         self,
         raw_results: list,
-        max_concurrency: int,
     ) -> tuple[list[PersonaProfile], list[AgentState], dict[str, Any]]:
         """Reassemble results from _batch_core into profiles/states/summary."""
         profiles: list[PersonaProfile] = []
@@ -354,7 +357,6 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             "total_corrections": total_corrections,
             "avg_authenticity_score": sum(p.authenticity_score or 0 for p in profiles)
             / max(generated_count, 1),
-            "concurrency": max(1, max_concurrency),
             "failures": failures,
         }
 
