@@ -465,7 +465,6 @@ class LLMClient:
         model: str | None,
         active_model: str,
         cache_key: str,
-        client: Anthropic | OpenAI,
         max_retries: int,
         call_provider: Callable[[], LLMResponse],
         sleep_fn: Callable[[float], None],
@@ -478,6 +477,7 @@ class LLMClient:
             max_tokens=resolved_max_tokens,
             json_mode=json_mode,
         )
+        last_exception: Exception | None = None
 
         for attempt in range(1, max_retries + 1):
             try:
@@ -555,7 +555,6 @@ class LLMClient:
         model: str | None,
         active_model: str,
         cache_key: str,
-        client: Anthropic | OpenAI,
         max_retries: int,
         call_provider: Callable[[], Awaitable[LLMResponse]],
         sleep_fn: Callable[[float], Awaitable[None]],
@@ -744,7 +743,6 @@ class LLMClient:
             model=model,
             active_model=active_model,
             cache_key=cache_key,
-            client=client,
             max_retries=max_retries,
             call_provider=_call_provider,
             sleep_fn=time.sleep,
@@ -860,7 +858,6 @@ class LLMClient:
             model=model,
             active_model=active_model,
             cache_key=cache_key,
-            client=client,
             max_retries=max_retries,
             call_provider=_call_provider,
             sleep_fn=asyncio.sleep,
