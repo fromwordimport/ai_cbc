@@ -299,18 +299,6 @@ class MongoQuestionnaireStore:
             self.alist_studies(product_category=product_category, page=page, page_size=page_size)
         )
 
-    def list_studies(
-        self,
-        *,
-        product_category: str | None = None,
-        page: int = 1,
-        page_size: int = 20,
-    ) -> tuple[list[CBCStudy], int]:
-        """Query studies with optional filters."""
-        return _run_coro(
-            self.alist_studies(product_category=product_category, page=page, page_size=page_size)
-        )
-
     async def alist_studies(
         self,
         *,
