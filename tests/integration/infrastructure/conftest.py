@@ -60,7 +60,10 @@ async def mongo_client():
 
         mongomock.database.Database.list_collection_names = _patched_list_collection_names
 
-        # Patch _run in store_mongo to handle mongomock_motor query objects
+        # Patch _run in store_mongo to handle mongomock_motor query objects.
+        # mongomock_motor does not natively support awaiting Beanie query objects
+        # produced by Document.find(..., projection=...), so we patch _run to
+        # properly await them in an async context.
         import aicbc.core.store_mongo as _store_mongo_module
 
         _orig_run = _store_mongo_module._run
