@@ -120,7 +120,12 @@
 
 | 时间 | 操作 | 分支 | 结果 | 备注 |
 |------|------|------|------|------|
-| 待执行 | — | — | — | — |
+| 2026-06-25 | 删除远程分支 | feature/ci-merge-commit-check | 成功 | 已合并到 master |
+| 2026-06-25 | 删除远程分支 | feature/security-scan-ignore-unfixed | 成功 | 已合并到 master |
+| 2026-06-25 | 合并 PR | feature/optimize-slow-tests | 成功 | PR #17，CI 全部通过 |
+| 2026-06-25 | 删除远程分支 | feature/optimize-slow-tests | 成功 | PR #17 合并后清理 |
+| 2026-06-25 | 解决冲突并合并 PR | feature/cicd-pipeline-flag-scripts | 成功 | PR #18，3 个 add/add 冲突已解决，CI 全部通过 |
+| 2026-06-25 | 删除远程分支 | feature/cicd-pipeline-flag-scripts | 成功 | PR #18 合并后清理 |
 
 ---
 
