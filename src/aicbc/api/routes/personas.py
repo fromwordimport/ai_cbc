@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from aicbc.analysis.tasks import run_persona_generation_task
 from aicbc.api.dependencies import (
     get_authenticity_scorer,
     get_bias_auditor,
@@ -291,6 +290,8 @@ async def generate_personas_async(
         "count": request.count,
         "seed": request.seed,
     }
+    from aicbc.analysis.tasks import run_persona_generation_task
+
     run_persona_generation_task.delay(job_id, json.dumps(payload))
 
     return AsyncBatchGenerateResponse(

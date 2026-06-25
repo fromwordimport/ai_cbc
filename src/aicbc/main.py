@@ -3,6 +3,7 @@
 import asyncio
 import os
 import signal
+import threading
 from contextlib import asynccontextmanager
 
 import jwt as pyjwt
@@ -53,8 +54,11 @@ async def lifespan(app: FastAPI):
         app.state.shutting_down = True
         logger.warning("shutdown_signal_received", signal=signum)
 
-    old_sigterm = signal.signal(signal.SIGTERM, _handle_signal)
-    old_sigint = signal.signal(signal.SIGINT, _handle_signal)
+    old_sigterm = None
+    old_sigint = None
+    if threading.current_thread() is threading.main_thread():
+        old_sigterm = signal.signal(signal.SIGTERM, _handle_signal)
+        old_sigint = signal.signal(signal.SIGINT, _handle_signal)
 
     use_memory = os.environ.get("USE_MEMORY_STORE", "").lower() in ("1", "true", "yes")
     env = settings.environment.lower()
@@ -83,8 +87,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    signal.signal(signal.SIGTERM, old_sigterm)
-    signal.signal(signal.SIGINT, old_sigint)
+    if old_sigterm is not None:
+        signal.signal(signal.SIGTERM, old_sigterm)
+    if old_sigint is not None:
+        signal.signal(signal.SIGINT, old_sigint)
 
     if _mongo_client is not None:
         # Wait briefly for in-flight requests before closing the connection.
