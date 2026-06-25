@@ -14,21 +14,21 @@ async def client() -> AsyncClient:
         yield ac
 
 
-@pytest.mark.asyncio
-async def test_shutdown_returns_503(client: AsyncClient):
+@pytest.fixture
+def shutting_down():
+    """Enable shutdown state for the duration of a test."""
     app.state.shutting_down = True
-    try:
-        response = await client.get("/api/v1/personas")
-        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    finally:
-        app.state.shutting_down = False
+    yield
+    app.state.shutting_down = False
 
 
 @pytest.mark.asyncio
-async def test_health_still_available_during_shutdown(client: AsyncClient):
-    app.state.shutting_down = True
-    try:
-        response = await client.get("/health")
-        assert response.status_code == status.HTTP_200_OK
-    finally:
-        app.state.shutting_down = False
+async def test_shutdown_returns_503(client: AsyncClient, shutting_down):
+    response = await client.get("/api/v1/personas")
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+@pytest.mark.asyncio
+async def test_health_still_available_during_shutdown(client: AsyncClient, shutting_down):
+    response = await client.get("/health")
+    assert response.status_code == status.HTTP_200_OK

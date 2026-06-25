@@ -53,8 +53,8 @@ async def lifespan(app: FastAPI):
         app.state.shutting_down = True
         logger.warning("shutdown_signal_received", signal=signum)
 
-    signal.signal(signal.SIGTERM, _handle_signal)
-    signal.signal(signal.SIGINT, _handle_signal)
+    old_sigterm = signal.signal(signal.SIGTERM, _handle_signal)
+    old_sigint = signal.signal(signal.SIGINT, _handle_signal)
 
     use_memory = os.environ.get("USE_MEMORY_STORE", "").lower() in ("1", "true", "yes")
     env = settings.environment.lower()
@@ -83,10 +83,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    signal.signal(signal.SIGTERM, old_sigterm)
+    signal.signal(signal.SIGINT, old_sigint)
+
     if _mongo_client is not None:
         # Wait briefly for in-flight requests before closing the connection.
-        timeout = settings.api_graceful_shutdown_timeout
-        logger.info("graceful_shutdown_waiting", timeout_seconds=timeout)
+        logger.info("graceful_shutdown_waiting")
         await asyncio.sleep(0.5)
         _mongo_client.close()
     logger.info("AI_CBC API shutting down")
@@ -166,7 +168,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         )
 
 
-# Add middleware (order matters: shutdown check first, then metrics outermost so limited requests are still counted)
+# Add middleware (FastAPI stacks in reverse registration order; ShutdownMiddleware
+# is registered first so it ends up innermost, but still rejects traffic before
+# the application handler runs. MetricsMiddleware is registered after RateLimit
+# so it wraps RateLimit and counts limited requests.)
 app.add_middleware(ShutdownMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MetricsMiddleware)
