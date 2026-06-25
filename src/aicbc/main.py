@@ -56,6 +56,10 @@ async def lifespan(app: FastAPI):
         _mongo_client = AsyncIOMotorClient(
             settings.database.mongodb_url,
             maxPoolSize=settings.database.mongodb_max_connections,
+            minPoolSize=settings.database.mongodb_min_connections,
+            maxIdleTimeMS=settings.database.mongodb_max_idle_time_ms,
+            waitQueueTimeoutMS=settings.database.mongodb_wait_queue_timeout_ms,
+            serverSelectionTimeoutMS=settings.database.mongodb_server_selection_timeout_ms,
         )
         await init_beanie(
             database=_mongo_client[settings.database.mongodb_database],
