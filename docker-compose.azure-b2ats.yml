@@ -23,6 +23,15 @@ services:
       - HB_MAX_CHAINS=2
       - HB_CORES=1
       - HB_MAX_DRAWS=1250
+      - DASHBOARD_CACHE_TTL=30
+      - USE_REDIS_CACHE=false
+      - LLM_HTTP_MAX_CONNECTIONS=20
+      - LLM_HTTP_MAX_KEEPALIVE=10
+      - MONGODB_MIN_CONNECTIONS=5
+      - MONGODB_MAX_IDLE_TIME_MS=60000
+      - MONGODB_WAIT_QUEUE_TIMEOUT_MS=5000
+      - MONGODB_SERVER_SELECTION_TIMEOUT_MS=5000
+      - API_GRACEFUL_SHUTDOWN_TIMEOUT=30
     depends_on:
       mongo:
         condition: service_healthy

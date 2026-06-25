@@ -1,6 +1,9 @@
 """FastAPI application entry point."""
 
+import asyncio
 import os
+import signal
+import threading
 from contextlib import asynccontextmanager
 
 import jwt as pyjwt
@@ -18,6 +21,7 @@ from aicbc.analysis import routes as analysis_routes
 from aicbc.api.middleware.audit_log import AuditLogMiddleware
 from aicbc.api.middleware.rate_limit import RateLimitMiddleware
 from aicbc.api.middleware.rbac import RBACMiddleware
+from aicbc.api.middleware.shutdown import ShutdownMiddleware
 from aicbc.api.routes import (
     admin,
     auth,
@@ -44,6 +48,18 @@ async def lifespan(app: FastAPI):
     """Application lifespan: initialize MongoDB/Beanie and clean up on shutdown."""
     logger.info("AI_CBC API starting up", environment=settings.environment)
 
+    app.state.shutting_down = False
+
+    def _handle_signal(signum, frame):
+        app.state.shutting_down = True
+        logger.warning("shutdown_signal_received", signal=signum)
+
+    old_sigterm = None
+    old_sigint = None
+    if threading.current_thread() is threading.main_thread():
+        old_sigterm = signal.signal(signal.SIGTERM, _handle_signal)
+        old_sigint = signal.signal(signal.SIGINT, _handle_signal)
+
     use_memory = os.environ.get("USE_MEMORY_STORE", "").lower() in ("1", "true", "yes")
     env = settings.environment.lower()
     is_dev_without_mongo = env in ("development", "dev", "testing", "test") and (
@@ -56,6 +72,10 @@ async def lifespan(app: FastAPI):
         _mongo_client = AsyncIOMotorClient(
             settings.database.mongodb_url,
             maxPoolSize=settings.database.mongodb_max_connections,
+            minPoolSize=settings.database.mongodb_min_connections,
+            maxIdleTimeMS=settings.database.mongodb_max_idle_time_ms,
+            waitQueueTimeoutMS=settings.database.mongodb_wait_queue_timeout_ms,
+            serverSelectionTimeoutMS=settings.database.mongodb_server_selection_timeout_ms,
         )
         await init_beanie(
             database=_mongo_client[settings.database.mongodb_database],
@@ -67,7 +87,15 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    if old_sigterm is not None:
+        signal.signal(signal.SIGTERM, old_sigterm)
+    if old_sigint is not None:
+        signal.signal(signal.SIGINT, old_sigint)
+
     if _mongo_client is not None:
+        # Wait briefly for in-flight requests before closing the connection.
+        logger.info("graceful_shutdown_waiting")
+        await asyncio.sleep(0.5)
         _mongo_client.close()
     logger.info("AI_CBC API shutting down")
 
@@ -146,7 +174,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         )
 
 
-# Add middleware (order matters: rate limit first, then metrics, then security headers, then auth, then RBAC, then audit)
+# Add middleware (FastAPI stacks in reverse registration order; ShutdownMiddleware
+# is registered first so it ends up innermost, but still rejects traffic before
+# the application handler runs. MetricsMiddleware is registered after RateLimit
+# so it wraps RateLimit and counts limited requests.)
+app.add_middleware(ShutdownMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -155,7 +187,7 @@ app.add_middleware(RBACMiddleware)
 app.add_middleware(AuditLogMiddleware)
 
 # Compress JSON responses above 1 KB. Placed before CORS so CORS remains outermost.
-app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 # CORS must be the outermost middleware so OPTIONS preflight responses are returned
 # before any auth/RBAC checks can reject them without CORS headers.

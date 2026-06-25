@@ -8,15 +8,13 @@ global:
     cluster: aicbc
     replica: '{{.ExternalURL}}'
 
+# TODO: Uncomment in Task 6 when alertmanager service is added to docker-compose.yml
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
-      # When Alertmanager is deployed, add its target here
-      # - targets: ['alertmanager:9093']
+        - targets: ['alertmanager:9093']
 
 rule_files:
-  # Load alerting rules
   - /etc/prometheus/rules/*.yml
 
 scrape_configs:

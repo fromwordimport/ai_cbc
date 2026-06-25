@@ -170,6 +170,74 @@
           }
         },
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 50,
+        "title": "API RPS / Errors / P95",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(aicbc_api_requests_total[1m]))",
+            "legendFormat": "RPS"
+          },
+          {
+            "expr": "sum(rate(aicbc_api_requests_total{status=~\"5..\"}[1m]))",
+            "legendFormat": "5xx/s"
+          },
+          {
+            "expr": "aicbc:api_request_p95_seconds",
+            "legendFormat": "P95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40}
+      },
+      {
+        "id": 51,
+        "title": "LLM Calls / P95 Latency / Cache Hit Ratio",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(aicbc_llm_api_calls_total[1m]))",
+            "legendFormat": "calls/s"
+          },
+          {
+            "expr": "aicbc:llm_p95_seconds",
+            "legendFormat": "P95 latency"
+          },
+          {
+            "expr": "aicbc_cache_hit_ratio",
+            "legendFormat": "cache hit ratio"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40}
+      },
+      {
+        "id": 52,
+        "title": "Celery Queue Depth / Task Duration",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "aicbc_queue_size",
+            "legendFormat": "{{queue_name}}"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(aicbc_persona_generation_duration_seconds_bucket[5m]))",
+            "legendFormat": "persona gen P95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48}
+      },
+      {
+        "id": 53,
+        "title": "MongoDB Query Duration P95",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(aicbc_mongodb_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{collection}}/{{operation}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48}
       }
     ]
   }

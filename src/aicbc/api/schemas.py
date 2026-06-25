@@ -608,3 +608,30 @@ class PersonaResponseSummary(BaseModel):
     completion_status: str
     n_answers: int
     created_at: datetime
+
+
+class AsyncBatchGenerateResponse(BaseModel):
+    """Response for async persona generation request."""
+
+    job_id: str
+    study_id: str
+    requested: int
+    status: str
+    message: str
+
+
+class PersonaGenerationJobStatusResponse(BaseModel):
+    """Status of an async persona generation job."""
+
+    job_id: str
+    study_id: str
+    status: str
+    requested: int
+    generated: int
+    failed: int
+    total_cost_cny: float
+    progress: float
+    bias_failed_count: int = 0
+    bias_warning: str | None = None
+    created_at: datetime
+    updated_at: datetime

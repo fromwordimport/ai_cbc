@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -112,6 +113,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_routes={
         "aicbc.analysis.*": {"queue": "analysis"},
+        "aicbc.analysis.run_persona_generation_task": {"queue": "persona_generation"},
     },
     result_expires=300,  # Results expire after 5 minutes to reduce Redis memory/commands
     result_extended=False,  # Do not store task name/args in result backend
@@ -617,4 +619,98 @@ def run_latent_class_task(
             study_id=study_id,
             exception=exc,
         )
+        raise
+
+
+@celery_app.task(
+    bind=True,
+    name="aicbc.analysis.run_persona_generation_task",
+    time_limit=1800,  # 30 minutes for large batches
+    soft_time_limit=1500,
+)
+def run_persona_generation_task(
+    self,
+    job_id: str,
+    request_json: str,
+) -> dict:
+    """Run persona batch generation as a background Celery task."""
+    from datetime import UTC, datetime
+
+    from aicbc.agents.consumer_generator import ConsumerGeneratorAgent
+    from aicbc.core.models.db_documents import PersonaGenerationJobDocument
+    from aicbc.core.store import get_store
+    from aicbc.monitoring.metrics import record_persona_generation_task
+
+    request = json.loads(request_json)
+    study_id = request["study_id"]
+    count = request["count"]
+    seed = request.get("seed")
+    life_stages = request.get("life_stages")
+
+    log = logger.bind(job_id=job_id, study_id=study_id, count=count)
+    log.info("persona_generation_task_started")
+
+    async def _update_status(status: str, progress: float, **fields) -> None:
+        doc = await PersonaGenerationJobDocument.find_one(
+            PersonaGenerationJobDocument.job_id == job_id
+        )
+        if doc is None:
+            return
+        doc.status = status
+        doc.progress = progress
+        for key, value in fields.items():
+            setattr(doc, key, value)
+        doc.updated_at = datetime.now(UTC)
+        await doc.save()
+
+    _run_async(_update_status("RUNNING", 0.0))
+
+    start_time = time.perf_counter()
+    try:
+        agent = ConsumerGeneratorAgent()
+        loop = _get_worker_loop()
+        profiles, states, summary = agent.generate_batch_on_loop(
+            loop=loop,
+            study_id=study_id,
+            count=count,
+            life_stages=life_stages,
+            seed=seed,
+            max_concurrency=3,
+        )
+
+        store = get_store()
+        saved = 0
+        for profile in profiles:
+            # acsave expects async store; get_store returns sync wrapper in worker context
+            if store.save(profile):
+                saved += 1
+
+        total_cost = sum(p.generation_metadata.cost_cny for p in profiles)
+        elapsed = time.perf_counter() - start_time
+
+        _run_async(
+            _update_status(
+                "COMPLETED",
+                100.0,
+                generated=saved,
+                failed=summary["failed"],
+                total_cost_cny=round(total_cost, 4),
+                data={"summary": summary, "states": [s.model_dump(mode="json") for s in states]},
+            )
+        )
+        record_persona_generation_task(study_id, elapsed, count)
+        log.info("persona_generation_task_completed", generated=saved, elapsed=elapsed)
+        return {"status": "COMPLETED", "job_id": job_id, "generated": saved}
+
+    except Exception as exc:
+        elapsed = time.perf_counter() - start_time
+        log.exception("persona_generation_task_failed")
+        _run_async(
+            _update_status(
+                "FAILED",
+                0.0,
+                data={"error": f"{type(exc).__name__}: {exc}"},
+            )
+        )
+        record_persona_generation_task(study_id, elapsed, count)
         raise

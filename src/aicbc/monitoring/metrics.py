@@ -60,6 +60,28 @@ def _get_metrics() -> dict[str, Any]:
             "Total cost per study in CNY",
             ["study_id"],
         ),
+        "persona_generation_duration_seconds": Histogram(
+            "aicbc_persona_generation_duration_seconds",
+            "Duration of a persona generation Celery task",
+            ["study_id"],
+            buckets=[1, 5, 10, 30, 60, 120, 300, 600, 1800],
+        ),
+        "persona_generation_batch_size": Histogram(
+            "aicbc_persona_generation_batch_size",
+            "Number of personas requested per batch task",
+            buckets=[1, 5, 10, 25, 50, 100],
+        ),
+        "cache_hit_ratio": Gauge(
+            "aicbc_cache_hit_ratio",
+            "Cache hit ratio for the active cache backend",
+            ["cache_name"],
+        ),
+        "mongodb_query_duration_seconds": Histogram(
+            "aicbc_mongodb_query_duration_seconds",
+            "MongoDB query duration",
+            ["collection", "operation"],
+            buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+        ),
         # System Metrics
         "api_request_duration_seconds": Histogram(
             "aicbc_api_request_duration_seconds",
@@ -227,3 +249,32 @@ def record_security_event(event_type: str, blocked: bool, detail: str = "") -> N
         metrics["authentication_failures_total"].labels(reason=detail).inc()
     elif event_type == "suspicious":
         metrics["suspicious_requests_total"].labels(type=detail).inc()
+
+
+def record_persona_generation_task(
+    study_id: str,
+    duration_seconds: float,
+    batch_size: int,
+) -> None:
+    """Record persona generation Celery task metrics."""
+    metrics = _get_metrics()
+    metrics["persona_generation_duration_seconds"].labels(study_id=study_id).observe(duration_seconds)
+    metrics["persona_generation_batch_size"].observe(batch_size)
+
+
+def record_cache_hit_ratio(cache_name: str, hit_ratio: float) -> None:
+    """Record cache hit ratio (0.0-1.0)."""
+    metrics = _get_metrics()
+    metrics["cache_hit_ratio"].labels(cache_name=cache_name).set(hit_ratio)
+
+
+def record_mongodb_query_duration(
+    collection: str,
+    operation: str,
+    duration_seconds: float,
+) -> None:
+    """Record MongoDB query duration."""
+    metrics = _get_metrics()
+    metrics["mongodb_query_duration_seconds"].labels(
+        collection=collection, operation=operation
+    ).observe(duration_seconds)

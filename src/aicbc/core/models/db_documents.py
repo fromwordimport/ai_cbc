@@ -184,6 +184,30 @@ class AuditLogDocument(Document):
         ]
 
 
+class PersonaGenerationJobDocument(Document):
+    """Persisted state for async persona generation Celery tasks."""
+
+    job_id: Indexed(str, unique=True)
+    study_id: Indexed(str)
+    status: Indexed(str)
+    requested: int
+    generated: int = 0
+    failed: int = 0
+    total_cost_cny: float = 0.0
+    bias_failed_count: int = 0
+    bias_warning: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    class Settings:
+        name = "persona_generation_jobs"
+        indexes = [
+            IndexModel([("created_at", -1)]),
+            IndexModel([("status", 1)]),
+        ]
+
+
 class DeadLetterDocument(Document):
     """Persisted record of failed Celery tasks for later inspection."""
 
@@ -214,5 +238,6 @@ ALL_DOCUMENT_MODELS: list[type[Document]] = [
     SettingsDocument,
     FeatureFlagDocument,
     AuditLogDocument,
+    PersonaGenerationJobDocument,
     DeadLetterDocument,
 ]

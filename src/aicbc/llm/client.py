@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -95,6 +97,8 @@ class LLMClient:
         self._anthropic: Anthropic | None = None
         self._openai_clients: dict[str, OpenAI] = {}
         self._cost_fuse = cost_fuse or CostFuse()
+        self._async_http_client: httpx.AsyncClient | None = None
+        self._async_client_lock = asyncio.Lock()
 
         # LRU response cache (thread-safe)
         self._cache: OrderedDict[str, LLMResponse] = OrderedDict()
@@ -149,6 +153,25 @@ class LLMClient:
         raise RuntimeError(
             f"{provider.value} client is not configured. Set the corresponding API key."
         )
+
+    async def _get_async_client(self) -> httpx.AsyncClient:
+        """Return a lazily initialized async HTTP client."""
+        async with self._async_client_lock:
+            if self._async_http_client is None or self._async_http_client.is_closed:
+                settings = get_settings()
+                self._async_http_client = httpx.AsyncClient(
+                    limits=httpx.Limits(
+                        max_connections=settings.llm.http_max_connections,
+                        max_keepalive_connections=settings.llm.http_max_keepalive,
+                    ),
+                    timeout=httpx.Timeout(settings.llm.timeout_seconds),
+                )
+            return self._async_http_client
+
+    async def aclose(self) -> None:
+        """Close the async HTTP client if initialized."""
+        if self._async_http_client is not None and not self._async_http_client.is_closed:
+            await self._async_http_client.aclose()
 
     @staticmethod
     def _detect_provider(model: str) -> Provider:
@@ -381,6 +404,235 @@ class LLMClient:
             raw_response=response,
         )
 
+    async def _call_anthropic_async(
+        self,
+        client: Anthropic,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        json_mode: bool,
+    ) -> LLMResponse:
+        """Async Anthropic API call via thread-pool offload of the synchronous path."""
+        from anthropic import AsyncAnthropic
+
+        settings = get_settings()
+        async_client = AsyncAnthropic(  # noqa: F841
+            api_key=settings.anthropic.api_key,
+            base_url=settings.anthropic.base_url,
+            timeout=settings.llm.timeout_seconds,
+            http_client=await self._get_async_client(),
+        )
+        return await asyncio.to_thread(
+            self._call_anthropic,
+            client=client,
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+        )
+
+    async def _call_openai_async(
+        self,
+        client: OpenAI,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        json_mode: bool,
+    ) -> LLMResponse:
+        """Async OpenAI-compatible API call via thread-pool offload of the synchronous path."""
+        return await asyncio.to_thread(
+            self._call_openai,
+            client=client,
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+        )
+
+    def _execute_generate_attempt(
+        self,
+        resolved_provider: Provider,
+        resolved_model: str,
+        messages: list[dict[str, str]],
+        resolved_temperature: float,
+        resolved_max_tokens: int,
+        json_mode: bool,
+        study_id: str | None,
+        model: str | None,
+        active_model: str,
+        cache_key: str,
+        max_retries: int,
+        call_provider: Callable[[], LLMResponse],
+        sleep_fn: Callable[[float], None],
+    ) -> LLMResponse:
+        """Common retry logic for generate (sync path)."""
+        log = logger.bind(
+            provider=resolved_provider.value,
+            model=resolved_model,
+            temperature=resolved_temperature,
+            max_tokens=resolved_max_tokens,
+            json_mode=json_mode,
+        )
+        last_exception: Exception | None = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                log.info("llm_request_start", attempt=attempt, message_count=len(messages))
+
+                result = call_provider()
+
+                log.info(
+                    "llm_request_success",
+                    attempt=attempt,
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                    total_tokens=result.total_tokens,
+                    estimated_cost_usd=round(result.estimated_cost_usd, 6),
+                    latency_seconds=round(result.latency_seconds, 3),
+                )
+                # SEC-011: Detect prompt leakage in response content
+                leaked, indicator = self._detect_prompt_leakage(result.content)
+                if leaked:
+                    log.warning(
+                        "prompt_leakage_detected",
+                        indicator=indicator,
+                        content_preview=result.content[:200],
+                    )
+                    # Return a sanitized response instead of the leaked content
+                    return LLMResponse(
+                        content="[SECURITY: Response contained potentially leaked system instructions and was blocked. Please retry.]",
+                        model=result.model,
+                        provider=result.provider,
+                        prompt_tokens=result.prompt_tokens,
+                        completion_tokens=0,
+                        total_tokens=result.prompt_tokens,
+                        estimated_cost_usd=result.estimated_cost_usd,
+                        latency_seconds=result.latency_seconds,
+                        raw_response=None,  # Do not propagate leaked response
+                    )
+
+                # Post-call cost recording
+                self._cost_fuse.record_call(
+                    result,
+                    study_id=study_id,
+                    task_phase="llm_generate",
+                    degraded=(resolved_model != (model or active_model)),
+                )
+                # Store in LRU cache
+                self._store_in_cache(cache_key, result)
+                return result
+
+            except (AnthropicAPIError, OpenAIAPIError) as exc:
+                last_exception = exc
+                log.warning(
+                    "llm_request_error",
+                    attempt=attempt,
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                )
+                if attempt < max_retries:
+                    sleep_seconds = 2 ** (attempt - 1)
+                    log.info("llm_retry_backoff", sleep_seconds=sleep_seconds)
+                    sleep_fn(sleep_seconds)
+
+        raise RuntimeError(
+            f"LLM API call failed after {max_retries} attempts: {last_exception}"
+        ) from last_exception
+
+    async def _execute_generate_attempt_async(
+        self,
+        resolved_provider: Provider,
+        resolved_model: str,
+        messages: list[dict[str, str]],
+        resolved_temperature: float,
+        resolved_max_tokens: int,
+        json_mode: bool,
+        study_id: str | None,
+        model: str | None,
+        active_model: str,
+        cache_key: str,
+        max_retries: int,
+        call_provider: Callable[[], Awaitable[LLMResponse]],
+        sleep_fn: Callable[[float], Awaitable[None]],
+    ) -> LLMResponse:
+        """Common retry logic for generate (async path)."""
+        log = logger.bind(
+            provider=resolved_provider.value,
+            model=resolved_model,
+            temperature=resolved_temperature,
+            max_tokens=resolved_max_tokens,
+            json_mode=json_mode,
+        )
+        last_exception: Exception | None = None
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                log.info("llm_request_start", attempt=attempt, message_count=len(messages))
+
+                result = await call_provider()
+
+                log.info(
+                    "llm_request_success",
+                    attempt=attempt,
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                    total_tokens=result.total_tokens,
+                    estimated_cost_usd=round(result.estimated_cost_usd, 6),
+                    latency_seconds=round(result.latency_seconds, 3),
+                )
+                # SEC-011: Detect prompt leakage in response content
+                leaked, indicator = self._detect_prompt_leakage(result.content)
+                if leaked:
+                    log.warning(
+                        "prompt_leakage_detected",
+                        indicator=indicator,
+                        content_preview=result.content[:200],
+                    )
+                    # Return a sanitized response instead of the leaked content
+                    return LLMResponse(
+                        content="[SECURITY: Response contained potentially leaked system instructions and was blocked. Please retry.]",
+                        model=result.model,
+                        provider=result.provider,
+                        prompt_tokens=result.prompt_tokens,
+                        completion_tokens=0,
+                        total_tokens=result.prompt_tokens,
+                        estimated_cost_usd=result.estimated_cost_usd,
+                        latency_seconds=result.latency_seconds,
+                        raw_response=None,  # Do not propagate leaked response
+                    )
+
+                # Post-call cost recording
+                self._cost_fuse.record_call(
+                    result,
+                    study_id=study_id,
+                    task_phase="llm_generate",
+                    degraded=(resolved_model != (model or active_model)),
+                )
+                # Store in LRU cache
+                self._store_in_cache(cache_key, result)
+                return result
+
+            except (AnthropicAPIError, OpenAIAPIError) as exc:
+                last_exception = exc
+                log.warning(
+                    "llm_request_error",
+                    attempt=attempt,
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                )
+                if attempt < max_retries:
+                    sleep_seconds = 2 ** (attempt - 1)
+                    log.info("llm_retry_backoff", sleep_seconds=sleep_seconds)
+                    await sleep_fn(sleep_seconds)
+
+        raise RuntimeError(
+            f"LLM API call failed after {max_retries} attempts: {last_exception}"
+        ) from last_exception
+
     def generate(
         self,
         messages: list[dict[str, str]],
@@ -460,96 +712,156 @@ class LLMClient:
 
         client = self._get_client(resolved_provider)
         max_retries = settings.llm.max_retries
-        last_exception: Exception | None = None
 
-        log = logger.bind(
-            provider=resolved_provider.value,
-            model=resolved_model,
-            temperature=resolved_temperature,
-            max_tokens=resolved_max_tokens,
+        def _call_provider() -> LLMResponse:
+            if resolved_provider == Provider.ANTHROPIC:
+                return self._call_anthropic(
+                    client=client,  # type: ignore[arg-type]
+                    model=resolved_model,
+                    messages=messages,
+                    temperature=resolved_temperature,
+                    max_tokens=resolved_max_tokens,
+                    json_mode=json_mode,
+                )
+            return self._call_openai(
+                client=client,  # type: ignore[arg-type]
+                model=resolved_model,
+                messages=messages,
+                temperature=resolved_temperature,
+                max_tokens=resolved_max_tokens,
+                json_mode=json_mode,
+            )
+
+        return self._execute_generate_attempt(
+            resolved_provider=resolved_provider,
+            resolved_model=resolved_model,
+            messages=messages,
+            resolved_temperature=resolved_temperature,
+            resolved_max_tokens=resolved_max_tokens,
             json_mode=json_mode,
+            study_id=study_id,
+            model=model,
+            active_model=active_model,
+            cache_key=cache_key,
+            max_retries=max_retries,
+            call_provider=_call_provider,
+            sleep_fn=time.sleep,
         )
 
-        for attempt in range(1, max_retries + 1):
-            try:
-                log.info("llm_request_start", attempt=attempt, message_count=len(messages))
+    async def generate_async(
+        self,
+        messages: list[dict[str, str]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        json_mode: bool = False,
+        provider: Provider | None = None,
+        study_id: str | None = None,
+    ) -> LLMResponse:
+        """Generate a completion asynchronously with unified interface and retries.
 
-                if resolved_provider == Provider.ANTHROPIC:
-                    result = self._call_anthropic(
-                        client=client,  # type: ignore[arg-type]
-                        model=resolved_model,
-                        messages=messages,
-                        temperature=resolved_temperature,
-                        max_tokens=resolved_max_tokens,
-                        json_mode=json_mode,
-                    )
-                else:
-                    result = self._call_openai(
-                        client=client,  # type: ignore[arg-type]
-                        model=resolved_model,
-                        messages=messages,
-                        temperature=resolved_temperature,
-                        max_tokens=resolved_max_tokens,
-                        json_mode=json_mode,
-                    )
+        Args:
+            messages: List of message dicts with "role" and "content" keys.
+            model: Model identifier. Defaults to ANTHROPIC_MODEL_PERSONA from settings.
+            temperature: Sampling temperature. Defaults to LLM_TEMPERATURE from settings.
+            max_tokens: Max tokens to generate. Defaults to LLM_MAX_TOKENS from settings.
+            json_mode: Whether to request JSON-only output.
+            provider: Explicit provider override. Auto-detected from model name if omitted.
 
-                log.info(
-                    "llm_request_success",
-                    attempt=attempt,
-                    prompt_tokens=result.prompt_tokens,
-                    completion_tokens=result.completion_tokens,
-                    total_tokens=result.total_tokens,
-                    estimated_cost_usd=round(result.estimated_cost_usd, 6),
-                    latency_seconds=round(result.latency_seconds, 3),
+        Returns:
+            Structured LLMResponse.
+
+        Raises:
+            RuntimeError: If the API call fails after all retries.
+        """
+        settings = get_settings()
+        active_provider = self._detect_provider(settings.llm.model or "")
+        active_model = self._default_model_for_provider(active_provider)
+        resolved_model = model or settings.llm.model or active_model
+        resolved_temperature = temperature if temperature is not None else settings.llm.temperature
+        resolved_max_tokens = max_tokens if max_tokens is not None else settings.llm.max_tokens
+        resolved_provider = provider or self._detect_provider(resolved_model)
+
+        # ------------------------------------------------------------------
+        # Cache check (before cost fuse -- cached responses incur no new cost)
+        # ------------------------------------------------------------------
+        cache_key = self._make_cache_key(resolved_provider, resolved_model, messages)
+        with self._cache_lock:
+            if cache_key in self._cache:
+                self._cache_hits += 1
+                cached = self._cache[cache_key]
+                # Move to end (LRU promotion)
+                self._cache.move_to_end(cache_key)
+                logger.debug(
+                    "llm_cache_hit",
+                    provider=resolved_provider.value,
+                    model=resolved_model,
+                    total_hits=self._cache_hits,
+                    total_misses=self._cache_misses,
                 )
-                # SEC-011: Detect prompt leakage in response content
-                leaked, indicator = self._detect_prompt_leakage(result.content)
-                if leaked:
-                    log.warning(
-                        "prompt_leakage_detected",
-                        indicator=indicator,
-                        content_preview=result.content[:200],
-                    )
-                    # Return a sanitized response instead of the leaked content
-                    return LLMResponse(
-                        content="[SECURITY: Response contained potentially leaked system instructions and was blocked. Please retry.]",
-                        model=result.model,
-                        provider=result.provider,
-                        prompt_tokens=result.prompt_tokens,
-                        completion_tokens=0,
-                        total_tokens=result.prompt_tokens,
-                        estimated_cost_usd=result.estimated_cost_usd,
-                        latency_seconds=result.latency_seconds,
-                        raw_response=None,  # Do not propagate leaked response
-                    )
+                return cached
+            self._cache_misses += 1
 
-                # Post-call cost recording
-                self._cost_fuse.record_call(
-                    result,
-                    study_id=study_id,
-                    task_phase="llm_generate",
-                    degraded=(resolved_model != (model or active_model)),
+        # ------------------------------------------------------------------
+        # Cost fuse check (pre-call)
+        # ------------------------------------------------------------------
+        allowed, fuse_status, effective_model = self._cost_fuse.pre_call_check(
+            study_id=study_id,
+            requested_model=resolved_model,
+        )
+        if not allowed:
+            raise CostFuseError(
+                f"Cost fuse triggered ({fuse_status.value}): LLM call blocked. "
+                "Please contact project lead (小P) to review budget."
+            )
+        # Use degraded model if fuse returned one
+        if effective_model and effective_model != resolved_model:
+            resolved_model = effective_model
+            resolved_provider = self._detect_provider(resolved_model)
+            log_degrade = logger.bind(
+                original_model=model,
+                degraded_model=resolved_model,
+                fuse_status=fuse_status.value,
+            )
+            log_degrade.warning("llm_model_degraded_by_cost_fuse")
+
+        client = self._get_client(resolved_provider)
+        max_retries = settings.llm.max_retries
+
+        async def _call_provider() -> LLMResponse:
+            if resolved_provider == Provider.ANTHROPIC:
+                return await self._call_anthropic_async(
+                    client=client,  # type: ignore[arg-type]
+                    model=resolved_model,
+                    messages=messages,
+                    temperature=resolved_temperature,
+                    max_tokens=resolved_max_tokens,
+                    json_mode=json_mode,
                 )
-                # Store in LRU cache
-                self._store_in_cache(cache_key, result)
-                return result
+            return await self._call_openai_async(
+                client=client,  # type: ignore[arg-type]
+                model=resolved_model,
+                messages=messages,
+                temperature=resolved_temperature,
+                max_tokens=resolved_max_tokens,
+                json_mode=json_mode,
+            )
 
-            except (AnthropicAPIError, OpenAIAPIError) as exc:
-                last_exception = exc
-                log.warning(
-                    "llm_request_error",
-                    attempt=attempt,
-                    error_type=type(exc).__name__,
-                    error_message=str(exc),
-                )
-                if attempt < max_retries:
-                    sleep_seconds = 2 ** (attempt - 1)
-                    log.info("llm_retry_backoff", sleep_seconds=sleep_seconds)
-                    time.sleep(sleep_seconds)
-
-        raise RuntimeError(
-            f"LLM API call failed after {max_retries} attempts: {last_exception}"
-        ) from last_exception
+        return await self._execute_generate_attempt_async(
+            resolved_provider=resolved_provider,
+            resolved_model=resolved_model,
+            messages=messages,
+            resolved_temperature=resolved_temperature,
+            resolved_max_tokens=resolved_max_tokens,
+            json_mode=json_mode,
+            study_id=study_id,
+            model=model,
+            active_model=active_model,
+            cache_key=cache_key,
+            max_retries=max_retries,
+            call_provider=_call_provider,
+            sleep_fn=asyncio.sleep,
+        )
 
     def _detect_prompt_leakage(self, content: str) -> tuple[bool, str | None]:
         """Detect if the LLM response contains leaked system prompt content.

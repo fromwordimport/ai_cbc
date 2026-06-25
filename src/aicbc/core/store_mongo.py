@@ -211,6 +211,45 @@ class MongoPersonaStore:
         items = [self._persona_from_doc(d) for d in docs]
         return items, total
 
+    async def alist_all_lightweight(
+        self,
+        *,
+        study_id: str | None = None,
+        segment: str | None = None,
+        city_tier: str | None = None,
+        bias_status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return lightweight persona summaries without deserializing full data."""
+        query: Any = {}
+        if segment is not None:
+            query["segment"] = segment
+        if city_tier is not None:
+            query["city"] = city_tier
+        if bias_status is not None:
+            query["bias_audit_status"] = bias_status
+        if study_id is not None:
+            prefix = f"persona-{study_id}-"
+            query["persona_id"] = {"$regex": f"^{prefix}"}
+
+        projection = {
+            "persona_id": 1,
+            "segment": 1,
+            "city": 1,
+            "bias_audit_status": 1,
+            "status": 1,
+            "created_at": 1,
+            "_id": 0,
+        }
+        total = await PersonaDocument.find(query).count()
+        start = (page - 1) * page_size
+        cursor = PersonaDocument.get_motor_collection().find(
+            query, projection=projection
+        ).skip(start).limit(page_size)
+        docs = await cursor.to_list(length=None)
+        return docs, total
+
     def delete_by_study(self, study_id: str) -> int:
         """Delete all personas belonging to a study."""
         return _run_coro(self.adelete_by_study(study_id))
@@ -317,6 +356,51 @@ class MongoQuestionnaireStore:
         docs = await mongo_query.skip(start).limit(page_size).to_list()
         items = [CBCStudy.model_validate(d.data) for d in docs]
         return items, total
+
+    async def acount_studies_by_status(self) -> dict[str, int]:
+        """Return study counts grouped by status using MongoDB aggregation."""
+        pipeline: list[dict[str, Any]] = [
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+        ]
+        cursor = StudyDocument.get_motor_collection().aggregate(pipeline)
+        results = await cursor.to_list(length=None)
+        return {str(r["_id"]): r["count"] for r in results}
+
+    async def alist_recent_studies(
+        self,
+        since: datetime,
+        limit: int = 10,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return lightweight recent study summaries and total count.
+
+        Uses projection to avoid transferring the full ``data`` field.
+        """
+        query: Any = {"created_at": {"$gte": since}}
+        projection = {
+            "study_id": 1,
+            "product_category": 1,
+            "status": 1,
+            "created_at": 1,
+            "_id": 0,
+        }
+        total = await StudyDocument.find(query).count()
+        cursor = StudyDocument.get_motor_collection().find(
+            query, projection=projection
+        ).sort("created_at", -1).limit(limit)
+        docs = await cursor.to_list(length=None)
+        return docs, total
+
+    def count_studies_by_status(self) -> dict[str, int]:
+        """Synchronous version of :meth:`acount_studies_by_status`."""
+        return _run_coro(self.acount_studies_by_status())
+
+    def list_recent_studies(
+        self,
+        since: datetime,
+        limit: int = 10,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Synchronous version of :meth:`alist_recent_studies`."""
+        return _run_coro(self.alist_recent_studies(since, limit))
 
     def save_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
         """Persist a questionnaire keyed by study_id."""
@@ -821,6 +905,24 @@ class MongoAnalysisStore:
         """Async version of :meth:`list_jobs_by_study`."""
         docs = await AnalysisJobDocument.find(AnalysisJobDocument.study_id == study_id).to_list()
         return [AnalysisJobStatus.model_validate(doc.data) for doc in docs]
+
+    async def alist_jobs_by_study_lightweight(
+        self,
+        study_id: str,
+    ) -> list[dict[str, Any]]:
+        """Return lightweight analysis job summaries for a study."""
+        projection = {
+            "analysis_id": 1,
+            "study_id": 1,
+            "status": 1,
+            "created_at": 1,
+            "_id": 0,
+        }
+        cursor = AnalysisJobDocument.get_motor_collection().find(
+            {"study_id": study_id}, projection=projection
+        )
+        docs = await cursor.to_list(length=None)
+        return docs
 
     def delete_analysis(self, analysis_id: str) -> bool:
         """Delete a job, its result, and all derivative artefacts."""

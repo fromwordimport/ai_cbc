@@ -235,39 +235,44 @@ async def cost_status() -> dict[str, Any]:
 async def dashboard_summary() -> dict[str, Any]:
     """Aggregated dashboard statistics from all subsystems.
 
-    Single-request endpoint replacing multiple independent API calls
-    for the overview Dashboard page. Cached for 10s to reduce MongoDB
-    pressure on the frequently-refreshed dashboard.
+    Uses MongoDB aggregation for status counts and projection for recent
+    studies. Cached for 30s to reduce load on frequently-refreshed dashboard.
     """
+    from datetime import UTC, datetime, timedelta
+
+    from aicbc.monitoring.metrics import record_mongodb_query_duration
+
     cache = get_dashboard_summary_cache()
     cached = cache.get("summary")
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    from datetime import UTC, datetime, timedelta
-
     persona_store = get_store()
     study_store = get_questionnaire_store()
 
-    studies, total_studies = await study_store.alist_studies(page=1, page_size=100)
+    start = datetime.now(UTC)
+    study_status_counts = await study_store.acount_studies_by_status()
+    record_mongodb_query_duration("studies", "aggregate_count", (datetime.now(UTC) - start).total_seconds())
+
+    total_studies = sum(study_status_counts.values())
+
+    start = datetime.now(UTC)
     persona_count = await persona_store.acount()
+    record_mongodb_query_duration("personas", "count", (datetime.now(UTC) - start).total_seconds())
 
-    study_status_counts: dict[str, int] = {}
-    for s in studies:
-        status = s.status.value if hasattr(s.status, "value") else str(s.status)
-        study_status_counts[status] = study_status_counts.get(status, 0) + 1
-
-    # Recent activity (last 7 days)
     week_ago = datetime.now(UTC) - timedelta(days=7)
+    start = datetime.now(UTC)
+    recent_docs, _ = await study_store.alist_recent_studies(week_ago, limit=10)
+    record_mongodb_query_duration("studies", "find_projection", (datetime.now(UTC) - start).total_seconds())
+
     recent_studies = [
         {
-            "study_id": s.study_id,
-            "product_category": s.product_category,
-            "status": s.status.value,
-            "created_at": s.created_at.isoformat(),
+            "study_id": doc["study_id"],
+            "product_category": doc.get("product_category", ""),
+            "status": doc["status"],
+            "created_at": doc["created_at"].isoformat(),
         }
-        for s in studies
-        if s.created_at >= week_ago
+        for doc in recent_docs
     ]
 
     result = {
@@ -277,7 +282,7 @@ async def dashboard_summary() -> dict[str, Any]:
             "studies_by_status": study_status_counts,
             "recent_studies_last_7d": len(recent_studies),
         },
-        "recent_studies": sorted(recent_studies, key=lambda s: s["created_at"], reverse=True)[:10],
+        "recent_studies": recent_studies,
     }
     cache.set("summary", result)
     return result

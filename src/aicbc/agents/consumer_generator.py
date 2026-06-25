@@ -244,6 +244,29 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
 
         return result, state
 
+    async def _batch_core(
+        self,
+        study_id: str,
+        count: int,
+        life_stages: list[str] | None,
+        seed: int | None,
+        max_concurrency: int,
+    ) -> list:
+        semaphore = asyncio.Semaphore(max_concurrency)
+
+        async def _bounded_generate(index: int):
+            async with semaphore:
+                return index, await asyncio.to_thread(
+                    self.generate_single,
+                    study_id=study_id,
+                    index=index,
+                    life_stage=life_stages[index % len(life_stages)] if life_stages else None,
+                    seed=(seed + index) if seed is not None else None,
+                )
+
+        tasks = [_bounded_generate(i) for i in range(count)]
+        return list(await asyncio.gather(*tasks, return_exceptions=True))
+
     def generate_batch(
         self,
         study_id: str,
@@ -254,55 +277,41 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
     ) -> tuple[list[PersonaProfile], list[AgentState], dict[str, Any]]:
         """Generate a batch of personas concurrently with error isolation.
 
-        Uses ``asyncio.Semaphore`` to cap parallel LLM calls and avoid
-        triggering provider rate limits.  Individual persona failures are
-        logged but do not abort the batch; failed items are excluded from
-        the returned lists while successful results preserve their original
-        index order.
-
-        Args:
-            study_id: Parent study identifier.
-            count: Number of personas to generate.
-            life_stages: Optional list of life stages (rotated if fewer than count).
-            seed: Optional base random seed.
-            max_concurrency: Max simultaneous persona generations (default 3).
-
-        Returns:
-            Tuple of (profiles, states, summary).  ``profiles`` and ``states``
-            are aligned one-to-one and contain only successful generations.
+        Standalone entry point that creates its own event loop.
         """
+        raw_results = asyncio.run(self._batch_core(study_id, count, life_stages, seed, max_concurrency))
+        profiles, states, summary = self._assemble_batch_results(raw_results)
+        summary["concurrency"] = max(1, max_concurrency)
+        return profiles, states, summary
 
-        async def _batch_core() -> list:
-            semaphore = asyncio.Semaphore(max_concurrency)
+    def generate_batch_on_loop(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        study_id: str,
+        count: int,
+        life_stages: list[str] | None = None,
+        seed: int | None = None,
+        max_concurrency: int = 3,
+    ) -> tuple[list[PersonaProfile], list[AgentState], dict[str, Any]]:
+        """Generate a batch using an existing event loop (Celery worker)."""
+        raw_results = loop.run_until_complete(
+            self._batch_core(study_id, count, life_stages, seed, max_concurrency)
+        )
+        profiles, states, summary = self._assemble_batch_results(raw_results)
+        summary["concurrency"] = max(1, max_concurrency)
+        return profiles, states, summary
 
-            async def _bounded_generate(index: int):
-                async with semaphore:
-                    # Run the synchronous generate_single in a thread so the
-                    # event loop stays responsive.
-                    return index, await asyncio.to_thread(
-                        self.generate_single,
-                        study_id=study_id,
-                        index=index,
-                        life_stage=life_stages[index % len(life_stages)] if life_stages else None,
-                        seed=(seed + index) if seed is not None else None,
-                    )
-
-            tasks = [_bounded_generate(i) for i in range(count)]
-            # return_exceptions=True : errors are returned as Exception objects
-            # rather than aborting the entire gather.
-            return list(await asyncio.gather(*tasks, return_exceptions=True))
-
-        raw_results = asyncio.run(_batch_core())
-
-        # Reassemble results in original index order, skipping failures
+    def _assemble_batch_results(
+        self,
+        raw_results: list,
+    ) -> tuple[list[PersonaProfile], list[AgentState], dict[str, Any]]:
+        """Reassemble results from _batch_core into profiles/states/summary."""
         profiles: list[PersonaProfile] = []
         states: list[AgentState] = []
         failures: list[dict[str, Any]] = []
         total_corrections = 0
         passed_count = 0
 
-        # Sort by index to guarantee original order (gather preserves creation
-        # order but explicit sort is defensive).
         indexed: list[tuple[int, Any]] = []
         for item in raw_results:
             if isinstance(item, Exception):
@@ -340,7 +349,7 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
         failed_count = len(failures)
 
         summary = {
-            "requested": count,
+            "requested": generated_count + failed_count,
             "generated": generated_count,
             "failed": failed_count,
             "passed_authenticity": passed_count,
@@ -348,7 +357,6 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             "total_corrections": total_corrections,
             "avg_authenticity_score": sum(p.authenticity_score or 0 for p in profiles)
             / max(generated_count, 1),
-            "concurrency": max_concurrency,
             "failures": failures,
         }
 

@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import threading
+from datetime import datetime
 from typing import Any
 
 from aicbc.core.models.persona import PersonaProfile
@@ -145,6 +146,53 @@ class MemoryQuestionnaireStore:
     async def aclear(self) -> None:
         """Async-compatible clear (delegates to sync implementation)."""
         self.clear()
+
+    def count_studies_by_status(self) -> dict[str, int]:
+        """Return study counts grouped by status."""
+        with self._lock:
+            items = list(self._studies.values())
+        study_status_counts: dict[str, int] = {}
+        for s in items:
+            status = s.status.value if hasattr(s.status, "value") else str(s.status)
+            study_status_counts[status] = study_status_counts.get(status, 0) + 1
+        return study_status_counts
+
+    async def acount_studies_by_status(self) -> dict[str, int]:
+        """Async-compatible count_studies_by_status (delegates to sync implementation)."""
+        return self.count_studies_by_status()
+
+    def list_recent_studies(
+        self,
+        since: datetime,
+        limit: int = 10,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return lightweight recent study summaries and total count."""
+        with self._lock:
+            items = list(self._studies.values())
+        total = len(items)
+        recent = [
+            s for s in items
+            if s.created_at >= since
+        ]
+        recent.sort(key=lambda s: s.created_at, reverse=True)
+        result = [
+            {
+                "study_id": s.study_id,
+                "product_category": s.product_category,
+                "status": s.status.value if hasattr(s.status, "value") else str(s.status),
+                "created_at": s.created_at,
+            }
+            for s in recent[:limit]
+        ]
+        return result, total
+
+    async def alist_recent_studies(
+        self,
+        since: datetime,
+        limit: int = 10,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Async-compatible list_recent_studies (delegates to sync implementation)."""
+        return self.list_recent_studies(since, limit)
 
 
 class MemoryResponseStore:
