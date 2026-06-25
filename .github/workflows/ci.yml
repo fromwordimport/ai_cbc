@@ -501,7 +501,7 @@ jobs:
       - name: Run lightweight API benchmark
         run: |
           source .venv/bin/activate
-          uv run python scripts/benchmark_api.py --base-url http://127.0.0.1:8000 --duration 10 --output /tmp/benchmark_current.json
+          uv run python scripts/benchmark_api.py --base-url http://127.0.0.1:8000 --requests 500 --output /tmp/benchmark_current.json
 
       - name: Compare against baseline
         run: |

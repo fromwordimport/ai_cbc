@@ -69,7 +69,7 @@ class TestAsyncPersonaGeneration:
             "aicbc.api.routes.personas.PersonaGenerationJobDocument",
             _MockPersonaGenerationJobDocument,
         ), patch(
-            "aicbc.api.routes.personas.run_persona_generation_task.delay"
+            "aicbc.analysis.tasks.run_persona_generation_task.delay"
         ) as mock_delay:
             response = await async_client.post("/api/v1/personas/generate-async", json={
                 "study_id": "async-test",
