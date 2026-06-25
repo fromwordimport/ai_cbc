@@ -6,6 +6,7 @@ groups:
   - name: aicbc_performance
     interval: 15s
     rules:
+      # Per-instance latency quantiles. Use by(le) only if you need service-level aggregates.
       - record: aicbc:api_request_p95_seconds
         expr: histogram_quantile(0.95, sum(rate(aicbc_api_request_duration_seconds_bucket[5m])) by (le, job, instance))
       - record: aicbc:api_request_p99_seconds
