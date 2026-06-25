@@ -46,6 +46,13 @@ def _make_minimal_study(study_id: str, status: StudyStatus, created_at: datetime
     )
 
 
+@pytest.fixture(autouse=True)
+def _clean_dashboard_summary_cache():
+    from aicbc.core.cache import invalidate_dashboard_summary
+    invalidate_dashboard_summary()
+    yield
+
+
 @pytest.mark.asyncio
 async def test_dashboard_summary_uses_cache():
     first = await dashboard_summary()
@@ -75,4 +82,5 @@ async def test_dashboard_summary_invalidates():
         study_store, "acount_studies_by_status", return_value={"draft": 5}
     ):
         second = await dashboard_summary()
-    assert first != second or second["summary"]["studies_by_status"].get("draft") == 5
+    assert first != second
+    assert second["summary"]["studies_by_status"].get("draft") == 5
