@@ -136,3 +136,9 @@ def get_feature_flag_store() -> MemoryFeatureFlagStore | MongoFeatureFlagStore:
         else:
             _feature_store = MongoFeatureFlagStore()
     return _feature_store
+
+
+def reset_feature_flag_store() -> None:
+    """Reset the global feature flag store singleton (mainly for tests)."""
+    global _feature_store
+    _feature_store = None
