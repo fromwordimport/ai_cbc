@@ -299,24 +299,50 @@ class MongoQuestionnaireStore:
             self.alist_studies(product_category=product_category, page=page, page_size=page_size)
         )
 
-    async def alist_studies(
-        self,
-        *,
-        product_category: str | None = None,
-        page: int = 1,
-        page_size: int = 20,
-    ) -> tuple[list[CBCStudy], int]:
-        """Query studies with optional filters (async, Motor-loop safe)."""
-        query: Any = {}
-        if product_category is not None:
-            query["product_category"] = product_category
+    async def acount_studies_by_status(self) -> dict[str, int]:
+        """Return study counts grouped by status using MongoDB aggregation."""
+        pipeline: list[dict[str, Any]] = [
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+        ]
+        cursor = StudyDocument.get_motor_collection().aggregate(pipeline)
+        results = await cursor.to_list(length=None)
+        return {str(r["_id"]): r["count"] for r in results}
 
-        mongo_query = StudyDocument.find(query)
-        total = await mongo_query.count()
-        start = (page - 1) * page_size
-        docs = await mongo_query.skip(start).limit(page_size).to_list()
-        items = [CBCStudy.model_validate(d.data) for d in docs]
-        return items, total
+    async def alist_recent_studies(
+        self,
+        since: datetime,
+        limit: int = 10,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return lightweight recent study summaries and total count.
+
+        Uses projection to avoid transferring the full ``data`` field.
+        """
+        query: Any = {"created_at": {"$gte": since}}
+        projection = {
+            "study_id": 1,
+            "product_category": 1,
+            "status": 1,
+            "created_at": 1,
+            "_id": 0,
+        }
+        total = await StudyDocument.find(query).count()
+        cursor = StudyDocument.get_motor_collection().find(
+            query, projection=projection
+        ).sort("created_at", -1).limit(limit)
+        docs = await cursor.to_list(length=None)
+        return docs, total
+
+    def count_studies_by_status(self) -> dict[str, int]:
+        """Synchronous version of :meth:`acount_studies_by_status`."""
+        return _run_coro(self.acount_studies_by_status())
+
+    def list_recent_studies(
+        self,
+        since: datetime,
+        limit: int = 10,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Synchronous version of :meth:`alist_recent_studies`."""
+        return _run_coro(self.alist_recent_studies(since, limit))
 
     def save_questionnaire(self, questionnaire: CBCQuestionnaire) -> None:
         """Persist a questionnaire keyed by study_id."""
