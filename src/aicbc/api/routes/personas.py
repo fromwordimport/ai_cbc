@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from aicbc.analysis.tasks import run_persona_generation_task
 from aicbc.api.dependencies import (
     get_authenticity_scorer,
     get_bias_auditor,
@@ -32,14 +33,13 @@ from aicbc.api.schemas import (
     PersonaSummary,
     ValidateResponse,
 )
-from aicbc.analysis.tasks import run_persona_generation_task
 from aicbc.config.settings import get_settings
-from aicbc.core.models.db_documents import PersonaGenerationJobDocument
 from aicbc.core.cache import (
     get_personas_list_cache,
     invalidate_dashboard_summary,
     invalidate_personas_list,
 )
+from aicbc.core.models.db_documents import PersonaGenerationJobDocument
 from aicbc.core.privacy import redact_dict
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
@@ -269,20 +269,23 @@ async def generate_personas_async(
     request: BatchGenerateRequest,
 ) -> AsyncBatchGenerateResponse:
     """Enqueue a large persona generation batch and return immediately."""
-    safe_study_id = sanitize_id(request.study_id, field_name="study_id")
+    try:
+        safe_study_id = sanitize_id(request.study_id, field_name="study_id")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
     job_id = f"pg-{safe_study_id}-{uuid.uuid4().hex[:8]}"
 
-    try:
-        job = PersonaGenerationJobDocument(
-            job_id=job_id,
-            study_id=safe_study_id,
-            status="QUEUED",
-            requested=request.count,
-        )
-        await job.insert()
-    except Exception:
-        # Beanie not initialized (in-memory test mode) — still return 202
-        pass
+    job = PersonaGenerationJobDocument(
+        job_id=job_id,
+        study_id=safe_study_id,
+        status="QUEUED",
+        requested=request.count,
+    )
+    await job.insert()
 
     payload = {
         "study_id": safe_study_id,
@@ -309,13 +312,9 @@ async def get_persona_generation_status(
     job_id: str,
 ) -> PersonaGenerationJobStatusResponse:
     """Poll the status of an async persona generation job."""
-    try:
-        doc = await PersonaGenerationJobDocument.find_one(
-            {"job_id": job_id}
-        )
-    except Exception:
-        # Beanie not initialized (in-memory test mode) — treat as not found
-        doc = None
+    doc = await PersonaGenerationJobDocument.find_one(
+        {"job_id": job_id}
+    )
     if doc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
