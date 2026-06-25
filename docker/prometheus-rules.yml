@@ -26,3 +26,64 @@ groups:
               1
             )
           )
+
+  - name: aicbc_alerts
+    rules:
+      - alert: AicbcHighP95Latency
+        expr: aicbc:api_request_p95_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI_CBC API P95 latency is high"
+          description: "P95 latency is {{ $value }}s for endpoint {{ $labels.endpoint }}"
+
+      - alert: AicbcHighP99Latency
+        expr: aicbc:api_request_p99_seconds > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI_CBC API P99 latency is very high"
+
+      - alert: AicbcHighErrorRate
+        expr: |
+          (
+            sum(rate(aicbc_api_requests_total{status=~"5.."}[2m]))
+            /
+            sum(rate(aicbc_api_requests_total[2m]))
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI_CBC API 5xx error rate is above 1%"
+
+      - alert: AicbcWorkerOOMRisk
+        expr: |
+          (
+            process_resident_memory_bytes{job="aicbc-api"}
+            /
+            container_spec_memory_limit_bytes{job="aicbc-api"}
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI_CBC worker memory usage is above 85%"
+
+      - alert: AicbcCeleryQueueBacklog
+        expr: aicbc_queue_size{queue_name="analysis"} > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery analysis queue backlog is above 10"
+
+      - alert: AicbcLLMHighLatency
+        expr: aicbc:llm_p95_seconds > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM P95 latency is above 30s"
