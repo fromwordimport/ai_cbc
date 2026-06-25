@@ -312,9 +312,7 @@ async def get_persona_generation_status(
     job_id: str,
 ) -> PersonaGenerationJobStatusResponse:
     """Poll the status of an async persona generation job."""
-    doc = await PersonaGenerationJobDocument.find_one(
-        PersonaGenerationJobDocument.job_id == job_id
-    )
+    doc = await PersonaGenerationJobDocument.find_one(PersonaGenerationJobDocument.job_id == job_id)
     if doc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

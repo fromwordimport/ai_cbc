@@ -279,7 +279,9 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
 
         Standalone entry point that creates its own event loop.
         """
-        raw_results = asyncio.run(self._batch_core(study_id, count, life_stages, seed, max_concurrency))
+        raw_results = asyncio.run(
+            self._batch_core(study_id, count, life_stages, seed, max_concurrency)
+        )
         profiles, states, summary = self._assemble_batch_results(raw_results)
         summary["concurrency"] = max(1, max_concurrency)
         return profiles, states, summary

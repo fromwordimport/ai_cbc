@@ -258,7 +258,9 @@ def record_persona_generation_task(
 ) -> None:
     """Record persona generation Celery task metrics."""
     metrics = _get_metrics()
-    metrics["persona_generation_duration_seconds"].labels(study_id=study_id).observe(duration_seconds)
+    metrics["persona_generation_duration_seconds"].labels(study_id=study_id).observe(
+        duration_seconds
+    )
     metrics["persona_generation_batch_size"].observe(batch_size)
 
 

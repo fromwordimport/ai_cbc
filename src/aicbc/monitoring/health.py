@@ -252,7 +252,9 @@ async def dashboard_summary() -> dict[str, Any]:
 
     start = datetime.now(UTC)
     study_status_counts = await study_store.acount_studies_by_status()
-    record_mongodb_query_duration("studies", "aggregate_count", (datetime.now(UTC) - start).total_seconds())
+    record_mongodb_query_duration(
+        "studies", "aggregate_count", (datetime.now(UTC) - start).total_seconds()
+    )
 
     total_studies = sum(study_status_counts.values())
 
@@ -263,7 +265,9 @@ async def dashboard_summary() -> dict[str, Any]:
     week_ago = datetime.now(UTC) - timedelta(days=7)
     start = datetime.now(UTC)
     recent_docs, _ = await study_store.alist_recent_studies(week_ago, limit=10)
-    record_mongodb_query_duration("studies", "find_projection", (datetime.now(UTC) - start).total_seconds())
+    record_mongodb_query_duration(
+        "studies", "find_projection", (datetime.now(UTC) - start).total_seconds()
+    )
 
     recent_studies = [
         {

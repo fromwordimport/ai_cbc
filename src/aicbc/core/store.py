@@ -170,10 +170,7 @@ class MemoryQuestionnaireStore:
         with self._lock:
             items = list(self._studies.values())
         total = len(items)
-        recent = [
-            s for s in items
-            if s.created_at >= since
-        ]
+        recent = [s for s in items if s.created_at >= since]
         recent.sort(key=lambda s: s.created_at, reverse=True)
         result = [
             {

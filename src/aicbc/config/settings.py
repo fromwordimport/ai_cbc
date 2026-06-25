@@ -91,7 +91,9 @@ class DatabaseSettings(BaseSettings):
     mongodb_min_connections: int = Field(default=10, alias="MONGODB_MIN_CONNECTIONS")
     mongodb_max_idle_time_ms: int = Field(default=60000, alias="MONGODB_MAX_IDLE_TIME_MS")
     mongodb_wait_queue_timeout_ms: int = Field(default=5000, alias="MONGODB_WAIT_QUEUE_TIMEOUT_MS")
-    mongodb_server_selection_timeout_ms: int = Field(default=5000, alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS")
+    mongodb_server_selection_timeout_ms: int = Field(
+        default=5000, alias="MONGODB_SERVER_SELECTION_TIMEOUT_MS"
+    )
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     redis_password: str = Field(default="", alias="REDIS_PASSWORD")
 

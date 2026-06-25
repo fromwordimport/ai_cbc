@@ -244,9 +244,12 @@ class MongoPersonaStore:
         }
         total = await PersonaDocument.find(query).count()
         start = (page - 1) * page_size
-        cursor = PersonaDocument.get_motor_collection().find(
-            query, projection=projection
-        ).skip(start).limit(page_size)
+        cursor = (
+            PersonaDocument.get_motor_collection()
+            .find(query, projection=projection)
+            .skip(start)
+            .limit(page_size)
+        )
         docs = await cursor.to_list(length=None)
         return docs, total
 
@@ -384,9 +387,12 @@ class MongoQuestionnaireStore:
             "_id": 0,
         }
         total = await StudyDocument.find(query).count()
-        cursor = StudyDocument.get_motor_collection().find(
-            query, projection=projection
-        ).sort("created_at", -1).limit(limit)
+        cursor = (
+            StudyDocument.get_motor_collection()
+            .find(query, projection=projection)
+            .sort("created_at", -1)
+            .limit(limit)
+        )
         docs = await cursor.to_list(length=None)
         return docs, total
 
