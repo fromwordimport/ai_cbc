@@ -112,7 +112,6 @@ async def generate_personas_batch(
     if request.count <= 5:
         log.info("batch_fast_path", count=request.count)
         # ... existing full logic continues below unchanged
-        pass
 
     # P0-001: Pass study_id to ProfileGenerator for per-study cost tracking.
     # Use the DI-injected profile_gen's llm_client so that test overrides apply.
@@ -313,7 +312,7 @@ async def get_persona_generation_status(
 ) -> PersonaGenerationJobStatusResponse:
     """Poll the status of an async persona generation job."""
     doc = await PersonaGenerationJobDocument.find_one(
-        {"job_id": job_id}
+        PersonaGenerationJobDocument.job_id == job_id
     )
     if doc is None:
         raise HTTPException(
@@ -329,7 +328,7 @@ async def get_persona_generation_status(
         failed=doc.failed,
         total_cost_cny=doc.total_cost_cny,
         progress=getattr(doc, "progress", 0.0),
-        bias_failed_count=doc.bias_failed_count,
+        bias_failed_count=getattr(doc, "bias_failed_count", 0),
         bias_warning=doc.bias_warning,
         created_at=doc.created_at,
         updated_at=doc.updated_at,
