@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
 
     old_sigterm = None
     old_sigint = None
+    # signal.signal only works in the main interpreter thread; skip in tests/workers.
     if threading.current_thread() is threading.main_thread():
         old_sigterm = signal.signal(signal.SIGTERM, _handle_signal)
         old_sigint = signal.signal(signal.SIGINT, _handle_signal)
