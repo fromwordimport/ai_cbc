@@ -1,4 +1,4 @@
-"""Celery worker benchmark for analysis tasks."""
+"""Benchmark HB analysis pipeline end-to-end."""
 
 from __future__ import annotations
 
@@ -8,10 +8,35 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 import httpx
+
+
+def _generate_minimal_dataset(
+    n_respondents: int, n_choice_sets: int, n_alternatives: int, study_id: str
+) -> dict[str, Any]:
+    """Generate a minimal synthetic CBC dataset for benchmarking."""
+    choice_records = []
+    for r in range(n_respondents):
+        for cs in range(n_choice_sets):
+            choice_records.append(
+                {
+                    "respondent_id": f"resp-{r:03d}",
+                    "choice_set_id": cs,
+                    "selected_alternative": r % n_alternatives,
+                    "available_alternatives": list(range(n_alternatives)),
+                }
+            )
+    return {
+        "study_id": study_id,
+        "n_respondents": n_respondents,
+        "n_choice_sets": n_choice_sets,
+        "n_alternatives": n_alternatives,
+        "choice_records": choice_records,
+    }
 
 
 def poll_task_status(base_url: str, analysis_id: str, timeout: int = 600) -> dict:
@@ -42,7 +67,7 @@ def main() -> None:
 
     with httpx.Client() as client:
         # 1. Create study
-        client.post(
+        response = client.post(
             f"{base}/api/v1/studies",
             json={
                 "study_id": args.study_id,
@@ -51,31 +76,16 @@ def main() -> None:
             },
             timeout=10.0,
         )
+        response.raise_for_status()
 
         # 2. Upload a minimal dataset (150 respondents x 12 choice sets x 3 alts)
-        n_respondents = 150
-        n_choice_sets = 12
-        n_alternatives = 3
-        choice_records = []
-        for r in range(n_respondents):
-            for cs in range(n_choice_sets):
-                choice_records.append(
-                    {
-                        "respondent_id": f"resp-{r:03d}",
-                        "choice_set_id": cs,
-                        "selected_alternative": r % n_alternatives,
-                        "available_alternatives": list(range(n_alternatives)),
-                    }
-                )
-
-        dataset_payload = {
-            "study_id": args.study_id,
-            "n_respondents": n_respondents,
-            "n_choice_sets": n_choice_sets,
-            "n_alternatives": n_alternatives,
-            "choice_records": choice_records,
-        }
-        client.post(f"{base}/api/v1/studies/{args.study_id}/dataset", json=dataset_payload, timeout=30.0)
+        dataset_payload = _generate_minimal_dataset(150, 12, 3, args.study_id)
+        response = client.post(
+            f"{base}/api/v1/studies/{args.study_id}/dataset",
+            json=dataset_payload,
+            timeout=30.0,
+        )
+        response.raise_for_status()
 
         # 3. Trigger HB analysis
         analysis_id = f"{args.study_id}-hb"
@@ -90,7 +100,7 @@ def main() -> None:
             timeout=10.0,
         )
         response.raise_for_status()
-        queued_at = time.perf_counter()
+        queued_at = datetime.now(UTC).isoformat()
 
         # 4. Poll to completion
         result = poll_task_status(base, analysis_id)

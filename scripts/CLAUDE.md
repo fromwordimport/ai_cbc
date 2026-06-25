@@ -10,6 +10,7 @@ This directory contains **utility scripts** for development, verification, and b
 
 | File | Purpose |
 |------|---------|
+| `benchmark_worker.py` | End-to-end HB analysis benchmark: creates study, uploads synthetic dataset, triggers HB analysis, polls to completion |
 | `check_commit_msg.py` | Validate conventional commit messages for commit-msg hooks and local CI |
 | `batch_simulate.py` | End-to-end batch simulation CLI (persona generation → bias audit → questionnaire → choice simulation → export) |
 | `verify_endpoints.py` | Endpoint verification using FastAPI `TestClient` with mocked LLM |
