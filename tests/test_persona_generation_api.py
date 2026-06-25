@@ -13,7 +13,7 @@ from aicbc.main import app
 
 
 @pytest.fixture
-async def client() -> AsyncClient:
+async def async_client() -> AsyncClient:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
@@ -64,14 +64,14 @@ class _MockPersonaGenerationJobDocument:
 class TestAsyncPersonaGeneration:
     """Tests for async persona generation endpoints."""
 
-    async def test_generate_personas_async_returns_202(self, client: AsyncClient):
+    async def test_generate_personas_async_returns_202(self, async_client: AsyncClient):
         with patch(
             "aicbc.api.routes.personas.PersonaGenerationJobDocument",
             _MockPersonaGenerationJobDocument,
         ), patch(
             "aicbc.api.routes.personas.run_persona_generation_task.delay"
         ) as mock_delay:
-            response = await client.post("/api/v1/personas/generate-async", json={
+            response = await async_client.post("/api/v1/personas/generate-async", json={
                 "study_id": "async-test",
                 "count": 10,
             })
@@ -84,7 +84,7 @@ class TestAsyncPersonaGeneration:
             assert re.match(r"^pg-async-test-[0-9a-f]{8}$", job_id)
             mock_delay.assert_called_once()
 
-    async def test_get_persona_generation_status_200(self, client: AsyncClient):
+    async def test_get_persona_generation_status_200(self, async_client: AsyncClient):
         expected_job_id = "pg-test-123abc"
         expected_study_id = "test-study"
         expected_status = "RUNNING"
@@ -120,9 +120,10 @@ class TestAsyncPersonaGeneration:
         with patch(
             "aicbc.api.routes.personas.PersonaGenerationJobDocument",
             _MockPersonaGenerationJobDocument,
+        ), patch.object(
+            _MockPersonaGenerationJobDocument, "find_one", AsyncMock(return_value=mock_doc)
         ):
-            _MockPersonaGenerationJobDocument.find_one = AsyncMock(return_value=mock_doc)
-            response = await client.get(
+            response = await async_client.get(
                 f"/api/v1/personas/generation/{expected_job_id}/status"
             )
             assert response.status_code == status.HTTP_200_OK
@@ -140,11 +141,12 @@ class TestAsyncPersonaGeneration:
             assert data["created_at"] == expected_created_at
             assert data["updated_at"] == expected_updated_at
 
-    async def test_get_persona_generation_status_404(self, client: AsyncClient):
+    async def test_get_persona_generation_status_404(self, async_client: AsyncClient):
         with patch(
             "aicbc.api.routes.personas.PersonaGenerationJobDocument",
             _MockPersonaGenerationJobDocument,
+        ), patch.object(
+            _MockPersonaGenerationJobDocument, "find_one", AsyncMock(return_value=None)
         ):
-            _MockPersonaGenerationJobDocument.find_one = AsyncMock(return_value=None)
-            response = await client.get("/api/v1/personas/generation/nonexistent/status")
+            response = await async_client.get("/api/v1/personas/generation/nonexistent/status")
             assert response.status_code == status.HTTP_404_NOT_FOUND
