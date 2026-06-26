@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from pathlib import Path
@@ -537,9 +538,17 @@ class ProfileGenerator:
         )
 
     # ------------------------------------------------------------------
-    # Auxiliary generation (language samples + dishwasher context +
-    # mini_biography + scene_reactions) in a single LLM call.
-    # This preserves the 5-call pattern expected by test mocks.
+    # Auxiliary generation — adaptive dual-pattern support
+    # ------------------------------------------------------------------
+    # After layer 1-4, the 5th LLM call may return EITHER:
+    #   A) Combined auxiliary format (5-call pattern): contains language_samples
+    #      AND dishwasher_context (and optionally mini_biography + scene_reactions).
+    #      -> Use directly, no extra calls.
+    #   B) Narrative-core format (7-call pattern): contains mini_biography and/or
+    #      scene_reactions but NOT language_samples/dishwasher_context.
+    #      -> Treat as narrative core, then make 6th (product context) and 7th
+    #      (language samples) calls.
+    #   C) Empty / malformed -> derive everything from layer results.
     # ------------------------------------------------------------------
 
     def _generate_auxiliary(
@@ -548,13 +557,12 @@ class ProfileGenerator:
         seed_config: SeedConfig,
         layer_results: dict[int, dict[str, Any]],
     ) -> tuple[dict[str, Any], LLMResponse | None]:
-        """Generate all auxiliary data via a single LLM call.
-
-        On failure or misaligned response, falls back to defaults derived
-        from layer data so that every persona remains unique and bias-safe.
+        """Generate auxiliary data adaptively based on the 5th LLM response format.
 
         Returns:
-            Tuple of (aux_data_dict, llm_response_or_none).
+            Tuple of (aux_data_dict, llm_response_or_none).  The response is the
+            *first* auxiliary LLM call (combined or narrative core), used for
+            cost tracking.
         """
         log = logger.bind(persona_id=persona_id, task="auxiliary")
 
@@ -624,7 +632,39 @@ class ProfileGenerator:
             log.warning("auxiliary_generation_failed", error=str(exc))
             return self._derive_auxiliary_from_layers(persona_id, layer_results), None
 
-        # Validate and build auxiliary data dict
+        # ------------------------------------------------------------------
+        # Pattern detection
+        # ------------------------------------------------------------------
+        has_combined_keys = "language_samples" in parsed or "dishwasher_context" in parsed
+        has_narrative_keys = "mini_biography" in parsed or "scene_reactions" in parsed
+
+        # Pattern A: Combined auxiliary (5-call pattern)
+        if has_combined_keys:
+            log.info("auxiliary_pattern_detected", pattern="combined")
+            return self._parse_combined_auxiliary(parsed, persona_id, layer_results), response
+
+        # Pattern B: Narrative core only (7-call pattern)
+        if has_narrative_keys:
+            log.info("auxiliary_pattern_detected", pattern="narrative_core")
+            return self._continue_narrative_core_pattern(
+                parsed, persona_id, seed_config, layer_results, response
+            )
+
+        # Pattern C: Empty / malformed — fallback
+        log.warning("auxiliary_pattern_detected", pattern="fallback")
+        return self._derive_auxiliary_from_layers(persona_id, layer_results), response
+
+    # ------------------------------------------------------------------
+    # Pattern A: Combined auxiliary (single LLM call)
+    # ------------------------------------------------------------------
+
+    def _parse_combined_auxiliary(
+        self,
+        parsed: dict[str, Any],
+        persona_id: str,
+        layer_results: dict[int, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Parse a combined-format auxiliary response (language_samples + context)."""
         aux_data: dict[str, Any] = {}
 
         # Language samples
@@ -651,7 +691,54 @@ class ProfileGenerator:
         except Exception:
             aux_data["dishwasher_context"] = DishwasherContext()
 
-        # Mini biography
+        # Mini biography (optional in combined format)
+        mb_data = parsed.get("mini_biography")
+        if isinstance(mb_data, dict):
+            with contextlib.suppress(Exception):
+                aux_data["mini_biography"] = MiniBiography(
+                    past=mb_data.get("past", "成长过程中的一次具体消费经历塑造了她的价值观。"),
+                    present=mb_data.get("present", "在日常工作和家庭责任之间寻找平衡。"),
+                    future=mb_data.get("future", "担忧即将到来的大额支出与生活质量之间的冲突。"),
+                )
+        if "mini_biography" not in aux_data:
+            fallback = self._derive_auxiliary_from_layers(persona_id, layer_results)
+            aux_data["mini_biography"] = fallback["mini_biography"]
+
+        # Scene reactions (optional in combined format)
+        sr_data = parsed.get("scene_reactions")
+        if isinstance(sr_data, dict):
+            with contextlib.suppress(Exception):
+                aux_data["scene_reactions"] = SceneReactions(
+                    under_pressure=sr_data.get("under_pressure", "压力下会先搜索信息但延迟决策"),
+                    friend_recommendation=sr_data.get("friend_recommendation", "会询问细节但保持独立判断"),
+                    flash_sale_limited=sr_data.get("flash_sale_limited", "容易冲动加购但可能不结算"),
+                    found_cheaper_elsewhere=sr_data.get("found_cheaper_elsewhere", "感到后悔并考虑退换"),
+                    product_fault_after_sales=sr_data.get("product_fault_after_sales", "先查攻略再联系售后"),
+                )
+        if "scene_reactions" not in aux_data:
+            fallback = self._derive_auxiliary_from_layers(persona_id, layer_results)
+            aux_data["scene_reactions"] = fallback["scene_reactions"]
+
+        return aux_data
+
+    # ------------------------------------------------------------------
+    # Pattern B: Narrative core → product context → language samples
+    # ------------------------------------------------------------------
+
+    def _continue_narrative_core_pattern(
+        self,
+        parsed: dict[str, Any],
+        persona_id: str,
+        seed_config: SeedConfig,
+        layer_results: dict[int, dict[str, Any]],
+        first_response: LLMResponse,
+    ) -> tuple[dict[str, Any], LLMResponse]:
+        """Continue the 7-call pattern: narrative core (done) + product context + language samples."""
+        log = logger.bind(persona_id=persona_id, task="narrative_core_continuation")
+
+        aux_data: dict[str, Any] = {}
+
+        # Parse narrative core from the 5th call
         mb_data = parsed.get("mini_biography", {})
         try:
             aux_data["mini_biography"] = MiniBiography(
@@ -666,7 +753,6 @@ class ProfileGenerator:
                 future="担忧即将到来的大额支出与生活质量之间的冲突。",
             )
 
-        # Scene reactions
         sr_data = parsed.get("scene_reactions", {})
         try:
             aux_data["scene_reactions"] = SceneReactions(
@@ -685,7 +771,116 @@ class ProfileGenerator:
                 product_fault_after_sales="先查攻略再联系售后",
             )
 
-        return aux_data, response
+        # 6th call: product context (eligibility, reason, dishwasher_context)
+        product_prompt = (
+            "基于以下消费者画像，判断其对洗碗机的购买资格并生成购买情境。\n\n"
+            f"【消费者画像】\n{self._build_compact_summary(seed_config, layer_results)}\n\n"
+            "【输出格式】严格返回JSON：\n"
+            + json.dumps(
+                {
+                    "eligibility": "latent_need | actively_considering | not_applicable",
+                    "reason": "判断理由",
+                    "dishwasher_context": {
+                        "purchase_constraints": ["约束1"],
+                        "decision_factors": ["因素1"],
+                        "ignored_factors": ["忽略1"],
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+
+        try:
+            product_response = self._llm.generate(
+                messages=[
+                    {"role": "system", "content": "你是一个专业的消费者研究专家。"},
+                    {"role": "user", "content": product_prompt},
+                ],
+                json_mode=True,
+                study_id=self._study_id,
+            )
+            product_parsed = json.loads(product_response.content)
+        except Exception as exc:
+            log.warning("product_context_generation_failed", error=str(exc))
+            product_parsed = {}
+
+        dc_data = product_parsed.get("dishwasher_context", {})
+        try:
+            aux_data["dishwasher_context"] = DishwasherContext(
+                purchase_constraints=dc_data.get("purchase_constraints", ["厨房空间限制"]),
+                decision_factors=dc_data.get("decision_factors", ["价格", "品牌", "功能"]),
+                ignored_factors=dc_data.get("ignored_factors", ["外观设计"]),
+            )
+        except Exception:
+            aux_data["dishwasher_context"] = DishwasherContext()
+
+        # 7th call: language samples
+        lang_prompt = (
+            "基于以下消费者画像，生成3条代表性发言（语言样本），每条20-60字。\n\n"
+            f"【消费者画像】\n{self._build_compact_summary(seed_config, layer_results)}\n\n"
+            "【输出格式】严格返回JSON：\n"
+            + json.dumps(
+                {
+                    "language_samples": [
+                        "第一条代表性发言，20-60字",
+                        "第二条代表性发言，20-60字",
+                        "第三条代表性发言，20-60字",
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+
+        try:
+            lang_response = self._llm.generate(
+                messages=[
+                    {"role": "system", "content": "你是一个专业的消费者研究专家。"},
+                    {"role": "user", "content": lang_prompt},
+                ],
+                json_mode=True,
+                study_id=self._study_id,
+            )
+            lang_parsed = json.loads(lang_response.content)
+        except Exception as exc:
+            log.warning("language_samples_generation_failed", error=str(exc))
+            lang_parsed = {}
+
+        samples = lang_parsed.get("language_samples", [])
+        if isinstance(samples, list) and len(samples) == 3:
+            validated: list[str] = []
+            for s in samples:
+                if isinstance(s, str) and 20 <= len(s.strip()) <= 60:
+                    validated.append(s.strip())
+                else:
+                    validated.append(self._default_language_samples()[len(validated)])
+            aux_data["language_samples"] = validated
+        else:
+            aux_data["language_samples"] = self._default_language_samples()
+
+        # Return the first response for cost tracking (caller adds its cost)
+        return aux_data, first_response
+
+    def _build_compact_summary(
+        self, seed_config: SeedConfig, layer_results: dict[int, dict[str, Any]]
+    ) -> str:
+        """Build a compact persona summary string for auxiliary prompts."""
+        lines = [
+            f"人生阶段: {seed_config.life_stage}",
+            f"核心焦虑: {', '.join(seed_config.anxieties)}",
+            f"收入: {seed_config.income_bracket}",
+            f"城市: {seed_config.city_tier}",
+        ]
+        for num in range(1, 5):
+            lines.append(f"\nLayer {num}:")
+            for k, v in layer_results[num].items():
+                lines.append(f"  {k}: {v}")
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Fallback: derive all auxiliary data from layer results
+    # ------------------------------------------------------------------
 
     def _derive_auxiliary_from_layers(
         self, persona_id: str, layer_results: dict[int, dict[str, Any]]
