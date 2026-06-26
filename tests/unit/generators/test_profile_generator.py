@@ -5,10 +5,6 @@ All LLM calls are mocked — no real API requests are made.
 
 from __future__ import annotations
 
-import pytest
-
-pytestmark = pytest.mark.unit
-
 import json
 from typing import Any
 from unittest.mock import MagicMock
@@ -26,6 +22,8 @@ from aicbc.generators.profile_generator import (
     ProfileGenerator,
 )
 from aicbc.llm.client import LLMResponse, Provider
+
+pytestmark = pytest.mark.unit
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -153,6 +151,45 @@ def _auxiliary_response() -> dict[str, Any]:
     }
 
 
+def _narrative_core_response() -> dict[str, Any]:
+    return {
+        "mini_biography": {
+            "past": "大学时跟风买奢侈品导致债务危机，形成先研究再购买的习惯。",
+            "present": "工作日晚上做双十一攻略，周末逛奥特莱斯。",
+            "future": "担心教育支出挤占品质生活预算。",
+        },
+        "scene_reactions": {
+            "under_pressure": "压力大时加购但不结算",
+            "friend_recommendation": "先问价格和缺点",
+            "flash_sale_limited": "设闹钟但常错过",
+            "found_cheaper_elsewhere": "纠结要不要退货重买",
+            "product_fault_after_sales": "先小红书查攻略再联系客服",
+        },
+    }
+
+
+def _product_context_response() -> dict[str, Any]:
+    return {
+        "eligibility": "latent_need",
+        "reason": "租房空间小，安装不便",
+        "dishwasher_context": {
+            "purchase_constraints": ["厨房空间小", "租房不便安装"],
+            "decision_factors": ["价格", "品牌口碑", "清洁效果", "安装便利性"],
+            "ignored_factors": ["外观设计", "智能互联"],
+        },
+    }
+
+
+def _language_samples_response() -> dict[str, Any]:
+    return {
+        "language_samples": [
+            "这个洗碗机真的好用吗？我看网上评价褒贬不一，有点纠结要不要入手。",
+            "价格倒是其次，主要是怕买了之后厨房放不下，放着积灰就浪费了。",
+            "如果真能省出每天洗碗的时间，我觉得多花点钱也值得考虑一下吧。",
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Tests: initialization
 # ---------------------------------------------------------------------------
@@ -198,7 +235,9 @@ class TestNormalGeneration:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-001", seed_config)
@@ -226,7 +265,9 @@ class TestNormalGeneration:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         profile_generator.generate("persona-test-002", seed_config)
@@ -253,7 +294,9 @@ class TestNormalGeneration:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         profile_generator.generate("persona-test-003", seed_config)
@@ -279,7 +322,9 @@ class TestFallbackHandling:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-004", seed_config)
@@ -298,7 +343,9 @@ class TestFallbackHandling:
             mock_llm_response_factory("not valid json {["),  # Layer 2 bad JSON
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-005", seed_config)
@@ -317,7 +364,9 @@ class TestFallbackHandling:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-006", seed_config)
@@ -337,7 +386,9 @@ class TestFallbackHandling:
             RuntimeError("Layer 2 failed"),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-007", seed_config)
@@ -350,13 +401,15 @@ class TestFallbackHandling:
     def test_auxiliary_fallback_on_failure(
         self, profile_generator, seed_config, mock_llm_response_factory
     ):
-        """If auxiliary generation fails, default language samples and dishwasher context are used."""
+        """If post-layer generation fails, defaults are used for those components."""
         profile_generator._llm.generate.side_effect = [
             mock_llm_response_factory(_layer1_response()),
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            RuntimeError("Auxiliary failed"),
+            RuntimeError("Narrative core failed"),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-008", seed_config)
@@ -451,7 +504,9 @@ class TestOutputValidation:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-010", seed_config)
@@ -474,7 +529,9 @@ class TestOutputValidation:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-011", seed_config)
@@ -489,7 +546,9 @@ class TestOutputValidation:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-012", seed_config)
@@ -519,7 +578,9 @@ class TestEdgeCases:
             mock_llm_response_factory(_layer2_response()),
             mock_llm_response_factory(_layer3_response()),
             mock_llm_response_factory(_layer4_response()),
-            mock_llm_response_factory(_auxiliary_response()),
+            mock_llm_response_factory(_narrative_core_response()),
+            mock_llm_response_factory(_product_context_response()),
+            mock_llm_response_factory(_language_samples_response()),
         ]
 
         result = profile_generator.generate("persona-test-013", seed)

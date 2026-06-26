@@ -19,6 +19,11 @@ from aicbc.core.models.persona import (
     PersonaProfile,
 )
 from aicbc.core.models.seed_config import SeedConfig
+from aicbc.core.validators.narrative_consistency_checker import NarrativeConsistencyChecker
+from aicbc.core.validators.plausibility_validator import PlausibilityValidator
+from aicbc.core.validators.product_context_deriver import ProductContextDeriver
+from aicbc.generators.language_sample_generator import LanguageSampleGenerator
+from aicbc.generators.narrative_core_generator import NarrativeCoreGenerator
 from aicbc.llm.client import LLMClient, LLMResponse
 
 logger = structlog.get_logger("aicbc.generators")
@@ -209,6 +214,12 @@ class ProfileGenerator:
         self._template = self._load_template()
         self._study_id = study_id
 
+        self._narrative_gen = NarrativeCoreGenerator(llm_client=self._llm)
+        self._product_deriver = ProductContextDeriver(llm_client=self._llm)
+        self._plausibility_validator = PlausibilityValidator()
+        self._language_gen = LanguageSampleGenerator(llm_client=self._llm)
+        self._narrative_checker = NarrativeConsistencyChecker()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -258,10 +269,48 @@ class ProfileGenerator:
         # Derive segment from seed
         segment = f"{seed_config.life_stage}-{seed_config.city_tier}"
 
-        # Generate language samples and dishwasher context using a final prompt
-        language_samples, dishwasher_context = self._generate_auxiliary(
-            persona_id, seed_config, layer_results
+        # Build a preliminary profile for narrative/core derivation.
+        preliminary = PersonaProfile(
+            persona_id=persona_id,
+            segment=segment,
+            layer1_demographics=layer1,
+            layer2_behavior=layer2,
+            layer3_psychology=layer3,
+            layer4_scenarios=layer4,
+            language_samples=self._default_language_samples(),
+            dishwasher_context=DishwasherContext(),
+            generation_metadata=GenerationMetadata(),
         )
+
+        # Narrative core
+        mini_biography, scene_reactions = self._narrative_gen.generate(preliminary)
+        preliminary.mini_biography = mini_biography
+        preliminary.scene_reactions = scene_reactions
+
+        # Product context derivation
+        derived_context = self._product_deriver.derive(preliminary)
+        preliminary.dishwasher_context = derived_context.dishwasher_context
+
+        # Plausibility check
+        plausibility = self._plausibility_validator.validate(preliminary, derived_context)
+        if plausibility.hard_failed:
+            log.warning(
+                "plausibility_hard_failed",
+                findings=[f.rule_id for f in plausibility.findings],
+            )
+            # We still return the profile; the agent decides whether to regenerate.
+
+        # Narrative consistency check (diagnostic)
+        consistency = self._narrative_checker.check(preliminary)
+        if consistency.unexplained_tags:
+            log.warning(
+                "narrative_consistency_issues",
+                unexplained_tags=consistency.unexplained_tags,
+                score=consistency.contradiction_score,
+            )
+
+        # Language samples from narrative core
+        language_samples = self._language_gen.generate(preliminary)
 
         profile = PersonaProfile(
             persona_id=persona_id,
@@ -270,8 +319,10 @@ class ProfileGenerator:
             layer2_behavior=layer2,
             layer3_psychology=layer3,
             layer4_scenarios=layer4,
+            mini_biography=mini_biography,
+            scene_reactions=scene_reactions,
             language_samples=language_samples,
-            dishwasher_context=dishwasher_context,
+            dishwasher_context=derived_context.dishwasher_context,
             generation_metadata=GenerationMetadata(
                 model=model_used or "unknown",
                 version="1.0",
@@ -284,6 +335,8 @@ class ProfileGenerator:
             "profile_generation_complete",
             segment=segment,
             cost_cny=profile.generation_metadata.cost_cny,
+            plausibility_passed=plausibility.passed,
+            narrative_score=consistency.contradiction_score,
             llm_cache_hits=self._llm.cache_hits,
             llm_cache_misses=self._llm.cache_misses,
             llm_cache_size=self._llm.cache_size,
@@ -423,123 +476,11 @@ class ProfileGenerator:
         log.info("layer_generation_success", layer=layer_num)
         return validated, response
 
-    # ------------------------------------------------------------------
-    # Auxiliary generation (language samples + dishwasher context)
-    # ------------------------------------------------------------------
-
-    def _generate_auxiliary(
-        self,
-        persona_id: str,
-        seed_config: SeedConfig,
-        layer_results: dict[int, dict[str, Any]],
-    ) -> tuple[list[str], DishwasherContext]:
-        """Generate language samples and dishwasher context.
-
-        This uses a single LLM call that requests both outputs together.
-        On failure, sensible defaults are returned.
-
-        Args:
-            persona_id: Persona identifier.
-            seed_config: Seed configuration.
-            layer_results: All four generated layers.
-
-        Returns:
-            Tuple of (language_samples_list, DishwasherContext).
-        """
-        log = logger.bind(persona_id=persona_id, task="auxiliary")
-
-        # Build a compact persona summary for the auxiliary prompt
-        summary_lines = [
-            f"人生阶段: {seed_config.life_stage}",
-            f"核心焦虑: {', '.join(seed_config.anxieties)}",
-            f"收入: {seed_config.income_bracket}",
-            f"城市: {seed_config.city_tier}",
-        ]
-        for num in range(1, 5):
-            summary_lines.append(f"\nLayer {num}:")
-            for k, v in layer_results[num].items():
-                summary_lines.append(f"  {k}: {v}")
-
-        persona_summary = "\n".join(summary_lines)
-
-        auxiliary_prompt = (
-            "基于以下完整的消费者画像，生成：\n"
-            "1. 3条代表性发言（语言样本），每条20-60字，体现该消费者的语言风格和典型态度\n"
-            "2. 洗碗机购买情境（DishwasherContext），包括购买约束、决策因素、忽略因素\n\n"
-            f"【消费者画像】\n{persona_summary}\n\n"
-            "【输出格式】严格返回JSON，不要包含任何Markdown代码块标记：\n"
-            + json.dumps(
-                {
-                    "language_samples": [
-                        "第一条代表性发言，20-60字",
-                        "第二条代表性发言，20-60字",
-                        "第三条代表性发言，20-60字",
-                    ],
-                    "dishwasher_context": {
-                        "purchase_constraints": ["购买约束1", "购买约束2"],
-                        "decision_factors": ["决策因素1", "决策因素2", "决策因素3"],
-                        "ignored_factors": ["忽略因素1"],
-                    },
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-
-        try:
-            response = self._llm.generate(
-                messages=[
-                    {"role": "system", "content": "你是一个专业的消费者研究专家。"},
-                    {"role": "user", "content": auxiliary_prompt},
-                ],
-                json_mode=True,
-                study_id=self._study_id,
-            )
-            parsed = json.loads(response.content)
-        except Exception as exc:
-            log.warning("auxiliary_generation_failed", error=str(exc))
-            return self._default_language_samples(), self._default_dishwasher_context()
-
-        language_samples = parsed.get("language_samples", [])
-        if not isinstance(language_samples, list) or len(language_samples) != 3:
-            log.warning("language_samples_invalid", samples=language_samples)
-            language_samples = self._default_language_samples()
-
-        # Validate sample lengths (20-60 chars)
-        validated_samples = []
-        for sample in language_samples:
-            if isinstance(sample, str) and 20 <= len(sample.strip()) <= 60:
-                validated_samples.append(sample.strip())
-            else:
-                validated_samples.append(self._default_language_samples()[len(validated_samples)])
-
-        dc_data = parsed.get("dishwasher_context", {})
-        try:
-            dishwasher_context = DishwasherContext(
-                purchase_constraints=dc_data.get("purchase_constraints", ["厨房空间限制"]),
-                decision_factors=dc_data.get("decision_factors", ["价格", "品牌", "功能"]),
-                ignored_factors=dc_data.get("ignored_factors", ["外观设计"]),
-            )
-        except Exception as exc:
-            log.warning("dishwasher_context_invalid", error=str(exc))
-            dishwasher_context = self._default_dishwasher_context()
-
-        return validated_samples, dishwasher_context
-
     @staticmethod
     def _default_language_samples() -> list[str]:
-        """Return default language samples."""
+        """Return default language samples for the preliminary profile."""
         return [
             "这个洗碗机真的好用吗？我看网上评价褒贬不一，有点纠结。",
             "价格倒是其次，主要是怕买了之后家里老人不会用，放着积灰。",
             "如果真能省出每天洗碗的时间，我觉得多花点钱也值得考虑。",
         ]
-
-    @staticmethod
-    def _default_dishwasher_context() -> DishwasherContext:
-        """Return default dishwasher context."""
-        return DishwasherContext(
-            purchase_constraints=["厨房空间限制", "预算范围"],
-            decision_factors=["价格", "品牌口碑", "清洁效果", "能耗等级"],
-            ignored_factors=["外观设计", "智能互联功能"],
-        )
