@@ -44,7 +44,9 @@ class NarrativeCoreGenerator:
         prompt_template_path: Path | str | None = None,
     ) -> None:
         self._llm = llm_client or LLMClient()
-        self._prompt_path = Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        self._prompt_path = (
+            Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        )
         self._template = self._prompt_path.read_text(encoding="utf-8")
 
     def generate(self, persona: PersonaProfile) -> tuple[MiniBiography, SceneReactions]:
@@ -53,7 +55,10 @@ class NarrativeCoreGenerator:
         try:
             response = self._llm.generate(
                 messages=[
-                    {"role": "system", "content": "你是一个资深的消费者研究专家，擅长把标签化画像还原成有故事的人。"},
+                    {
+                        "role": "system",
+                        "content": "你是一个资深的消费者研究专家，擅长把标签化画像还原成有故事的人。",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 json_mode=True,

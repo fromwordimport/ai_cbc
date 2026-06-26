@@ -32,7 +32,9 @@ class LanguageSampleGenerator:
         prompt_template_path: Path | str | None = None,
     ) -> None:
         self._llm = llm_client or LLMClient()
-        self._prompt_path = Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        self._prompt_path = (
+            Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        )
         self._template = self._prompt_path.read_text(encoding="utf-8")
 
     def generate(self, persona: PersonaProfile) -> list[str]:
@@ -41,7 +43,10 @@ class LanguageSampleGenerator:
         try:
             response = self._llm.generate(
                 messages=[
-                    {"role": "system", "content": "你是一个消费者研究专家，擅长模仿真实人物的说话方式。"},
+                    {
+                        "role": "system",
+                        "content": "你是一个消费者研究专家，擅长模仿真实人物的说话方式。",
+                    },
                     {"role": "user", "content": prompt},
                 ],
                 json_mode=True,

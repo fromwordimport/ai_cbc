@@ -66,7 +66,9 @@ class ProductContextDeriver:
         prompt_template_path: Path | str | None = None,
     ) -> None:
         self._llm = llm_client or LLMClient()
-        self._prompt_path = Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        self._prompt_path = (
+            Path(prompt_template_path) if prompt_template_path else DEFAULT_PROMPT_PATH
+        )
         self._template = self._prompt_path.read_text(encoding="utf-8")
 
     def derive(self, persona: PersonaProfile) -> DerivedProductContext:
@@ -106,12 +108,8 @@ class ProductContextDeriver:
                 purchase_constraints=parsed.get("dishwasher_context", {}).get(
                     "purchase_constraints", []
                 ),
-                decision_factors=parsed.get("dishwasher_context", {}).get(
-                    "decision_factors", []
-                ),
-                ignored_factors=parsed.get("dishwasher_context", {}).get(
-                    "ignored_factors", []
-                ),
+                decision_factors=parsed.get("dishwasher_context", {}).get("decision_factors", []),
+                ignored_factors=parsed.get("dishwasher_context", {}).get("ignored_factors", []),
             ),
         )
 

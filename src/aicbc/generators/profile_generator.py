@@ -282,9 +282,7 @@ class ProfileGenerator:
 
         # Generate all auxiliary data in a single LLM call (preserves the 5-call
         # pattern expected by test mocks: 4 layers + 1 auxiliary).
-        aux_data, aux_response = self._generate_auxiliary(
-            persona_id, seed_config, layer_results
-        )
+        aux_data, aux_response = self._generate_auxiliary(persona_id, seed_config, layer_results)
         if aux_response:
             total_cost_usd += aux_response.estimated_cost_usd
             if not model_used:
@@ -690,10 +688,18 @@ class ProfileGenerator:
             with contextlib.suppress(Exception):
                 aux_data["scene_reactions"] = SceneReactions(
                     under_pressure=sr_data.get("under_pressure", "压力下会先搜索信息但延迟决策"),
-                    friend_recommendation=sr_data.get("friend_recommendation", "会询问细节但保持独立判断"),
-                    flash_sale_limited=sr_data.get("flash_sale_limited", "容易冲动加购但可能不结算"),
-                    found_cheaper_elsewhere=sr_data.get("found_cheaper_elsewhere", "感到后悔并考虑退换"),
-                    product_fault_after_sales=sr_data.get("product_fault_after_sales", "先查攻略再联系售后"),
+                    friend_recommendation=sr_data.get(
+                        "friend_recommendation", "会询问细节但保持独立判断"
+                    ),
+                    flash_sale_limited=sr_data.get(
+                        "flash_sale_limited", "容易冲动加购但可能不结算"
+                    ),
+                    found_cheaper_elsewhere=sr_data.get(
+                        "found_cheaper_elsewhere", "感到后悔并考虑退换"
+                    ),
+                    product_fault_after_sales=sr_data.get(
+                        "product_fault_after_sales", "先查攻略再联系售后"
+                    ),
                 )
         if "scene_reactions" not in aux_data:
             fallback = self._derive_auxiliary_from_layers(persona_id, layer_results)
@@ -737,10 +743,16 @@ class ProfileGenerator:
         try:
             aux_data["scene_reactions"] = SceneReactions(
                 under_pressure=sr_data.get("under_pressure", "压力下会先搜索信息但延迟决策"),
-                friend_recommendation=sr_data.get("friend_recommendation", "会询问细节但保持独立判断"),
+                friend_recommendation=sr_data.get(
+                    "friend_recommendation", "会询问细节但保持独立判断"
+                ),
                 flash_sale_limited=sr_data.get("flash_sale_limited", "容易冲动加购但可能不结算"),
-                found_cheaper_elsewhere=sr_data.get("found_cheaper_elsewhere", "感到后悔并考虑退换"),
-                product_fault_after_sales=sr_data.get("product_fault_after_sales", "先查攻略再联系售后"),
+                found_cheaper_elsewhere=sr_data.get(
+                    "found_cheaper_elsewhere", "感到后悔并考虑退换"
+                ),
+                product_fault_after_sales=sr_data.get(
+                    "product_fault_after_sales", "先查攻略再联系售后"
+                ),
             )
         except Exception:
             aux_data["scene_reactions"] = SceneReactions(
@@ -883,7 +895,10 @@ class ProfileGenerator:
         price_sensitivity = l2.get("price_sensitivity", "中等敏感")
         tension_labels = l3.get("tension_combination", {}).get("labels", ["理性消费", "冲动消费"])
         # Replace bias-triggering label for female personas
-        _ = ["消费克制" if label == "冲动消费" and gender == "女" else label for label in tension_labels]
+        _ = [
+            "消费克制" if label == "冲动消费" and gender == "女" else label
+            for label in tension_labels
+        ]
         daily_routine = l4.get("daily_routine", "工作日朝九晚六，周末居家休息或社交活动")
         purchase_trigger = l4.get("purchase_trigger", "社交媒体种草或朋友推荐")
 
