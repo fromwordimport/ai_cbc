@@ -1,176 +1,161 @@
-# 在 Azure VM 上部署 cloudflared 并切换 DNS 至 Cloudflare Tunnel
+# Cloudflare Tunnel 部署与 DNS 切换手册
 
-> **任务**：将生产环境入口从 Azure 公共 IP 迁移到 Task 1 创建的 Cloudflare Tunnel。  
-> **执行方式**：以下步骤需在真实的 Azure VM 和 Cloudflare Dashboard 上由人工执行。  
-> **适用分支**：`feature/azure-public-ip-alternative`
+> **版本**：v1.0  
+> **日期**：2026-06-26  
+> **状态**：待实施  
+> **负责人**：小维（DevOps/MLOps）  
+> **前置条件**：已完成 [Cloudflare Tunnel 人工配置手册](MANUAL-cloudflare-setup.md)（Task 1），已获取 `CF_TUNNEL_TOKEN` 和 Tunnel ID。
 
----
+## 概述
 
-## 前置条件
-
-- Azure VM 已安装 Docker（`setup-azure-vm.sh` 已完成）。
-- Cloudflare Tunnel 已在 Task 1 中创建，且 `CF_TUNNEL_TOKEN` 已保存到 GitHub Secrets 或已安全传输到 VM。
-- 拥有 Cloudflare Dashboard 的 DNS 编辑权限。
-- 当前 DNS 记录：`api.example.com` → A 记录（Azure 公共 IP）。
+本文档指导人工操作员在 Azure VM 上部署 cloudflared 容器，并将生产流量从 Azure 公共 IP 切换到 Cloudflare Tunnel。所有涉及真实 VM 和 Cloudflare 仪表盘的步骤必须由持有相应权限的人员手动执行。
 
 ---
 
-## Step 1：在 VM 上执行 cloudflared 安装脚本
+## 步骤 1：在 VM 上执行 cloudflared 安装脚本
 
-SSH 登录到 Azure VM，然后执行：
+1. 通过 SSH 登录到 Azure B2ats v2 VM：
+   ```bash
+   ssh user@<vm-public-ip>
+   ```
 
-```bash
-export CF_TUNNEL_TOKEN="your-token-here"
-bash scripts/setup-cloudflared.sh
-```
+2. 进入项目目录：
+   ```bash
+   cd ~/ai_cbc
+   ```
 
-**说明**：
-- `setup-cloudflared.sh` 会拉取 `cloudflare/cloudflared:latest` 镜像并以 host 网络模式运行容器。
-- 脚本内置 30 秒健康检查，若日志中出现 `Registered tunnel connection` 或 `Active` 则自动退出并返回 0。
-- 若失败，脚本会打印最近 30 行日志供排查。
+3. 设置环境变量并执行脚本：
+   ```bash
+   export CF_TUNNEL_TOKEN="your-tunnel-token-here"
+   bash scripts/setup-cloudflared.sh
+   ```
+   - `CF_TUNNEL_TOKEN` 为 Cloudflare Tunnel 创建时生成的 JWT 字符串（以 `eyJ` 开头）。
+   - 若 token 已写入 VM 的 `/etc/environment` 或 systemd 环境变量，可直接执行脚本。
 
----
+4. 脚本执行完成后，预期输出：
+   ```
+   cloudflared 隧道连接已注册
+   ```
 
-## Step 2：验证 cloudflared 运行状态
-
-使用本任务提供的辅助脚本：
-
-```bash
-bash scripts/check-tunnel.sh
-```
-
-**期望输出**：
-
-```
-=== cloudflared 容器状态: 运行中 ===
-
-=== 最近 30 行日志 ===
-... Registered tunnel connection ...
-... Active ...
-```
-
-**手动验证**（如脚本不可用）：
-
-```bash
-docker ps -f name=cloudflared
-docker logs --tail 50 cloudflared
-```
+**验证标准**：脚本以退出码 0 结束，且输出包含 `cloudflared 隧道连接已注册`。
 
 ---
 
-## Step 3：降低 DNS TTL
+## 步骤 2：验证 cloudflared 运行状态
 
-在 Cloudflare Dashboard 中：
+1. 查看 cloudflared 容器日志：
+   ```bash
+   docker logs --tail 50 cloudflared
+   ```
 
-1. 进入目标域名的 **DNS** → **记录**。
-2. 找到 `api.example.com` 的 A 记录。
-3. 将 **TTL** 从默认值（如 Auto / 1 小时）改为 **300 秒**（5 分钟）或更低。
-4. 保存。
+2. 预期日志内容包含以下关键字：
+   - `Registered tunnel connection` — 表示隧道已成功注册到 Cloudflare。
+   - `Active` 或 `connIndex=0` 连接状态 — 表示隧道处于活跃状态。
 
-> **目的**：缩短 TTL 可让后续 DNS 切换更快生效，减少回滚时的故障时间。
+3. 使用辅助脚本快速检查：
+   ```bash
+   bash scripts/check-tunnel.sh
+   ```
+   - 退出码 0：容器运行且日志正常。
+   - 退出码 1：容器未运行或日志异常，需排查。
+
+**验证标准**：日志显示 `Registered tunnel connection` 和 `Active` 状态；`check-tunnel.sh` 返回退出码 0。
 
 ---
 
-## Step 4：切换 DNS 记录
+## 步骤 3：降低 DNS TTL
 
-在同一 Cloudflare Dashboard 页面，**优先使用编辑方式**，避免删除 A 记录导致服务中断：
+在切换 DNS 记录前，先将目标子域名的 TTL 调低，以缩短全球 DNS 缓存刷新时间，避免切换后长时间无法生效。
 
-### 推荐方式：直接编辑 A 记录为 CNAME
+1. 打开浏览器，访问 [Cloudflare 仪表盘](https://dash.cloudflare.com)。
+2. 选择目标域名（如 `example.com`），进入 **DNS** → **记录**。
+3. 找到现有的 `A` 记录：
+   - 名称：`api`（或你的子域名前缀）
+   - 内容：当前 Azure VM 的公共 IP 地址
+4. 点击该记录右侧的 **编辑** 按钮。
+5. 将 **TTL** 字段修改为 **300 秒**（或更低，如 1 分钟/Auto）。
+6. 点击 **保存**。
 
-1. 找到现有的 `api.example.com` A 记录（指向 Azure 公共 IP）。
-2. **编辑**该记录：
-   - **类型**：改为 `CNAME`
-   - **目标**：`<tunnel-id>.cfargotunnel.com`（将 `<tunnel-id>` 替换为 Task 1 中创建的 Tunnel ID）
-   - **代理状态**：**已代理**（橙色云图标，即 Proxy status = Enabled）
-   - **TTL**：Auto（或保持 300 秒）
-3. 保存。
+> **注意**：若原 TTL 为 1 小时（3600 秒），则需等待最多 1 小时让旧 TTL 在全球 DNS 缓存中过期。建议在非高峰时段提前执行此步骤。
 
-> **警告**：在确认隧道状态为 `Active` 之前，**不要删除 A 记录**。删除后若隧道未就绪，将立即失去入口，导致服务完全不可访问。
+**验证标准**：DNS 记录页面显示该 `A` 记录的 TTL 为 300 秒或更低。
 
-### 备选方式：删除后新建（仅当 DNS 提供商不支持 A 改 CNAME 时）
+---
 
-若你的 DNS 提供商或 Cloudflare Dashboard 不支持将 A 记录直接编辑为 CNAME，请按以下顺序操作：
+## 步骤 4：切换 DNS 记录
 
-1. **先确认隧道状态**：执行 `bash scripts/check-tunnel.sh`，确认日志中包含 `Registered tunnel connection` 和 `Active`。
-2. **删除**现有的 `api.example.com` A 记录（指向 Azure 公共 IP）。
-3. **新建**一条 `api.example.com` 记录：
-   - **类型**：`CNAME`
+待旧 TTL 过期后（或确认缓存已刷新），将 DNS 记录从 A 记录切换为 CNAME 记录。
+
+1. 在 Cloudflare DNS 记录页面，找到目标子域名（如 `api`）的 `A` 记录。
+2. 点击该记录右侧的 **编辑** 按钮。
+3. 修改记录类型和参数：
+   - **类型**：将 `A` 改为 `CNAME`
    - **目标**：`<tunnel-id>.cfargotunnel.com`
-   - **代理状态**：**已代理**（橙色云图标）
-   - **TTL**：Auto（或保持 300 秒）
-4. 保存。
+     - 例如：`12345678-1234-1234-1234-123456789abc.cfargotunnel.com`
+   - **代理状态**：**已启用**（橙色云图标）
+   - **TTL**：保持 300 秒或 Auto
+4. 点击 **保存**。
+
+> **注意**：CNAME 目标中的 `<tunnel-id>` 为 Cloudflare Tunnel 创建时分配的 UUID，可在 Zero Trust → Networks → Tunnels → 隧道详情页的 **Overview** 标签页找到。
+
+**验证标准**：DNS 记录列表中显示 `api.example.com` 为 `CNAME` 类型，目标为 `<tunnel-id>.cfargotunnel.com`，代理状态为橙色云。
 
 ---
 
-## Step 5：验证外部访问
+## 步骤 5：验证外部访问
 
-等待 TTL 过期（最多 5 分钟），然后在本地终端执行：
+等待 DNS 传播完成后（通常几分钟内，取决于 TTL），从本地机器验证外部访问。
 
-```bash
-# 验证 DNS 已指向 Cloudflare Tunnel
-curl -I https://api.example.com/health
+1. 检查 DNS 解析：
+   ```bash
+   nslookup api.example.com
+   ```
+   - 预期返回：CNAME 链指向 `<tunnel-id>.cfargotunnel.com`，最终解析到 Cloudflare 边缘节点 IP（如 `104.16.x.x` 或 `172.64.x.x`）。
 
-# 验证 DNS 解析结果
-nslookup api.example.com
-```
+2. 检查 HTTP 连通性：
+   ```bash
+   curl -I https://api.example.com/health
+   ```
+   - 预期返回：HTTP/2 200 OK，响应头包含 `cloudflare` 或 `cf-ray` 等 Cloudflare 标识。
 
-**期望结果**：
+3. 检查端到端业务接口：
+   ```bash
+   curl https://api.example.com/health
+   ```
+   - 预期返回 JSON：`{"status":"ok"}` 或类似健康检查响应。
 
-- `curl -I https://api.example.com/health` 返回 `HTTP/1.1 200 OK`（或 `HTTP/2 200`）。
-- `nslookup api.example.com` 返回的 `canonical name` 为 `<tunnel-id>.cfargotunnel.com`，且解析 IP 为 Cloudflare 边缘节点 IP（非 Azure 公共 IP）。
+**验证标准**：`nslookup` 返回 Cloudflare CNAME 链；`curl -I` 返回 200 OK；业务接口响应正常。
 
 ---
 
 ## 回滚步骤
 
-若切换后出现问题，按以下顺序回滚：
+若切换后出现问题，可按以下步骤回滚到 Azure 公共 IP 方案：
 
-### 1. 停止 cloudflared
+1. **停止 cloudflared 容器**：
+   ```bash
+   docker stop cloudflared && docker rm cloudflared
+   ```
 
-```bash
-docker stop cloudflared
-docker rm cloudflared
-```
+2. **切换 DNS 记录回 A 记录**：
+   - 在 Cloudflare DNS 记录页面，将 `api.example.com` 的 `CNAME` 记录改回 `A` 记录。
+   - **内容**：填写原 Azure VM 的公共 IP 地址（切换前记录的值）。
+   - **代理状态**：保持橙色云（已启用）。
+   - **TTL**：可恢复为原值（如 1 小时）。
 
-### 2. 恢复 DNS 为 A 记录
+3. **重新绑定公共 IP（如已解绑）**：
+   - 若已在 Azure 门户中解绑公共 IP，需重新绑定到 VM 的网络接口。
+   - 在 Azure 门户 → 虚拟机 → 网络 → 网络接口 → IP 配置 → 关联公共 IP。
 
-在 Cloudflare Dashboard：
+4. **验证回滚**：
+   ```bash
+   nslookup api.example.com
+   curl -I https://api.example.com/health
+   ```
+   - 预期 `nslookup` 返回 Azure 公共 IP；`curl` 返回 200 OK。
 
-1. 删除 `api.example.com` 的 CNAME 记录。
-2. 重新添加 A 记录：
-   - **类型**：`A`
-   - **IPv4 地址**：Azure 公共 IP（原 IP）
-   - **代理状态**：按需（若之前为橙色云，保持已代理）
-   - **TTL**：300 秒或更低
-3. 保存。
-
-### 3. 重新绑定公共 IP（如已解绑）
-
-若 Azure VM 的公共 IP 已被解绑或释放：
-
-1. 登录 Azure Portal → 虚拟机 → 网络设置。
-2. 将公共 IP 重新关联到 VM 的网络接口。
-3. 确认防火墙规则（如 NSG、ufw）仍允许 443 入站。
-
-### 4. 验证回滚
-
-```bash
-curl -I https://api.example.com/health
-nslookup api.example.com
-```
-
-确认 `nslookup` 返回 Azure 公共 IP，且 `curl` 返回 200 OK。
+> **注意**：回滚后 cloudflared 容器已停止，Tunnel 状态在 Cloudflare 控制台会显示为 **Down**，这是正常的，不影响公共 IP 访问。
 
 ---
 
-## 相关文件
-
-| 文件 | 说明 |
-|------|------|
-| `scripts/setup-cloudflared.sh` | cloudflared 容器部署脚本（Task 1 产出） |
-| `scripts/check-tunnel.sh` | 隧道健康检查辅助脚本（本任务产出） |
-| 本文档 | 人工操作手册（本任务产出） |
-
----
-
-> **注意**：本指南仅涉及 DNS 和隧道切换操作，不涉及应用代码或 Kubernetes 配置的变更。所有操作完成后，请在 `feature/azure-public-ip-alternative` 分支上记录执行结果。
+> **占位符说明**：本文档中的 `api.example.com` 和 `<tunnel-id>` 仅为占位符，实际操作时请替换为你的真实子域名和 Tunnel UUID。

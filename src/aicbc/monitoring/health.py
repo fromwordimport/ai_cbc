@@ -218,11 +218,18 @@ async def cost_status() -> dict[str, Any]:
     dimensions and the current fuse status.
     """
     from aicbc.cost.fuse import CostFuse
+    from aicbc.cost.tracker import FuseStatus
 
     fuse = CostFuse()
     status, details = fuse.tracker.check_fuse_status()
+    costs = details.get("costs_cny", {})
+    thresholds = details.get("thresholds", {})
     return {
         "fuse_status": status.value,
+        "total_cost_cny": costs.get("global", 0.0),
+        "daily_cost_cny": costs.get("daily", 0.0),
+        "daily_budget_cny": thresholds.get("daily", 0.0),
+        "warning": status != FuseStatus.NORMAL,
         "details": details,
     }
 
