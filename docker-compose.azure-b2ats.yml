@@ -131,8 +131,8 @@ services:
     image: nginx:alpine
     container_name: aicbc-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
     volumes:
       - ./docker/nginx.azure-b2ats.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
