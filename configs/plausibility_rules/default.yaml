@@ -1,0 +1,25 @@
+rules:
+  - id: PLA-001
+    enabled: true
+    severity: hard
+    conditions:
+      life_stage_contains: "学生"
+      living_type_contains: "宿舍"
+      eligibility_not: "not_applicable"
+    message: "学生住宿舍通常无独立厨房和安装条件，请重新考虑该画像是否真会考虑洗碗机，或把需求改为毕业后租房/买房时才会考虑。"
+
+  - id: PLA-002
+    enabled: true
+    severity: hard
+    conditions:
+      income_contains: "3万元以下"
+      eligibility: "actively_considering"
+    message: "年收入 3 万以下画像若 actively_considering 洗碗机，需有明确的借贷、赠礼或合租分摊叙事。"
+
+  - id: PLA-003
+    enabled: true
+    severity: soft
+    conditions:
+      life_stage_contains: "退休"
+      eligibility: "actively_considering"
+    message: "退休独居画像 actively_considering 洗碗机时，需有子女推荐、不想弯腰洗碗等触发事件。"
