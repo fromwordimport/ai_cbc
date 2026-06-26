@@ -1,9 +1,9 @@
 """AuthenticityScorer — rule-based evaluation of persona realism.
 
-Scores across 7 dimensions (0-2 each), total 0-14.
-    >= 12: Excellent
-    >= 9:  Pass
-    < 9:   Needs revision
+Scores across 9 dimensions (0-2 each), total 0-18.
+    >= 15: Excellent
+    >= 10: Pass
+    < 10:  Needs revision
 """
 
 from __future__ import annotations
@@ -11,8 +11,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from aicbc.config.settings import get_settings
 from aicbc.core.models.persona import PersonaProfile
+from aicbc.core.validators.narrative_consistency_checker import NarrativeConsistencyResult
+from aicbc.core.validators.plausibility_models import PlausibilityResult
 
 # ---------------------------------------------------------------------------
 # Result type
@@ -34,17 +35,15 @@ class AuthenticityResult:
     """Complete authenticity scoring result."""
 
     total_score: float
-    max_score: float = 14.0
+    max_score: float = 18.0
     dimensions: list[DimensionScore] = field(default_factory=list)
     passed: bool = False
-    pass_threshold: float = 9.0
-    excellent_threshold: float = 12.0
 
     @property
     def grade(self) -> str:
-        if self.total_score >= self.excellent_threshold:
+        if self.total_score >= 15:
             return "优秀"
-        if self.total_score >= self.pass_threshold:
+        if self.total_score >= 10:
             return "良好"
         if self.total_score >= 6:
             return "一般"
@@ -57,7 +56,7 @@ class AuthenticityResult:
 
 
 class AuthenticityScorer:
-    """Evaluate persona realism via 7 rule-based dimensions.
+    """Evaluate persona realism via 9 rule-based dimensions.
 
     Each dimension scores 0-2:
       0 = severely unrealistic
@@ -98,8 +97,13 @@ class AuthenticityScorer:
         r"量化.*分析",
     ]
 
-    def score(self, persona: PersonaProfile) -> AuthenticityResult:
-        """Run all 7 dimensions and return aggregated result."""
+    def score(
+        self,
+        persona: PersonaProfile,
+        plausibility_result: PlausibilityResult | None = None,
+        narrative_consistency_result: NarrativeConsistencyResult | None = None,
+    ) -> AuthenticityResult:
+        """Run all 9 dimensions and return aggregated result."""
         dimensions: list[DimensionScore] = []
 
         dimensions.append(self._score_internal_consistency(persona))
@@ -109,17 +113,14 @@ class AuthenticityScorer:
         dimensions.append(self._score_temporal_continuity(persona))
         dimensions.append(self._score_language_naturalness(persona))
         dimensions.append(self._score_knowledge_boundary(persona))
+        dimensions.append(self._score_plausibility(persona, plausibility_result))
+        dimensions.append(self._score_narrative_depth(persona))
 
         total = sum(d.score for d in dimensions)
-        settings = get_settings()
-        pass_threshold = settings.authenticity.pass_threshold
-        excellent_threshold = settings.authenticity.excellent_threshold
         return AuthenticityResult(
             total_score=total,
             dimensions=dimensions,
-            passed=total >= pass_threshold,
-            pass_threshold=pass_threshold,
-            excellent_threshold=excellent_threshold,
+            passed=total >= 10,
         )
 
     # ------------------------------------------------------------------
@@ -314,18 +315,25 @@ class AuthenticityScorer:
         defense = l3.defense_mechanism.strip() if l3.defense_mechanism else ""
         has_defense = len(defense) > 5 and "无" not in defense
 
-        if friction_count >= 3 and has_defense:
+        if friction_count >= 1 and has_defense:
             return DimensionScore(
                 name="社会摩擦感",
                 score=2,
                 rationale=f"语言样本中出现{friction_count}处矛盾/犹豫标记，且有明确心理防御机制",
             )
 
-        if friction_count >= 1 or has_defense:
+        if has_defense:
             return DimensionScore(
                 name="社会摩擦感",
                 score=1,
-                rationale="有少量摩擦标记或心理防御机制",
+                rationale="有明确心理防御机制，语言样本摩擦标记较少",
+            )
+
+        if friction_count >= 1:
+            return DimensionScore(
+                name="社会摩擦感",
+                score=1,
+                rationale="有少量摩擦标记但缺少心理防御机制",
             )
 
         return DimensionScore(
@@ -396,8 +404,9 @@ class AuthenticityScorer:
     def _score_language_naturalness(self, persona: PersonaProfile) -> DimensionScore:
         """Real consumers speak colloquially, not in marketing speak.
 
-        Checks: Are language samples free of jargon? Are they fragmented?
-        Do they contain filler words?
+        Checks: Are language samples free of jargon? Do they show sentence variation?
+        We no longer require a specific count of colloquial filler words to avoid
+        keyword stuffing.
         """
         samples = persona.language_samples
         samples_text = " ".join(samples)
@@ -418,26 +427,15 @@ class AuthenticityScorer:
                 rationale="出现1处术语，但整体尚可",
             )
 
-        # Positive: colloquial markers
-        colloquial_markers = ["吧", "呢", "啊", "嘛", "哎", "啦", "其实", "反正", "就是"]
-        colloquial_count = sum(1 for m in colloquial_markers if m in samples_text)
-
-        # Sentence length variation (real speech has short + long)
+        # Positive: sentence length variation (real speech has short + long)
         lengths = [len(s) for s in samples]
         has_variation = max(lengths) - min(lengths) >= 10 if lengths else False
 
-        if colloquial_count >= 3 and has_variation:
+        if has_variation:
             return DimensionScore(
                 name="语言自然度",
                 score=2,
-                rationale="口语化标记丰富，句子长度有变化",
-            )
-
-        if colloquial_count >= 1 or has_variation:
-            return DimensionScore(
-                name="语言自然度",
-                score=1,
-                rationale="有一定口语化特征或长度变化",
+                rationale="句子长度有变化，无营销术语",
             )
 
         return DimensionScore(
@@ -502,4 +500,52 @@ class AuthenticityScorer:
             name="知识边界感",
             score=0,
             rationale="语言过于自信，缺少知识边界感",
+        )
+
+    # ------------------------------------------------------------------
+    # Dimension 8: Plausibility
+    # ------------------------------------------------------------------
+
+    def _score_plausibility(
+        self,
+        persona: PersonaProfile,
+        plausibility_result: PlausibilityResult | None,
+    ) -> DimensionScore:
+        """Persona-product fit must be realistic."""
+        if plausibility_result is None:
+            return DimensionScore(
+                name="情境合理性",
+                score=1,
+                rationale="未提供 plausibility 结果",
+            )
+        if plausibility_result.hard_failed:
+            return DimensionScore(
+                name="情境合理性",
+                score=0,
+                rationale=f"hard 规则失败: {', '.join(f.rule_id for f in plausibility_result.findings if f.severity == 'hard')}",
+            )
+        if plausibility_result.findings:
+            return DimensionScore(name="情境合理性", score=1, rationale="存在 soft 提醒")
+        return DimensionScore(name="情境合理性", score=2, rationale="情境合理")
+
+    # ------------------------------------------------------------------
+    # Dimension 9: Narrative Depth
+    # ------------------------------------------------------------------
+
+    def _score_narrative_depth(self, persona: PersonaProfile) -> DimensionScore:
+        """Mini-biography should have past, present, future with substance."""
+        bio = persona.mini_biography
+        if not bio or not (bio.past and bio.present and bio.future):
+            return DimensionScore(name="叙事深度", score=0, rationale="缺少人物小传")
+        parts = [bio.past, bio.present, bio.future]
+        if all(len(p) >= 10 for p in parts):
+            return DimensionScore(
+                name="叙事深度",
+                score=2,
+                rationale="小传包含过去/现在/未来",
+            )
+        return DimensionScore(
+            name="叙事深度",
+            score=1,
+            rationale="小传存在但部分内容过短",
         )
