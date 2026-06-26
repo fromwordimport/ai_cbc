@@ -87,7 +87,9 @@ class LanguageSampleGenerator:
             scene_text = (
                 f"压力大时：{scenes.under_pressure}\n"
                 f"朋友推荐时：{scenes.friend_recommendation}\n"
-                f"大促限时：{scenes.flash_sale_limited}"
+                f"大促限时：{scenes.flash_sale_limited}\n"
+                f"发现更低价时：{scenes.found_cheaper_elsewhere}\n"
+                f"售后故障时：{scenes.product_fault_after_sales}"
             )
 
         return self._template.format(

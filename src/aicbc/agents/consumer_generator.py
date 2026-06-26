@@ -40,10 +40,10 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
     The agent enforces:
         - Tension-first: every persona must have internally contradictory traits
         - Four-layer coherence: upper layers explain lower-layer anomalies
-        - Authenticity threshold: score >= 9 (configurable)
+        - Authenticity threshold: score >= 10 (configurable)
     """
 
-    DEFAULT_AUTHENTICITY_THRESHOLD = 9.0
+    DEFAULT_AUTHENTICITY_THRESHOLD = 10.0
 
     def __init__(
         self,
@@ -376,13 +376,18 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
 
     def _evaluate(self, profile: PersonaProfile) -> dict[str, Any]:
         """Evaluate a generated persona and return assessment dict."""
-        result = self._scorer.score(profile)
-
         # Derive product context for plausibility check
         derived_context = self._product_deriver.derive(profile)
         plausibility = self._plausibility_validator.validate(profile, derived_context)
 
         narrative_check = self._narrative_checker.check(profile)
+
+        result = self._scorer.score(
+            profile,
+            plausibility_result=plausibility,
+            narrative_consistency_result=narrative_check,
+        )
+
         bias_result = self._bias_auditor.audit(profile)
 
         # Check tension presence

@@ -499,35 +499,15 @@ class ProfileGenerator:
     def _derive_product_context(self, persona: PersonaProfile) -> DerivedProductContext:
         """Derive product context from persona demographics without LLM call.
 
-        Uses the same hard-constraint logic as ProductContextDeriver so that
+        Uses the shared hard-constraint logic from ProductContextDeriver so that
         ProfileGenerator stays within the 5-call pattern (4 layers + 1 aux).
         """
-        from aicbc.core.validators.product_context_deriver import _has_independent_kitchen
+        from aicbc.core.validators.product_context_deriver import evaluate_hard_constraints
         from aicbc.core.validators.product_context_models import DerivedProductContext
 
-        l1 = persona.layer1_demographics
-
-        if "学生" in l1.life_stage and "宿舍" in l1.living_type:
-            return DerivedProductContext(
-                eligibility="not_applicable",
-                reason="学生住宿舍通常无独立厨房和水电安装条件",
-                dishwasher_context=DishwasherContext(
-                    purchase_constraints=["无独立厨房，无法安装"],
-                    decision_factors=[],
-                    ignored_factors=[],
-                ),
-            )
-
-        if not _has_independent_kitchen(l1.living_type):
-            return DerivedProductContext(
-                eligibility="not_applicable",
-                reason=f"居住形态 '{l1.living_type}' 不具备独立厨房",
-                dishwasher_context=DishwasherContext(
-                    purchase_constraints=["无独立厨房，无法安装"],
-                    decision_factors=[],
-                    ignored_factors=[],
-                ),
-            )
+        hard_result = evaluate_hard_constraints(persona)
+        if hard_result is not None:
+            return hard_result
 
         # For all other cases, use the dishwasher_context already populated
         # by _generate_auxiliary().

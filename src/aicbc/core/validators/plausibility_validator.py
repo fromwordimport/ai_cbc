@@ -97,12 +97,13 @@ class PlausibilityValidator:
                     return False
             elif key == "price_above":
                 # Price-threshold rules are not implemented in the initial version.
+                # Conservatively return False so the rule does not match until implemented.
                 logger.warning(
                     "plausibility_condition_not_implemented",
                     key=key,
                     rule_id=rule.get("id"),
                 )
-                continue
+                return False
             else:
                 logger.warning(
                     "plausibility_unknown_condition_key",

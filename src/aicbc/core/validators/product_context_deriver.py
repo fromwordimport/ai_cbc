@@ -24,6 +24,39 @@ def _has_independent_kitchen(living_type: str) -> bool:
     return not any(marker in living_type for marker in impossible)
 
 
+def evaluate_hard_constraints(persona: PersonaProfile) -> DerivedProductContext | None:
+    """Evaluate hard physical constraints; return DerivedProductContext if ineligible, else None.
+
+    This shared function is used by both ProductContextDeriver and ProfileGenerator
+    to ensure consistent hard-constraint evaluation without code duplication.
+    """
+    l1 = persona.layer1_demographics
+
+    if "学生" in l1.life_stage and "宿舍" in l1.living_type:
+        return DerivedProductContext(
+            eligibility="not_applicable",
+            reason="学生住宿舍通常无独立厨房和水电安装条件",
+            dishwasher_context=DishwasherContext(
+                purchase_constraints=["无独立厨房，无法安装"],
+                decision_factors=[],
+                ignored_factors=[],
+            ),
+        )
+
+    if not _has_independent_kitchen(l1.living_type):
+        return DerivedProductContext(
+            eligibility="not_applicable",
+            reason=f"居住形态 '{l1.living_type}' 不具备独立厨房",
+            dishwasher_context=DishwasherContext(
+                purchase_constraints=["无独立厨房，无法安装"],
+                decision_factors=[],
+                ignored_factors=[],
+            ),
+        )
+
+    return None
+
+
 class ProductContextDeriver:
     """Derive whether and how a persona would consider a dishwasher."""
 
@@ -38,30 +71,10 @@ class ProductContextDeriver:
 
     def derive(self, persona: PersonaProfile) -> DerivedProductContext:
         """Return derived product context based on persona reality."""
-        l1 = persona.layer1_demographics
-
         # Hard physical constraints first — no LLM needed.
-        if "学生" in l1.life_stage and "宿舍" in l1.living_type:
-            return DerivedProductContext(
-                eligibility="not_applicable",
-                reason="学生住宿舍通常无独立厨房和水电安装条件",
-                dishwasher_context=DishwasherContext(
-                    purchase_constraints=["无独立厨房，无法安装"],
-                    decision_factors=[],
-                    ignored_factors=[],
-                ),
-            )
-
-        if not _has_independent_kitchen(l1.living_type):
-            return DerivedProductContext(
-                eligibility="not_applicable",
-                reason=f"居住形态 '{l1.living_type}' 不具备独立厨房",
-                dishwasher_context=DishwasherContext(
-                    purchase_constraints=["无独立厨房，无法安装"],
-                    decision_factors=[],
-                    ignored_factors=[],
-                ),
-            )
+        hard_result = evaluate_hard_constraints(persona)
+        if hard_result is not None:
+            return hard_result
 
         # Fall back to LLM for nuanced cases.
         prompt = self._build_prompt(persona)
