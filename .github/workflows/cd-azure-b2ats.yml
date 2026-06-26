@@ -53,52 +53,22 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, azure-b2ats]
     needs: build-push
     environment: azure-b2ats
     outputs:
       image_tag: ${{ needs.build-push.outputs.image_tag }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy on VM
         env:
           IMAGE_TAG: ${{ needs.build-push.outputs.image_tag }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          envs: IMAGE_TAG,GITHUB_TOKEN
-          script_stop: true
-          script: |
-            cd /opt/aicbc
-            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/fromwordimport/ai_cbc.git
-            git fetch origin master
-            git reset --hard origin/master
-            export IMAGE_TAG=${IMAGE_TAG}
-            bash scripts/deploy-to-azure-b2ats.sh
-
-      - name: Verify deployment health
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          script_stop: true
-          script: |
-            cd /opt/aicbc
-            for i in {1..30}; do
-              if docker compose -f docker-compose.azure-b2ats.yml exec -T api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" > /dev/null 2>&1; then
-                echo "部署后健康检查通过"
-                exit 0
-              fi
-              echo "等待 API 健康... ($i/30)"
-              sleep 2
-            done
-            echo "ERROR: 部署后健康检查失败" >&2
-            exit 1
+        run: |
+          cd /opt/aicbc
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/fromwordimport/ai_cbc.git
+          git fetch origin master
+          git reset --hard origin/master
+          export IMAGE_TAG=${IMAGE_TAG}
+          bash scripts/deploy-to-azure-b2ats.sh
 
   deploy-worker:
     runs-on: ubuntu-22.04
