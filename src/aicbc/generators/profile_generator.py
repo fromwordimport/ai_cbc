@@ -262,6 +262,8 @@ class ProfileGenerator:
 
         # Build layer objects (fallbacks already applied inside _generate_layer)
         layer1 = Layer1Demographics(**layer_results[1])
+        if not layer1.life_stage and seed_config.life_stage:
+            layer1.life_stage = seed_config.life_stage
         layer2 = Layer2Behavior(**layer_results[2])
         layer3 = Layer3Psychology(**layer_results[3])
         layer4 = Layer4Scenarios(**layer_results[4])
