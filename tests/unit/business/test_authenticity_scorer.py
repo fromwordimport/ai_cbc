@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
-pytestmark = pytest.mark.unit
-
 from typing import Any
+
+import pytest
 
 from aicbc.core.models.persona import (
     DishwasherContext,
@@ -19,6 +17,8 @@ from aicbc.core.models.persona import (
     TensionCombination,
 )
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
+
+pytestmark = pytest.mark.unit
 
 
 def _make_base_persona(**overrides: Any) -> PersonaProfile:
@@ -79,7 +79,7 @@ def _make_base_persona(**overrides: Any) -> PersonaProfile:
 
 
 class TestAuthenticityScorer:
-    """Tests for the 7-dimension authenticity scorer."""
+    """Tests for the 9-dimension authenticity scorer."""
 
     def test_full_score_on_good_persona(self) -> None:
         """A well-crafted persona should score highly."""
@@ -87,13 +87,13 @@ class TestAuthenticityScorer:
         persona = _make_base_persona()
         result = scorer.score(persona)
 
-        assert result.total_score >= 9  # Should pass
+        assert result.total_score >= 10  # Should pass
         assert result.passed is True
         assert result.grade in ("优秀", "良好")
-        assert len(result.dimensions) == 7
+        assert len(result.dimensions) == 9
 
     def test_each_dimension_has_score(self) -> None:
-        """All 7 dimensions should produce scores."""
+        """All 9 dimensions should produce scores."""
         scorer = AuthenticityScorer()
         persona = _make_base_persona()
         result = scorer.score(persona)
@@ -106,6 +106,8 @@ class TestAuthenticityScorer:
         assert "时间延续性" in names
         assert "语言自然度" in names
         assert "知识边界感" in names
+        assert "情境合理性" in names
+        assert "叙事深度" in names
 
     def test_internal_consistency_zero_on_missing_narrative(self) -> None:
         """Missing tension narrative should score 0 on internal consistency."""
