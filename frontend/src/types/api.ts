@@ -474,6 +474,7 @@ export interface CostStatus {
   daily_cost_cny: number
   daily_budget_cny: number
   warning: boolean
+  details?: Record<string, unknown>
 }
 
 export interface HealthStatus {
@@ -523,10 +524,9 @@ export interface ProviderConfig {
 export interface LLMSettings {
   provider: string
   model: string
-  model_provider?: string
-  model_name?: string
   temperature: number
   max_tokens: number
+  timeout_seconds?: number
   base_url?: string
   api_key?: string
 }
@@ -538,6 +538,13 @@ export interface SystemSettings {
   cost_budget_monthly: number
   pass_threshold: number
   excellent_threshold: number
+  max_score?: number
+  study_defaults?: {
+    n_choice_sets?: number
+    n_alternatives?: number
+    sample_size?: number
+    d_efficiency_target?: number
+  }
 }
 
 export interface AdminSettings {
@@ -566,6 +573,7 @@ export interface AdminSettings {
   authenticity: {
     pass_threshold: number
     excellent_threshold: number
+    max_score?: number
   }
 }
 

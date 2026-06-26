@@ -39,6 +39,30 @@ def _provider_config(provider: str) -> dict[str, Any]:
     }
 
 
+def _validate_authenticity_threshold(
+    name: str, value: Any, max_score: int
+) -> tuple[int | None, str | None]:
+    """Validate an authenticity threshold value.
+
+    Returns (validated_value, error_message). A boolean is rejected because
+    ``bool`` is a subclass of ``int`` in Python.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None, f"{name} must be an integer"
+    if value < 0 or value > max_score:
+        return None, f"{name} must be between 0 and {max_score}"
+    return value, None
+
+
+def _validate_positive_number(name: str, value: Any) -> tuple[float | None, str | None]:
+    """Validate a positive numeric budget value."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None, f"{name} must be a number"
+    if value <= 0:
+        return None, f"{name} must be > 0"
+    return float(value), None
+
+
 @router.get("/admin/settings")
 async def admin_get_settings() -> dict[str, Any]:
     """Return non-sensitive configuration for the frontend settings page.
@@ -83,6 +107,7 @@ async def admin_get_settings() -> dict[str, Any]:
         "authenticity": {
             "pass_threshold": s.authenticity.pass_threshold,
             "excellent_threshold": s.authenticity.excellent_threshold,
+            "max_score": s.authenticity.max_score,
         },
     }
 
@@ -151,11 +176,49 @@ async def admin_update_settings(payload: dict[str, Any]) -> dict[str, Any]:
             object.__setattr__(s.llm, key, value)
             applied[key] = value
         elif key in allowed_authenticity and hasattr(s.authenticity, key):
-            object.__setattr__(s.authenticity, key, value)
-            applied[key] = value
+            validated, err = _validate_authenticity_threshold(
+                key, value, s.authenticity.max_score
+            )
+            if err:
+                rejected[key] = err
+                continue
+            assert validated is not None
+            # Ensure pass_threshold does not exceed excellent_threshold.
+            other_key = (
+                "excellent_threshold" if key == "pass_threshold" else "pass_threshold"
+            )
+            other_value = payload.get(other_key)
+            if other_value is None:
+                other_value = getattr(s.authenticity, other_key)
+            other_validated, _ = _validate_authenticity_threshold(
+                other_key, other_value, s.authenticity.max_score
+            )
+            if other_validated is not None:
+                if key == "pass_threshold" and validated > other_validated:
+                    rejected[key] = "pass_threshold must be <= excellent_threshold"
+                    continue
+                if key == "excellent_threshold" and validated < other_validated:
+                    rejected[key] = "excellent_threshold must be >= pass_threshold"
+                    continue
+            object.__setattr__(s.authenticity, key, validated)
+            applied[key] = validated
         elif key in allowed_study and hasattr(s.study, key):
             object.__setattr__(s.study, key, value)
             applied[key] = value
+        elif key == "cost_budget_daily":
+            cost_validated, cost_err = _validate_positive_number(key, value)
+            if cost_validated is not None:
+                object.__setattr__(s.cost_fuse, "daily_cny", cost_validated)
+                applied[key] = cost_validated
+            elif cost_err:
+                rejected[key] = cost_err
+        elif key == "cost_budget_monthly":
+            cost_validated, cost_err = _validate_positive_number(key, value)
+            if cost_validated is not None:
+                object.__setattr__(s.cost_fuse, "monthly_cny", cost_validated)
+                applied[key] = cost_validated
+            elif cost_err:
+                rejected[key] = cost_err
         else:
             rejected[key] = f"field '{key}' is read-only or not recognized"
 

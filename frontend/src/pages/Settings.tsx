@@ -24,19 +24,12 @@ const PROVIDERS = [
   { key: 'glm', label: '智谱 GLM' },
 ]
 
-const DEFAULT_PROVIDER_MODELS: Record<string, string[]> = {
-  anthropic: ['claude-sonnet-4-6', 'claude-haiku-4-5'],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
-  qwen: ['qwen-max'],
-  glm: ['glm-4'],
-}
-
 const DEFAULT_LLM: LLMSettings = {
   provider: 'anthropic',
   model: '',
   temperature: 0.7,
   max_tokens: 4096,
+  timeout_seconds: 120,
 }
 
 const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
@@ -47,12 +40,21 @@ const DEFAULT_PROVIDERS: Record<string, ProviderConfig> = {
   glm: { enabled: false, api_key_set: false, base_url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
 }
 
+const DEFAULT_STUDY_DEFAULTS: SystemSettings['study_defaults'] = {
+  n_choice_sets: 12,
+  n_alternatives: 3,
+  sample_size: 150,
+  d_efficiency_target: 0.85,
+}
+
 const DEFAULT_SYSTEM: SystemSettings = {
   llm: DEFAULT_LLM,
-  cost_budget_daily: 50.0,
-  cost_budget_monthly: 1000.0,
+  cost_budget_daily: 1000.0,
+  cost_budget_monthly: 20000.0,
   pass_threshold: 9,
   excellent_threshold: 12,
+  max_score: 14,
+  study_defaults: DEFAULT_STUDY_DEFAULTS,
 }
 
 const SETTINGS_STORAGE_KEY = 'aicbc_settings'
@@ -84,12 +86,18 @@ function mergeBackendSettings(local: SystemSettings, backend: AdminSettings): Sy
       model: backend.llm?.model ?? local.llm.model,
       temperature: backend.llm?.temperature ?? local.llm.temperature,
       max_tokens: backend.llm?.max_tokens ?? local.llm.max_tokens,
+      timeout_seconds: backend.llm?.timeout_seconds ?? local.llm.timeout_seconds,
     },
     providers,
     cost_budget_daily: backend.cost_fuse?.daily_cny ?? local.cost_budget_daily,
     cost_budget_monthly: backend.cost_fuse?.monthly_cny ?? local.cost_budget_monthly,
     pass_threshold: backend.authenticity?.pass_threshold ?? local.pass_threshold,
     excellent_threshold: backend.authenticity?.excellent_threshold ?? local.excellent_threshold,
+    max_score: backend.authenticity?.max_score ?? local.max_score ?? 14,
+    study_defaults: {
+      ...local.study_defaults,
+      ...backend.study_defaults,
+    },
   }
 }
 
@@ -163,9 +171,13 @@ const Settings: React.FC = () => {
         llm_model: settings.llm.model,
         temperature: settings.llm.temperature,
         max_tokens: settings.llm.max_tokens,
+        timeout_seconds: settings.llm.timeout_seconds,
         providers: providersPayload,
         pass_threshold: settings.pass_threshold,
         excellent_threshold: settings.excellent_threshold,
+        cost_budget_daily: settings.cost_budget_daily,
+        cost_budget_monthly: settings.cost_budget_monthly,
+        ...settings.study_defaults,
       }
       const apiResult = await updateAdminSettings(payload)
       saveToLocal(settings)
@@ -196,7 +208,9 @@ const Settings: React.FC = () => {
   }
 
   const providers = settings.providers ?? DEFAULT_PROVIDERS
-  const activeModels = DEFAULT_PROVIDER_MODELS[settings.llm.provider] ?? []
+  const activeModels = backendSettings?.available_models
+    ? Object.values(backendSettings.available_models[settings.llm.provider] ?? {})
+    : []
 
   return (
     <div>
@@ -276,10 +290,15 @@ const Settings: React.FC = () => {
         <Descriptions size="small" bordered column={1} style={{ marginBottom: 16 }}>
           <Descriptions.Item label="当前模型提供商">
             <Select value={settings.llm.provider} style={{ width: 200 }}
-              onChange={(v) => setSettings((prev) => ({
-                ...prev,
-                llm: { ...prev.llm, provider: v, model: DEFAULT_PROVIDER_MODELS[v]?.[0] ?? '' },
-              }))}>
+              onChange={(v) => setSettings((prev) => {
+                const models = backendSettings?.available_models
+                  ? Object.values(backendSettings.available_models[v] ?? {})
+                  : []
+                return {
+                  ...prev,
+                  llm: { ...prev.llm, provider: v, model: models[0] ?? '' },
+                }
+              })}>
               {PROVIDERS.map((p) => (
                 <Option key={p.key} value={p.key}>{p.label}</Option>
               ))}
@@ -301,6 +320,10 @@ const Settings: React.FC = () => {
           <Descriptions.Item label="最大 Token 数">
             <InputNumber min={256} max={32768} step={256} value={settings.llm.max_tokens}
               onChange={(v) => setSettings((prev) => ({ ...prev, llm: { ...prev.llm, max_tokens: v ?? 4096 } }))} />
+          </Descriptions.Item>
+          <Descriptions.Item label="请求超时 (秒)">
+            <InputNumber min={5} max={600} step={5} value={settings.llm.timeout_seconds}
+              onChange={(v) => setSettings((prev) => ({ ...prev, llm: { ...prev.llm, timeout_seconds: v ?? 120 } }))} />
           </Descriptions.Item>
         </Descriptions>
 
@@ -360,12 +383,44 @@ const Settings: React.FC = () => {
               onChange={(v) => setSettings((prev) => ({ ...prev, cost_budget_monthly: v ?? 1000 }))} prefix="¥" />
           </Descriptions.Item>
           <Descriptions.Item label="真实性通过阈值">
-            <InputNumber min={0} max={20} step={1} value={settings.pass_threshold}
+            <InputNumber min={0} max={settings.max_score ?? 14} step={1} value={settings.pass_threshold}
               onChange={(v) => setSettings((prev) => ({ ...prev, pass_threshold: v ?? 9 }))} />
           </Descriptions.Item>
           <Descriptions.Item label="真实性优秀阈值">
-            <InputNumber min={0} max={20} step={1} value={settings.excellent_threshold}
+            <InputNumber min={0} max={settings.max_score ?? 14} step={1} value={settings.excellent_threshold}
               onChange={(v) => setSettings((prev) => ({ ...prev, excellent_threshold: v ?? 12 }))} />
+          </Descriptions.Item>
+        </Descriptions>
+
+        <Divider orientation="left">实验默认参数</Divider>
+        <Descriptions size="small" bordered column={1} style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="默认选择集数">
+            <InputNumber min={1} max={50} step={1} value={settings.study_defaults?.n_choice_sets}
+              onChange={(v) => setSettings((prev) => ({
+                ...prev,
+                study_defaults: { ...prev.study_defaults, n_choice_sets: v ?? 12 },
+              }))} />
+          </Descriptions.Item>
+          <Descriptions.Item label="默认选项数">
+            <InputNumber min={2} max={10} step={1} value={settings.study_defaults?.n_alternatives}
+              onChange={(v) => setSettings((prev) => ({
+                ...prev,
+                study_defaults: { ...prev.study_defaults, n_alternatives: v ?? 3 },
+              }))} />
+          </Descriptions.Item>
+          <Descriptions.Item label="默认样本量">
+            <InputNumber min={1} max={10000} step={10} value={settings.study_defaults?.sample_size}
+              onChange={(v) => setSettings((prev) => ({
+                ...prev,
+                study_defaults: { ...prev.study_defaults, sample_size: v ?? 150 },
+              }))} />
+          </Descriptions.Item>
+          <Descriptions.Item label="D-efficiency 目标">
+            <InputNumber min={0.1} max={1.0} step={0.01} value={settings.study_defaults?.d_efficiency_target}
+              onChange={(v) => setSettings((prev) => ({
+                ...prev,
+                study_defaults: { ...prev.study_defaults, d_efficiency_target: v ?? 0.85 },
+              }))} />
           </Descriptions.Item>
         </Descriptions>
 

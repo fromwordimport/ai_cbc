@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from aicbc.config.settings import get_settings
 from aicbc.core.models.persona import PersonaProfile
 
 # ---------------------------------------------------------------------------
@@ -36,12 +37,14 @@ class AuthenticityResult:
     max_score: float = 14.0
     dimensions: list[DimensionScore] = field(default_factory=list)
     passed: bool = False
+    pass_threshold: float = 9.0
+    excellent_threshold: float = 12.0
 
     @property
     def grade(self) -> str:
-        if self.total_score >= 12:
+        if self.total_score >= self.excellent_threshold:
             return "优秀"
-        if self.total_score >= 9:
+        if self.total_score >= self.pass_threshold:
             return "良好"
         if self.total_score >= 6:
             return "一般"
@@ -108,10 +111,15 @@ class AuthenticityScorer:
         dimensions.append(self._score_knowledge_boundary(persona))
 
         total = sum(d.score for d in dimensions)
+        settings = get_settings()
+        pass_threshold = settings.authenticity.pass_threshold
+        excellent_threshold = settings.authenticity.excellent_threshold
         return AuthenticityResult(
             total_score=total,
             dimensions=dimensions,
-            passed=total >= 9,
+            passed=total >= pass_threshold,
+            pass_threshold=pass_threshold,
+            excellent_threshold=excellent_threshold,
         )
 
     # ------------------------------------------------------------------
