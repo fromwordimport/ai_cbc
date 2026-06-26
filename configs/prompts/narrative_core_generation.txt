@@ -1,0 +1,29 @@
+基于以下四层消费者画像，生成一段人物小传和五个关键场景反应。
+
+人口统计: {layer1_summary}
+行为: {decision_style}, 价格敏感度{price_sensitivity}
+心理: 价值观{core_values}, 焦虑{core_anxieties}, 张力[{tension_labels}]: {tension_narrative}
+秘密动机: {secret_motivation}, 防御机制: {defense_mechanism}
+情境: {daily_routine}; 触发{purchase_trigger}; 压力{stress_response}
+
+要求:
+1. 小传【过去】写一个具体事件，解释当前消费观的来源。
+2. 小传【现在】描述典型一周的消费节奏。
+3. 小传【未来】写一个即将到来的转变及其消费含义。
+4. 场景反应必须是该人物在具体瞬间会怎么做，不要抽象。
+
+严格返回 JSON，不要 Markdown 代码块:
+{{
+  "mini_biography": {{
+    "past": "...",
+    "present": "...",
+    "future": "..."
+  }},
+  "scene_reactions": {{
+    "under_pressure": "...",
+    "friend_recommendation": "...",
+    "flash_sale_limited": "...",
+    "found_cheaper_elsewhere": "...",
+    "product_fault_after_sales": "..."
+  }}
+}}
