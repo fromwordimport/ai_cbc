@@ -1,0 +1,21 @@
+基于以下消费者画像，判断该人物对洗碗机的真实购买可能性，并给出购买情境。
+
+人生阶段: {life_stage}
+居住形态: {living_type}
+收入: {income}
+家庭结构: {marital_status}
+价格敏感度: {price_sensitivity}
+决策风格: {decision_style}
+日常轨迹: {daily_routine}
+购买触发: {purchase_trigger}
+
+请严格返回以下 JSON，不要包含 Markdown 代码块：
+{{
+  "eligibility": "not_applicable" | "latent_need" | "actively_considering",
+  "reason": "简短理由",
+  "dishwasher_context": {{
+    "purchase_constraints": ["约束1"],
+    "decision_factors": ["因素1"],
+    "ignored_factors": ["忽略1"]
+  }}
+}}
