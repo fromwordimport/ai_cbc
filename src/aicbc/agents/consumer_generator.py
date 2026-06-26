@@ -166,15 +166,7 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
     # Core execution
     # ------------------------------------------------------------------
 
-    def execute(
-        self,
-        study_id: str,
-        index: int,
-        life_stage: str | None = None,
-        anxieties: list[str] | None = None,
-        seed: int | None = None,
-        feedback: str = "",
-    ) -> PersonaProfile:
+    def execute(self, **kwargs: Any) -> PersonaProfile:
         """Generate a single persona with optional correction feedback.
 
         Args:
@@ -188,6 +180,13 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
         Returns:
             Generated PersonaProfile.
         """
+        study_id: str = kwargs["study_id"]
+        index: int = kwargs["index"]
+        life_stage: str | None = kwargs.get("life_stage")
+        anxieties: list[str] | None = kwargs.get("anxieties")
+        seed: int | None = kwargs.get("seed")
+        feedback: str = kwargs.get("feedback", "")
+
         persona_id = f"persona-{study_id}-{index:04d}"
         log = self._log.bind(persona_id=persona_id)
 
@@ -204,7 +203,7 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             log.info("generation_with_feedback", feedback_preview=feedback[:100])
 
         # Generate profile — pass feedback for correction-aware regeneration
-        profile = self.call_tool(
+        profile: PersonaProfile = self.call_tool(
             "generate_profile",
             persona_id=persona_id,
             seed_config=seed_config,
@@ -260,7 +259,7 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
     ) -> list:
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def _bounded_generate(index: int):
+        async def _bounded_generate(index: int) -> tuple[int, tuple[PersonaProfile, AgentState]]:
             async with semaphore:
                 return index, await asyncio.to_thread(
                     self.generate_single,
