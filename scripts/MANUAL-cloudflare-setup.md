@@ -103,9 +103,10 @@
 完成上述人工配置后，继续执行以下自动化步骤：
 
 1. 在 Azure VM 上运行 `scripts/setup-cloudflared.sh` 启动 cloudflared 容器。
-2. 在 Cloudflare DNS 中将原有的 `A` 记录（指向 Azure 公共 IP）改为 `CNAME` 记录，指向 `<TUNNEL_ID>.cfargotunnel.com`。
-3. 验证 `api.example.com` 可通过 Cloudflare Tunnel 正常访问。
-4. 确认无误后，在 Azure 门户中解绑并删除 VM 的公共 IP。
+2. **降低 DNS TTL**：在 Cloudflare DNS 记录页面，找到目标子域名（如 `api`）的现有 `A` 记录，将其 **TTL** 修改为 **300 秒**（或更低，如 1 分钟/Auto）。保存后等待旧 TTL 过期（例如原 TTL 为 1 小时，则需等待最多 1 小时），以确保全球 DNS 缓存已刷新。
+3. 在 Cloudflare DNS 中将原有的 `A` 记录（指向 Azure 公共 IP）改为 `CNAME` 记录，指向 `<TUNNEL_ID>.cfargotunnel.com`。
+4. 验证 `api.example.com` 可通过 Cloudflare Tunnel 正常访问。
+5. 确认无误后，在 Azure 门户中解绑并删除 VM 的公共 IP。
 
 ## 回滚信息
 
@@ -117,3 +118,5 @@
 ---
 
 > **注意**：本手册中的 `example.com` 仅为占位符，实际操作时请替换为你的真实域名。
+
+> **平台限制**：`scripts/setup-cloudflared.sh` 使用 `--network host` 模式，该模式仅在 Linux 环境下可用。本脚本专为 **Azure B2ats v2 Linux VM** 设计，**不支持 Windows Docker Desktop**。若在 Windows 上运行，需改用 `host.docker.internal` 或 `bridge` 网络模式并手动映射端口。
