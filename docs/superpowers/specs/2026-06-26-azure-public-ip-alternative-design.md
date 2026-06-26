@@ -175,11 +175,110 @@ Azure 对没有公共 IP 的 VM 提供「默认出站访问」（Default Outboun
   2. 将 DNS `CNAME` 改回 `A` 记录。
   3. 恢复原有 Nginx + Certbot 配置。
 
+### 4.4 默认出站访问不可用时的免费 fallback 方案
+
+如果 Azure 默认出站访问已被禁用，Cloudflare Tunnel 本身也无法建立连接（`cloudflared` 需要访问 `*.argotunnel.com` 和 Cloudflare 边缘）。此时需要额外的免费出站方案。以下是按推荐度排序的备选：
+
+#### 方案 F1：Cloudflare WARP / Cloudflare One（推荐）
+
+在 VM 上安装 **Cloudflare One Client（WARP）**，将 VM 作为 headless 设备加入 Cloudflare Zero Trust 团队。Zero Trust 免费计划支持最多 50 个用户/设备，无带宽限制，无需 Azure 公共 IP 即可让 VM 出站。
+
+实施要点：
+
+1. 在 Cloudflare Zero Trust 控制台创建 service token。
+2. 配置 device enrollment 策略，允许该 service token。
+3. 在 VM 上安装 WARP 客户端：
+
+   ```bash
+   curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | \
+     sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] \
+     https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | \
+     sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+   sudo apt update && sudo apt install cloudflare-warp
+   ```
+
+4. 创建 MDM 配置文件 `/var/lib/cloudflare-warp/mdm.xml`：
+
+   ```xml
+   <dict>
+     <key>auth_client_id</key>
+     <string>YOUR_CLIENT_ID</string>
+     <key>auth_client_secret</key>
+     <string>YOUR_CLIENT_SECRET</string>
+     <key>organization</key>
+     <string>your-team-name</string>
+     <key>auto_connect</key>
+     <integer>1</integer>
+     <key>service_mode</key>
+     <string>warp</string>
+     <key>onboarding</key>
+     <false/>
+   </dict>
+   ```
+
+5. 启用并启动服务：
+
+   ```bash
+   sudo systemctl enable --now warp-svc
+   warp-cli connect
+   ```
+
+6. 验证：
+
+   ```bash
+   curl https://www.cloudflare.com/cdn-cgi/trace
+   # 期望看到 warp=on
+   ```
+
+7. 确保 Docker 流量也走 WARP。如果默认路由未覆盖 Docker 网桥，可配置 Docker daemon 使用系统代理，或让 WARP 作为默认网关。
+
+注意事项：
+
+- 必须使用 **Cloudflare Zero Trust** 免费计划，而不是 consumer WARP。服务器通过 consumer WARP 出站可能违反服务条款。
+- WARP 是 0 成本方案，但会引入少量额外延迟。
+
+#### 方案 F2：Cloudflare WARP Connector
+
+如果未来需要把整个 Azure 子网都接入 Cloudflare，可使用 **WARP Connector**（2026 年已 GA）。它本质上是 site-to-site VPN，允许子网内所有设备通过 Cloudflare 网络出站，也包含在 Zero Trust 免费计划中。当前单 VM 场景下，F1 更简单。
+
+#### 方案 F3：第三方免费云 + WireGuard/Tailscale 网关
+
+如果已有或愿意注册其他云平台的免费套餐（如 **Oracle Cloud Free Tier** 提供 2 个免费 AMD VM + 免费公共 IP），可在该平台创建一台 tiny gateway，然后：
+
+- 在 Azure VM 和 gateway 之间建立 **WireGuard** 或 **Tailscale** 隧道。
+- 将 gateway 配置为 exit node / NAT 出口。
+- Azure VM 的默认路由指向该隧道，从而通过 gateway 免费出网。
+
+该方案 0 成本，但需要维护第二朵云的基础设施，复杂度高于 F1。
+
+#### 方案 F4：通过 Azure Run Command 推送部署包（有限适用）
+
+如果 VM 完全不能出网，可让 GitHub Actions 在构建阶段把 Docker 镜像导出为 tar，再尝试通过 Azure Run Command 传入 VM 并导入。但 Azure Run Command 对输入脚本大小有限制，大镜像分片传递不可靠，**仅作为极端情况下的临时手段**，不推荐作为常规方案。
+
+### 4.5 出站验证扩展
+
+若 4.2 验证失败（默认出站访问不可用），则继续验证 F1：
+
+1. 重新绑定公共 IP，安装并配置 Cloudflare WARP（F1）。
+2. 解绑公共 IP。
+3. 执行以下测试：
+
+   ```bash
+   curl -I https://cloudflare.com
+   docker pull ghcr.io/fromwordimport/ai_cbc:latest
+   git fetch origin master
+   cloudflared tunnel --no-autoupdate run --token $TUNNEL_TOKEN
+   ```
+
+4. 如果 WARP 能提供稳定出站且 Tunnel 正常建立，则 F1 成立，可继续实施。
+5. 如果 F1 也不可行，则进入 F3（第三方免费云网关）评估，或接受无法在当前约束下实现 0 成本的事实。
+
 ## 5. 风险与应对
 
 | 风险 | 影响 | 应对 |
 |---|---|---|
-| Azure 默认出站访问不可用 | VM 无法拉镜像/同步代码，方案不可行 | 前置验证；失败即回滚，维持现状 |
+| Azure 默认出站访问不可用 | VM 无法拉镜像/同步代码，方案不可行 | 前置验证；启用 Cloudflare WARP/One 或第三方免费网关；仍失败则维持现状 |
 | Cloudflare Tunnel 连接中断 | 外部无法访问服务 | 双轨 CI/CD 仍可在 VM 内工作；快速切回公共 IP |
 | Azure Run Command 权限配置复杂 | 备用部署路径失败 | 以 self-hosted runner 为主，Run Command 仅作冗余；提前配置服务主体 |
 | 域名/证书切换窗口服务闪断 | 用户短暂无法访问 | 低 TTL + 非高峰时段执行 |
@@ -210,3 +309,5 @@ Azure 对没有公共 IP 的 VM 提供「默认出站访问」（Default Outboun
 - [Cloudflare Origin CA certificates](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/)
 - [Azure 默认出站访问](https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/default-outbound-access)
 - [Azure Run Command 文档](https://learn.microsoft.com/en-us/azure/virtual-machines/run-command-overview)
+- [Deploy the Cloudflare One Client on headless Linux machines](https://developers.cloudflare.com/cloudflare-one/tutorials/deploy-client-headless-linux/)
+- [Cloudflare WARP Linux client docs](https://developers.cloudflare.com/warp-client/get-started/linux/)
