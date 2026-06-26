@@ -31,9 +31,11 @@ class PlausibilityValidator:
         with self._rules_path.open("r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
         if not isinstance(data, dict):
+            logger.warning("plausibility_rules_invalid_format", reason="top_level_not_mapping")
             return []
         rules = data.get("rules", [])
         if not isinstance(rules, list):
+            logger.warning("plausibility_rules_invalid_format", reason="rules_not_list")
             return []
         return [rule for rule in rules if isinstance(rule, dict)]
 
@@ -95,5 +97,17 @@ class PlausibilityValidator:
                     return False
             elif key == "price_above":
                 # Price-threshold rules are not implemented in the initial version.
+                logger.warning(
+                    "plausibility_condition_not_implemented",
+                    key=key,
+                    rule_id=rule.get("id"),
+                )
+                continue
+            else:
+                logger.warning(
+                    "plausibility_unknown_condition_key",
+                    key=key,
+                    rule_id=rule.get("id"),
+                )
                 continue
         return True
