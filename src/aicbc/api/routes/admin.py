@@ -176,17 +176,13 @@ async def admin_update_settings(payload: dict[str, Any]) -> dict[str, Any]:
             object.__setattr__(s.llm, key, value)
             applied[key] = value
         elif key in allowed_authenticity and hasattr(s.authenticity, key):
-            validated, err = _validate_authenticity_threshold(
-                key, value, s.authenticity.max_score
-            )
+            validated, err = _validate_authenticity_threshold(key, value, s.authenticity.max_score)
             if err:
                 rejected[key] = err
                 continue
             assert validated is not None
             # Ensure pass_threshold does not exceed excellent_threshold.
-            other_key = (
-                "excellent_threshold" if key == "pass_threshold" else "pass_threshold"
-            )
+            other_key = "excellent_threshold" if key == "pass_threshold" else "pass_threshold"
             other_value = payload.get(other_key)
             if other_value is None:
                 other_value = getattr(s.authenticity, other_key)
