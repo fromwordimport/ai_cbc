@@ -20,6 +20,9 @@ from aicbc.agents.base import (
 from aicbc.core.models.persona import PersonaProfile
 from aicbc.core.scoring.authenticity_scorer import AuthenticityScorer
 from aicbc.core.scoring.bias_auditor import BiasAuditor
+from aicbc.core.validators.narrative_consistency_checker import NarrativeConsistencyChecker
+from aicbc.core.validators.plausibility_validator import PlausibilityValidator
+from aicbc.core.validators.product_context_deriver import ProductContextDeriver
 from aicbc.generators.profile_generator import ProfileGenerator
 from aicbc.generators.seed_generator import SeedGenerator
 
@@ -122,6 +125,9 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
         self._seed_gen = seed_generator or SeedGenerator()
         self._scorer = AuthenticityScorer()
         self._bias_auditor = BiasAuditor()  # Task 3: bias-driven self-correction
+        self._product_deriver = ProductContextDeriver()
+        self._plausibility_validator = PlausibilityValidator()
+        self._narrative_checker = NarrativeConsistencyChecker()
         self._threshold = authenticity_threshold
 
         # Register tools with permission tags (SEC-009)
@@ -150,7 +156,7 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             self._scorer.score,
             ToolSpec(
                 name="score_authenticity",
-                description="Score persona authenticity (0-14)",
+                description="Score persona authenticity (0-18)",
                 parameters={"persona": "PersonaProfile"},
                 permission_tags=["scoring"],
             ),
@@ -373,7 +379,11 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
         """Evaluate a generated persona and return assessment dict."""
         result = self._scorer.score(profile)
 
-        # Bias audit (Task 3)
+        # Derive product context for plausibility check
+        derived_context = self._product_deriver.derive(profile)
+        plausibility = self._plausibility_validator.validate(profile, derived_context)
+
+        narrative_check = self._narrative_checker.check(profile)
         bias_result = self._bias_auditor.audit(profile)
 
         # Check tension presence
@@ -398,6 +408,11 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
             "bias_high_count": bias_result.high_severity_count,
             "bias_total_findings": len(bias_result.findings),
             "bias_result": bias_result,
+            "plausibility_hard_failed": plausibility.hard_failed,
+            "plausibility_findings": plausibility.findings,
+            "plausibility_passed": plausibility.passed,
+            "narrative_under_explained": len(narrative_check.unexplained_tags) >= 2,
+            "narrative_unexplained_tags": narrative_check.unexplained_tags,
         }
 
     def _should_correct(self, evaluation: dict[str, Any]) -> tuple[bool, str]:
@@ -405,11 +420,13 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
 
         Returns (should_correct: bool, feedback: str).
 
-        Triggers re-generation on:
-          - Authenticity score below threshold
-          - Missing tension combination
-          - Narrative too short
-          - CRITICAL bias status (FAILED) or >=1 HIGH bias finding
+        Hard gates (in order):
+          - Bias: FAILED or any HIGH finding
+          - Plausibility: any hard rule failure
+          - Narrative consistency: 2+ unexplained key tags
+
+        Soft gate (severe authenticity only):
+          - Authenticity score < 6
         """
         # Bias check first (most important — biased output must be re-generated)
         bias_status = evaluation.get("bias_status", "PENDING")
@@ -421,9 +438,23 @@ class ConsumerGeneratorAgent(BaseAgent[PersonaProfile]):
                 f"总发现={bias_findings})—请重新生成并避免刻板印象"
             )
 
+        # Plausibility hard failure
+        if evaluation.get("plausibility_hard_failed", False):
+            findings = evaluation.get("plausibility_findings", [])
+            messages = "; ".join(
+                f"{f.rule_id}: {f.message}" for f in findings if f.severity == "hard"
+            )
+            return True, f"情境不合理，请修正: {messages}"
+
+        # Narrative under-explained
+        if evaluation.get("narrative_under_explained", False):
+            tags = evaluation.get("narrative_unexplained_tags", [])
+            return True, f"人物小传未能解释以下关键标签: {', '.join(tags)}"
+
+        # Severe authenticity only
         score = evaluation.get("authenticity_score", 0)
-        if score < self._threshold:
-            return True, f"真实性评分{score}低于阈值{self._threshold}"
+        if score < 6:
+            return True, f"真实性评分{score}明显偏低，请提升画像真实感"
 
         if not evaluation.get("has_tension", False):
             return True, "缺少张力组合（矛盾特质）"
