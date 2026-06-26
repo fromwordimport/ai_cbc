@@ -73,15 +73,32 @@ docker logs --tail 50 cloudflared
 
 ## Step 4：切换 DNS 记录
 
-在同一 Cloudflare Dashboard 页面：
+在同一 Cloudflare Dashboard 页面，**优先使用编辑方式**，避免删除 A 记录导致服务中断：
 
-1. **删除**（或编辑）现有的 `api.example.com` A 记录（指向 Azure 公共 IP）。
-2. **新建**一条 `api.example.com` 记录：
-   - **类型**：`CNAME`
+### 推荐方式：直接编辑 A 记录为 CNAME
+
+1. 找到现有的 `api.example.com` A 记录（指向 Azure 公共 IP）。
+2. **编辑**该记录：
+   - **类型**：改为 `CNAME`
    - **目标**：`<tunnel-id>.cfargotunnel.com`（将 `<tunnel-id>` 替换为 Task 1 中创建的 Tunnel ID）
    - **代理状态**：**已代理**（橙色云图标，即 Proxy status = Enabled）
    - **TTL**：Auto（或保持 300 秒）
 3. 保存。
+
+> **警告**：在确认隧道状态为 `Active` 之前，**不要删除 A 记录**。删除后若隧道未就绪，将立即失去入口，导致服务完全不可访问。
+
+### 备选方式：删除后新建（仅当 DNS 提供商不支持 A 改 CNAME 时）
+
+若你的 DNS 提供商或 Cloudflare Dashboard 不支持将 A 记录直接编辑为 CNAME，请按以下顺序操作：
+
+1. **先确认隧道状态**：执行 `bash scripts/check-tunnel.sh`，确认日志中包含 `Registered tunnel connection` 和 `Active`。
+2. **删除**现有的 `api.example.com` A 记录（指向 Azure 公共 IP）。
+3. **新建**一条 `api.example.com` 记录：
+   - **类型**：`CNAME`
+   - **目标**：`<tunnel-id>.cfargotunnel.com`
+   - **代理状态**：**已代理**（橙色云图标）
+   - **TTL**：Auto（或保持 300 秒）
+4. 保存。
 
 ---
 
