@@ -6,6 +6,19 @@
 
 ---
 
+## 0. 降低 DNS TTL（如目标域名指向该公共 IP）
+
+如果计划后续将域名解析迁移至 Cloudflare Tunnel（Task 5），在解绑公共 IP 之前应先降低 DNS TTL：
+
+1. 登录域名 DNS 服务商控制台。
+2. 找到指向该 VM 公共 IP 的子域名记录。
+3. 将 TTL 修改为 **300 秒或更低**（例如 60 秒）。
+4. **等待旧 TTL 过期**后再继续下一步（例如旧 TTL 为 3600 秒，则需等待至少 1 小时）。
+
+> **注意**：TTL 未过期时，全球 DNS 缓存仍可能解析到旧公共 IP，导致切换后部分用户无法访问。
+
+---
+
 ## 1. 临时解绑公共 IP（Azure 门户）
 
 1. 登录 [Azure 门户](https://portal.azure.com)。
@@ -25,7 +38,7 @@
 
 - **Azure Serial Console**（推荐）：  
   VM 页面 → **Help** → **Serial console**。基于 Azure 管理平面，不依赖公共 IP。
-- **Azure Bastion**：如果已部署且不想额外付费，可临时使用；否则优先 Serial Console。
+- **Azure Bastion**：这是 Azure 的付费服务；如果当前已部署且费用可接受，可临时使用；否则优先使用 Serial Console。
 - **其他私有通道**：如已有 VPN、ExpressRoute、或另一台同 VNet 的跳板机。
 
 ---
